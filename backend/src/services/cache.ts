@@ -139,6 +139,7 @@ class CacheService {
       console.log(`Found ${subDeckCaches.length} sub-deck cache(s) for parent deck "${deckName}"`);
       const allNotes: Note[] = [];
       let oldestTimestamp: string | null = null;
+      let oldestSyncTimestamp: number | undefined = undefined;
 
       for (const subDeck of subDeckCaches) {
         const subCache = await this.getCachedNotes(subDeck);
@@ -146,6 +147,12 @@ class CacheService {
           allNotes.push(...subCache.notes);
           if (!oldestTimestamp || subCache.timestamp < oldestTimestamp) {
             oldestTimestamp = subCache.timestamp;
+          }
+          // Track the oldest sync timestamp to enable incremental sync for parent deck
+          if (subCache.lastSyncTimestamp) {
+            if (oldestSyncTimestamp === undefined || subCache.lastSyncTimestamp < oldestSyncTimestamp) {
+              oldestSyncTimestamp = subCache.lastSyncTimestamp;
+            }
           }
         }
       }
@@ -160,6 +167,7 @@ class CacheService {
         notes: allNotes,
         timestamp: oldestTimestamp || new Date().toISOString(),
         count: allNotes.length,
+        lastSyncTimestamp: oldestSyncTimestamp,
       };
     } catch (error) {
       console.log(`Error loading cache for deck "${deckName}":`, error);
