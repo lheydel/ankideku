@@ -1,6 +1,6 @@
 # AnkiDeku Development TODO
 
-**Last Updated**: 2025-01-22
+**Last Updated**: 2025-11-22
 
 ---
 
@@ -11,7 +11,7 @@
 - [x] **Project Setup**
   - [x] Initialize Node.js backend with Express
   - [x] Initialize React frontend with Vite + Tailwind CSS
-  - [x] Configure project structure (backend/, frontend/, revisions/)
+  - [x] Configure project structure (backend/, frontend/, database/)
   - [x] Install dependencies (axios, cors, zustand, diff-match-patch)
 
 - [x] **AnkiConnect Service Layer**
@@ -42,10 +42,10 @@
 
 - [x] **UI Components - Initial**
   - [x] DeckSelector component (with connection error handling)
-  - [x] PromptInput component (with history and examples)
   - [x] Queue component (sidebar with progress)
   - [x] Main App layout (header + two-view structure)
-  - [x] Mock suggestion generation (placeholder for AI)
+  - [x] Chat-based AI Assistant sidebar
+  - [x] Session selector UI
 
 - [x] **Comparison View Component**
   - [x] Display original vs suggested side-by-side
@@ -62,6 +62,7 @@
   - [x] Success/error notifications (toast system)
   - [x] Update Anki via API on accept
   - [x] Track actions in history
+  - [x] Remove accepted/rejected cards from queue
 
 - [x] **TypeScript Conversion**
   - [x] Convert backend to TypeScript (.js → .ts)
@@ -71,14 +72,17 @@
   - [x] Add TypeScript config files (tsconfig.json)
   - [x] Update imports and fix type errors
   - [x] Test compilation and runtime with TypeScript
+  - [x] Shared type contract (contract/types.ts)
 
 - [x] **Filesystem Cache System**
   - [x] Implement cache service (backend/src/services/cache.ts)
-  - [x] Cache deck notes to JSON files (cache/decks/)
+  - [x] Cache deck notes to JSON files (database/decks/)
   - [x] Cache-first loading strategy
   - [x] Manual sync endpoint for refreshing cache
   - [x] Auto-update cache when accepting changes
   - [x] Batch fetching from Anki (100 cards at a time)
+  - [x] Background incremental sync using edited:N query
+  - [x] Hierarchical caching with sub-deck support
 
 - [x] **UI Redesign - Single Page Layout**
   - [x] Remove welcome/setup page
@@ -87,12 +91,17 @@
   - [x] Processing progress display in sidebar
   - [x] Multiline textarea with Shift+Enter for new line
   - [x] Hideable sidebar with toggle button
+  - [x] Dark theme support with persistent preference
 
 - [x] **Queue Enhancement**
   - [x] Two tabs: Queue and History
   - [x] Search functionality for both tabs
   - [x] Color-coded history items (green=accept, red=reject, gray=skip)
   - [x] Display field configuration per note type
+  - [x] Click to navigate to specific card
+  - [x] Show all queue items (not just upcoming)
+  - [x] Auto-scroll to current item
+  - [x] Progress tracking based on actual reviewed count
 
 - [x] **Settings System**
   - [x] Settings modal component with field display config
@@ -107,6 +116,7 @@
   - [x] Rename cache/ directory to database/
   - [x] database/decks/ for cached notes
   - [x] database/settings.json for user settings
+  - [x] database/ai-sessions/ for AI processing sessions
 
 ### ⏳ Pending
 
@@ -117,13 +127,6 @@
   - [ ] E - Edit mode
   - [ ] J/K - Navigate cards
   - [ ] ? - Show shortcuts help
-
-- [ ] **Revision Logging**
-  - [ ] Create revisions/ directory structure
-  - [ ] Save each session to JSON file (session-YYYY-MM-DD-HHMMSS.json)
-  - [ ] Log format: { timestamp, deckName, prompt, changes: [...] }
-  - [ ] Include before/after values for each change
-  - [ ] Track accepted/rejected/skipped counts
 
 - [ ] **Edit Mode**
   - [ ] Inline field editing
@@ -145,12 +148,6 @@
 
 ### ⏳ Not Started
 
-- [ ] **AI Reasoning Display**
-  - [ ] Show why each change was suggested
-  - [ ] Confidence level indicator
-  - [ ] Change type icons (🔧 typo, 📝 improvement, etc.)
-  - [ ] Collapsible panel
-
 - [ ] **Revision History Viewer**
   - [ ] Timeline view of all changes
   - [ ] Filter by date/deck/type
@@ -160,44 +157,83 @@
 
 - [ ] **Progress Indicators**
   - [ ] Loading states with skeleton screens
-  - [ ] Progress bar for batch processing
   - [ ] Estimated time remaining
-  - [ ] Cancellable operations
-
-- [x] **Settings Panel**
-  - [x] Field display configuration per note type (✅ Completed)
+  - [ ] Better cancellation UX
 
 ---
 
 ## Phase 3 - Intelligence (AI Features)
 
-### ⏳ Not Started
+**📖 See detailed implementation spec**: `AI_WORKFLOW_IMPLEMENTATION.md`
 
-- [ ] **Claude Code Integration**
-  - [ ] Research integration methods (Agent SDK, CLI, MCP)
-  - [ ] Implement chosen approach
-  - [ ] Pass card data and prompt to AI
-  - [ ] Parse structured responses (field: value format)
-  - [ ] Handle errors and timeouts
+### ✅ Completed
 
-- [ ] **AI Processing Optimization**
-  - [ ] Parallel processing (batch cards together)
-  - [ ] Chunking for large decks (process 100 at a time)
-  - [ ] Rate limiting to avoid overwhelming API
-  - [ ] Caching for similar cards
-  - [ ] Resume interrupted processing
+- [x] **File-Based AI Workflow** (Core)
+  - [x] Session management service (create/load/list/delete sessions)
+  - [x] File watcher service (chokidar for suggestion detection)
+  - [x] Claude spawner service (spawn CLI process in background)
+  - [x] WebSocket integration (socket.io for real-time updates)
+  - [x] Session API routes (POST /new, GET /:id, GET /, DELETE /:id)
+  - [x] Frontend WebSocket hook (useWebSocket)
+  - [x] Session management hook (useSessionManagement)
+  - [x] Real-time queue updates from WebSocket
+  - [x] Session selector UI component
+  - [x] Update useCardGeneration to use real API
 
-- [ ] **Prompt Templates**
+- [x] **Session Management**
+  - [x] Create new session with prompt and deck
+  - [x] Load existing session with suggestions
+  - [x] List all sessions with metadata
+  - [x] Delete session and cleanup files
+  - [x] Cancel running session
+  - [x] Session status endpoint
+  - [x] Output log viewer (stdout/stderr/combined)
+  - [x] Session chat history in sidebar
+  - [x] "New Session" button to clear and start fresh
+  - [x] "Back to Sessions" navigation
+
+- [x] **Prompt Generation**
+  - [x] Generate Claude task prompt from user input
+  - [x] Include deck context and card count
+  - [x] Write prompt to claude-task.md
+  - [x] Pass deck file paths for processing
+
+- [x] **Real-time Processing**
+  - [x] Watch for new suggestion files
+  - [x] Emit WebSocket events on new suggestions
+  - [x] Update queue in real-time as suggestions arrive
+  - [x] Progress tracking during processing
+  - [x] Session completion notification
+
+- [x] **Session Directory Structure**
+  - [x] database/ai-sessions/{sessionId}/
+  - [x] request.json - Original prompt and metadata
+  - [x] claude-task.md - Generated task for Claude
+  - [x] suggestions/ - Individual suggestion files
+  - [x] logs/ - Claude output logs (stdout, stderr, combined)
+
+### ⏳ Pending
+
+- [ ] **History Tab Enhancement**
+  - [ ] Toggle between "Current Session" and "All History"
+  - [ ] Display session metadata (timestamp, prompt, deck)
+  - [ ] Session filtering and search
+
+- [ ] **Phase 3.1 - Progress Tracking** (Future)
+  - [ ] Add metadata.json to track detailed progress
+  - [ ] Real-time progress percentage in UI
+  - [ ] Better estimated time remaining
+
+- [ ] **Phase 3.2 - Prompt Templates** (Future)
   - [ ] Save custom prompts
   - [ ] Quick-action buttons ("Fix typos", "Improve", etc.)
-  - [ ] Template variables (e.g., {{deckName}})
+  - [ ] Template variables (e.g., {{deckName}}, {{cardCount}})
   - [ ] Import/export prompt library
 
-- [ ] **Confidence Scoring**
-  - [ ] Parse confidence from AI response
-  - [ ] Visual indicators (High/Medium/Low)
-  - [ ] Filter queue by confidence threshold
-  - [ ] Auto-accept high confidence (optional)
+- [ ] **Phase 3.3 - Resume Capability** (Future)
+  - [ ] Detect incomplete sessions
+  - [ ] Resume from last processed card
+  - [ ] Handle interruptions gracefully
 
 ---
 
@@ -222,6 +258,11 @@
   - [ ] Virtual scrolling
   - [ ] Web worker for diff processing
 
+- [ ] **Multi-Session History**
+  - [ ] Global history view across all sessions
+  - [ ] Per-session history toggle
+  - [ ] History persistence and export
+
 ---
 
 ## Known Issues
@@ -235,21 +276,37 @@
 - **Backend runs on**: http://localhost:3001 (TypeScript)
 - **Frontend runs on**: http://localhost:5173 (TypeScript)
 - **AnkiConnect**: http://localhost:8765
-- **Current stage**: Phase 1 MVP complete! Full TypeScript codebase with chat UI.
-- **Next session**: Integrate actual AI processing and add keyboard shortcuts
-- **Latest update** (2025-01-22):
+- **Current stage**: Phase 3 AI integration complete! Full real-time AI workflow operational.
+- **Next priorities**: Keyboard shortcuts, edit mode, connection monitoring
+- **Latest update** (2025-11-22):
+  - ✅ **Phase 3 AI Integration COMPLETE!**
+    - Real-time AI processing with Claude Code CLI
+    - WebSocket-based live suggestion updates
+    - Session management (create/load/delete/cancel)
+    - File watcher for incremental suggestion detection
+    - Output log viewer for debugging
+  - ✅ **Session UI Enhancements**
+    - Session chat history display in sidebar
+    - Load previous sessions with context restoration
+    - "New Session" button to start fresh
+    - "Back to Sessions" navigation
+    - Session selector dropdown in queue
+  - ✅ **Queue Improvements**
+    - Fixed: Show all items instead of hiding reviewed ones
+    - Fixed: Progress tracking uses actual reviewed count
+    - Fixed: Accept/Reject now properly removes cards from queue
+    - Added: Auto-scroll to current item
+    - Added: Click any item to jump to it
+  - ✅ **UI Polish**
+    - Dark theme support throughout
+    - Improved session list cards with timestamps
+    - Output viewer modal for Claude logs
+    - Better session metadata display
+- **Previous updates**:
   - ✅ UI redesigned to single-page layout with chat-based sidebar
   - ✅ Queue enhanced with tabs (Queue/History) and search
   - ✅ Settings system for field display configuration
-  - ✅ Backend settings persistence (database/settings.json)
-  - ✅ Fixed React duplicate key warnings
-  - ✅ Fixed prompt state synchronization issue
-  - ✅ Renamed cache/ to database/ for better organization
-- **Previous updates**:
   - ✅ Complete TypeScript conversion (backend + frontend)
   - ✅ Filesystem cache system for fast deck loading
   - ✅ Hierarchical caching with sub-deck support
   - ✅ Background incremental sync using Anki's edited:N query
-  - ✅ Recursive binary splitting for batch retry logic
-  - ✅ Batch fetching to handle large decks (8k+ cards tested)
-  - 📝 Port changed from 3000 to 3001

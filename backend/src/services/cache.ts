@@ -271,33 +271,78 @@ class CacheService {
    * Since we cache by actual deck, we just need to update the specific sub-deck cache
    */
   async updateNoteInCache(deckName: string, noteId: number, updatedFields: Record<string, string>): Promise<void> {
-    const cache = await this.getCachedNotes(deckName);
-    if (!cache) {
-      console.warn(`No cache to update for deck "${deckName}"`);
+    // First, find which specific deck file contains this note
+    const noteDeck = await this.findDeckForNote(deckName, noteId);
+    if (!noteDeck) {
+      console.warn(`Note ${noteId} not found in any cache for deck "${deckName}"`);
       return;
     }
 
-    // Find and update the note
-    const noteIndex = cache.notes.findIndex(n => n.noteId === noteId);
-    if (noteIndex === -1) {
-      console.warn(`Note ${noteId} not found in cache for deck "${deckName}"`);
-      return;
+    // Load the specific deck cache
+    const cachePath = this.getCachePath(noteDeck);
+    try {
+      const data = await fs.readFile(cachePath, 'utf-8');
+      const cache = JSON.parse(data) as CachedDeckData;
+
+      // Find and update the note
+      const noteIndex = cache.notes.findIndex(n => n.noteId === noteId);
+      if (noteIndex === -1) {
+        console.warn(`Note ${noteId} not found in cache file for deck "${noteDeck}"`);
+        return;
+      }
+
+      // Update the fields
+      for (const [fieldName, newValue] of Object.entries(updatedFields)) {
+        if (cache.notes[noteIndex].fields[fieldName]) {
+          cache.notes[noteIndex].fields[fieldName].value = newValue;
+        }
+      }
+
+      // Update modification timestamp
+      cache.notes[noteIndex].mod = Math.floor(Date.now() / 1000);
+
+      // Save the entire cache back (with all notes intact)
+      await fs.writeFile(cachePath, JSON.stringify(cache, null, 2), 'utf-8');
+      console.log(`Updated note ${noteId} in cache for deck "${noteDeck}"`);
+    } catch (error) {
+      console.error(`Error updating note ${noteId} in cache:`, error);
+    }
+  }
+
+  /**
+   * Find which deck file contains a specific note
+   */
+  private async findDeckForNote(deckName: string, noteId: number): Promise<string | null> {
+    // Check exact deck first
+    const exactCache = this.getCachePath(deckName);
+    try {
+      const data = await fs.readFile(exactCache, 'utf-8');
+      const cache = JSON.parse(data) as CachedDeckData;
+      if (cache.notes.some(n => n.noteId === noteId)) {
+        return deckName;
+      }
+    } catch {
+      // Not in exact deck, check subdecks
     }
 
-    // Update the fields
-    for (const [fieldName, newValue] of Object.entries(updatedFields)) {
-      if (cache.notes[noteIndex].fields[fieldName]) {
-        cache.notes[noteIndex].fields[fieldName].value = newValue;
+    // Check all subdeck caches
+    const allCachedDecks = await this.getAllCachedDecks();
+    const subDecks = allCachedDecks.filter(deck => deck.startsWith(deckName + '::'));
+
+    for (const subDeck of subDecks) {
+      const cachePath = this.getCachePath(subDeck);
+      try {
+        const data = await fs.readFile(cachePath, 'utf-8');
+        const cache = JSON.parse(data) as CachedDeckData;
+        if (cache.notes.some(n => n.noteId === noteId)) {
+          return subDeck;
+        }
+      } catch {
+        continue;
       }
     }
 
-    // Update modification timestamp
-    cache.notes[noteIndex].mod = Math.floor(Date.now() / 1000);
-
-    // Save back to cache using the note's actual deck
-    const noteDeck = cache.notes[noteIndex].deckName || deckName;
-    await this.cacheNotes(noteDeck, [cache.notes[noteIndex]]);
-    console.log(`Updated note ${noteId} in cache for deck "${noteDeck}"`);
+    return null;
   }
 
   /**

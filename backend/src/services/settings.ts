@@ -40,8 +40,13 @@ class SettingsService {
       const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
       return JSON.parse(data);
     } catch (error) {
-      // If file doesn't exist, return default settings
-      return { ...DEFAULT_SETTINGS };
+      // Only return defaults if file doesn't exist
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { ...DEFAULT_SETTINGS };
+      }
+      // For other errors (corrupted JSON, permission issues, etc.), throw
+      console.error('Failed to load settings:', error);
+      throw new Error('Settings file is corrupted or inaccessible');
     }
   }
 

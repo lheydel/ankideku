@@ -1,17 +1,82 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import ankiConnect from './services/ankiConnect.js';
 import cache from './services/cache.js';
 import settings from './services/settings.js';
+import { SessionService } from './services/sessionService.js';
+import { FileWatcherService } from './services/fileWatcher.js';
+import { ClaudeSpawnerService } from './services/claudeSpawner.js';
+import sessionsRouter, { initializeRouter } from './routes/sessions.js';
 import type { GetNotesResponse, SyncResponse, CacheInfo, ErrorResponse } from './types/index.js';
 import type { FieldDisplayConfig } from './services/settings.js';
 
 const app = express();
 const PORT = 3001;
 
+// Create HTTP server for Socket.IO
+const httpServer = createServer(app);
+
+// Initialize Socket.IO
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: "http://localhost:5173", // Frontend URL
+    methods: ["GET", "POST"]
+  }
+});
+
+// Initialize AI workflow services
+const sessionService = new SessionService();
+const fileWatcher = new FileWatcherService();
+const claudeSpawner = new ClaudeSpawnerService();
+
+// Initialize sessions router with service dependencies
+initializeRouter({ sessionService, fileWatcher, claudeSpawner });
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// WebSocket connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+
+  // Subscribe to session updates
+  socket.on('subscribe:session', (sessionId: string) => {
+    socket.join(sessionId);
+    console.log(`Client ${socket.id} subscribed to session: ${sessionId}`);
+  });
+
+  // Unsubscribe from session
+  socket.on('unsubscribe:session', (sessionId: string) => {
+    socket.leave(sessionId);
+    console.log(`Client ${socket.id} unsubscribed from session: ${sessionId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+// Listen to file watcher events and emit via WebSocket
+fileWatcher.on('suggestion:new', ({ sessionId, suggestion }) => {
+  io.to(sessionId).emit('suggestion:new', suggestion);
+  console.log(`Sent suggestion to session ${sessionId}: note ${suggestion.noteId}`);
+});
+
+fileWatcher.on('session:complete', ({ sessionId, totalSuggestions }) => {
+  io.to(sessionId).emit('session:complete', { totalSuggestions });
+  console.log(`Session ${sessionId} complete: ${totalSuggestions} suggestions`);
+});
+
+fileWatcher.on('error', ({ sessionId, error }) => {
+  io.to(sessionId).emit('session:error', { error });
+  console.error(`Session ${sessionId} error:`, error);
+});
+
+// Mount sessions routes
+app.use('/api/sessions', sessionsRouter);
 
 // Health check
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -191,7 +256,29 @@ app.put('/api/settings/field-display', async (req: Request, res: Response) => {
   }
 });
 
+// Graceful shutdown handling
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  await fileWatcher.unwatchAll();
+  claudeSpawner.killAll();
+  httpServer.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  await fileWatcher.unwatchAll();
+  claudeSpawner.killAll();
+  httpServer.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
 // Start server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`AnkiDeku backend running on http://localhost:${PORT}`);
+  console.log(`WebSocket server ready for connections`);
 });

@@ -1,4 +1,19 @@
-// AnkiConnect API Types
+// Re-export shared types from contract
+export type {
+  NoteField,
+  Note,
+  DeckInfo,
+  GetNotesResponse,
+  SyncResponse,
+  CacheInfo,
+  ErrorResponse,
+  PingResponse,
+  SessionRequest,
+  CardSuggestion,
+  SessionData
+} from '../../../contract/types.js';
+
+// Backend-only types
 
 export interface AnkiConnectRequest {
   action: string;
@@ -11,28 +26,9 @@ export interface AnkiConnectResponse<T = any> {
   error: string | null;
 }
 
-export interface NoteField {
-  value: string;
-  order: number;
-}
-
-export interface Note {
-  noteId: number;
-  modelName: string;
-  fields: Record<string, NoteField>;
-  tags: string[];
-  cards: number[];
-  mod: number;
-  deckName?: string;
-}
-
-export interface DeckInfo {
-  [deckName: string]: number; // deck name -> deck ID
-}
-
 export interface CachedDeckData {
   deckName: string;
-  notes: Note[];
+  notes: import('../../../contract/types.js').Note[];
   timestamp: string;
   count: number;
   lastSyncTimestamp?: number; // Unix timestamp of last sync for incremental updates
@@ -45,28 +41,4 @@ export interface NoteUpdate {
 
 export interface BatchUpdateRequest {
   updates: NoteUpdate[];
-}
-
-// API Response Types
-export interface GetNotesResponse {
-  notes: Note[];
-  fromCache: boolean;
-  cachedAt: string;
-}
-
-export interface SyncResponse {
-  success: boolean;
-  count: number;
-  timestamp: string;
-}
-
-export interface CacheInfo {
-  exists: boolean;
-  timestamp?: string;
-  count?: number;
-  deckName?: string;
-}
-
-export interface ErrorResponse {
-  error: string;
 }

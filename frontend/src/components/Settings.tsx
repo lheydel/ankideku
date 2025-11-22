@@ -66,18 +66,18 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col border border-gray-200 dark:border-gray-700">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Display Settings</h2>
-            <p className="text-sm text-gray-600 mt-1">Configure which field to display in the sidebar for each note type</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Display Settings</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Configure which field to display in the sidebar for each note type</p>
           </div>
           <Button
             onClick={onClose}
             variant="ghost"
-            icon={<CloseIcon className="w-5 h-5 text-gray-600" />}
-            className="hover:bg-gray-100"
+            icon={<CloseIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />}
+            className="hover:bg-gray-100 dark:hover:bg-gray-700"
           />
         </div>
 
@@ -85,7 +85,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         <div className="flex-1 overflow-y-auto p-6">
           {modelTypes.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500">No note types found. Review some cards to configure display settings.</p>
+              <p className="text-gray-500 dark:text-gray-400">No note types found. Review some cards to configure display settings.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -96,15 +96,15 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
                 const currentField = localConfig[modelName] || fields[0];
 
                 return (
-                  <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{modelName}</h3>
-                      <p className="text-xs text-gray-500">{fields.length} field{fields.length !== 1 ? 's' : ''} available</p>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{modelName}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{fields.length} field{fields.length !== 1 ? 's' : ''} available</p>
                     </div>
                     <select
                       value={currentField}
                       onChange={(e) => handleFieldChange(modelName, e.target.value)}
-                      className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-w-[200px]"
+                      className="px-3 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
                     >
                       {fields.map(fieldName => (
                         <option key={fieldName} value={fieldName}>
@@ -120,7 +120,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 flex items-center justify-end gap-3">
+        <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-3">
           <Button
             onClick={onClose}
             variant="secondary"

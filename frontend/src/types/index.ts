@@ -1,57 +1,25 @@
-// Mirror backend types for frontend
-export interface NoteField {
-  value: string;
-  order: number;
-}
-
-export interface Note {
-  noteId: number;
-  modelName: string;
-  fields: Record<string, NoteField>;
-  tags: string[];
-  cards: number[];
-  mod: number;
-  deckName?: string;
-}
-
-export interface DeckInfo {
-  [deckName: string]: number;
-}
-
-export interface GetNotesResponse {
-  notes: Note[];
-  fromCache: boolean;
-  cachedAt: string;
-}
-
-export interface SyncResponse {
-  success: boolean;
-  count: number;
-  timestamp: string;
-}
-
-export interface CacheInfo {
-  exists: boolean;
-  timestamp?: string;
-  count?: number;
-  deckName?: string;
-}
-
-export interface ErrorResponse {
-  error: string;
-}
-
-export interface PingResponse {
-  connected: boolean;
-  error?: string;
-}
+// Re-export shared types from contract
+export type {
+  NoteField,
+  Note,
+  DeckInfo,
+  GetNotesResponse,
+  SyncResponse,
+  CacheInfo,
+  ErrorResponse,
+  PingResponse,
+  SessionRequest,
+  CardSuggestion,
+  SessionData
+} from '../../../contract/types';
 
 // Frontend-specific types
-export interface CardSuggestion {
-  noteId: number;
-  original: Note;
-  changes: Record<string, string>;
-  reasoning?: string;
+
+export interface SessionMetadata {
+  sessionId: string;
+  timestamp: string;
+  deckName: string;
+  totalCards: number;
 }
 
 export interface FieldDisplayConfig {
@@ -88,6 +56,7 @@ export interface StoreState {
   setQueue: (queue: CardSuggestion[]) => void;
   nextCard: () => void;
   prevCard: () => void;
+  goToCard: (index: number) => void;
   skipCard: () => void;
   removeFromQueue: (index: number) => void;
   getCurrentCard: () => CardSuggestion | undefined;

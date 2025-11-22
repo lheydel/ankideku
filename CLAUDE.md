@@ -12,7 +12,7 @@ This prevents multiple background processes from accumulating.
 
 ## Project Structure
 
-- **Backend**: TypeScript Express server on port 3000
+- **Backend**: TypeScript Express server on port 3001
   - Entry: `backend/src/index.ts`
   - Services: AnkiConnect, Cache
   - Routes: Health, Decks, Notes
@@ -45,9 +45,9 @@ cd frontend && npm run dev   # Start dev server
 cd frontend && npm run build # Build for production
 
 # Testing
-curl http://localhost:3000/api/health
-curl http://localhost:3000/api/anki/ping
-curl http://localhost:3000/api/decks
+curl http://localhost:3001/api/health
+curl http://localhost:3001/api/anki/ping
+curl http://localhost:3001/api/decks
 ```
 
 ## Frontend Code Practices

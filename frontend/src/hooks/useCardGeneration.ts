@@ -1,7 +1,8 @@
-import { useCallback } from 'react';
-import { ankiApi } from '../services/api';
+import { useCallback, useState } from 'react';
 import useStore from '../store/useStore';
-import type { Note, CardSuggestion } from '../types';
+import { useSessionManagement } from './useSessionManagement';
+import { useWebSocket } from './useWebSocket';
+import type { CardSuggestion } from '../types';
 
 export function useCardGeneration() {
   const {
@@ -11,6 +12,35 @@ export function useCardGeneration() {
     setProgress,
     addToPromptHistory,
   } = useStore();
+
+  const { createSession, currentSession } = useSessionManagement();
+  const [suggestionCount, setSuggestionCount] = useState(0);
+
+  // Handle new suggestions from WebSocket
+  const handleNewSuggestion = useCallback((suggestion: CardSuggestion) => {
+    setQueue((prev: CardSuggestion[]) => [...prev, suggestion]);
+    setSuggestionCount(prev => prev + 1);
+  }, [setQueue]);
+
+  // Handle session completion
+  const handleSessionComplete = useCallback((data: { totalSuggestions: number }) => {
+    console.log(`Session complete: ${data.totalSuggestions} suggestions generated`);
+    setProcessing(false);
+  }, [setProcessing]);
+
+  // Handle session errors
+  const handleSessionError = useCallback((error: { error: string }) => {
+    console.error('Session error:', error.error);
+    setProcessing(false);
+  }, [setProcessing]);
+
+  // Set up WebSocket listener
+  useWebSocket({
+    sessionId: currentSession,
+    onSuggestion: handleNewSuggestion,
+    onSessionComplete: handleSessionComplete,
+    onError: handleSessionError
+  });
 
   const generateSuggestions = useCallback(async (
     prompt: string,
@@ -22,53 +52,30 @@ export function useCardGeneration() {
     try {
       setProcessing(true);
       setProgress(0, 0);
+      setQueue([]); // Clear existing queue
+      setSuggestionCount(0);
 
       addToPromptHistory(prompt);
 
-      // Fetch notes from deck
-      const response = await ankiApi.getDeckNotes(selectedDeck);
-      const notes = response.notes || (response as any);
+      // Create a new AI processing session
+      const sessionId = await createSession(prompt, selectedDeck);
 
-      if (response.fromCache) {
-        onSuccess(`Loaded ${notes.length} cards from cache`);
-      }
+      onSuccess(`Started AI processing session: ${sessionId}`);
+      console.log(`Session ${sessionId} created. Waiting for suggestions...`);
 
-      setProgress(notes.length, notes.length);
+      // WebSocket will handle incoming suggestions in real-time
+      // Queue will update automatically via handleNewSuggestion callback
 
-      // Create mock suggestions with varied changes
-      const mockSuggestions: CardSuggestion[] = notes.slice(0, Math.min(10, notes.length)).map((note: Note) => {
-        const fieldNames = Object.keys(note.fields);
-        const changes: Record<string, string> = {};
-
-        fieldNames.forEach((fieldName, fieldIndex) => {
-          const originalValue = note.fields[fieldName].value;
-
-          if (fieldIndex === 0) {
-            changes[fieldName] = originalValue + ' (with additional context)';
-          } else if (fieldIndex === 1 && originalValue.length > 10) {
-            const halfLength = Math.floor(originalValue.length / 2);
-            changes[fieldName] = originalValue.substring(0, halfLength);
-          } else if (fieldIndex === 2) {
-            changes[fieldName] = originalValue.replace(/\w+/, 'corrected');
-          }
-        });
-
-        return {
-          noteId: note.noteId,
-          original: note,
-          changes,
-          reasoning: `Found ${Object.keys(changes).length} field(s) that could be improved: ${Object.keys(changes).join(', ')}. Added missing context, removed redundant information, and corrected terminology.`,
-        };
-      });
-
-      setQueue(mockSuggestions);
-      setProcessing(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate suggestions';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create session';
       onError(errorMessage);
       setProcessing(false);
     }
-  }, [selectedDeck, setQueue, setProcessing, setProgress, addToPromptHistory]);
+  }, [selectedDeck, setQueue, setProcessing, setProgress, addToPromptHistory, createSession]);
 
-  return { generateSuggestions };
+  return {
+    generateSuggestions,
+    currentSession,
+    suggestionCount
+  };
 }

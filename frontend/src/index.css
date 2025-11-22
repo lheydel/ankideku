@@ -9,7 +9,7 @@
     --color-primary-hover: 67 56 202; /* Indigo-700 */
     --color-primary-light: 238 242 255; /* Indigo-50 */
 
-    --color-success: 34 197 94; /* Green-500 */
+    --color-success: 99 102 241; /* Green-500 */
     --color-error: 239 68 68; /* Red-500 */
     --color-warning: 245 158 11; /* Amber-500 */
     --color-info: 59 130 246; /* Blue-500 */
@@ -29,7 +29,7 @@
     --color-primary-hover: 129 140 248; /* Indigo-400 */
     --color-primary-light: 30 27 75; /* Indigo-950 */
 
-    --color-success: 34 197 94; /* Green-500 */
+    --color-success: 99 102 241; /* Green-500 */
     --color-error: 248 113 113; /* Red-400 - Brighter for visibility */
     --color-warning: 251 191 36; /* Amber-400 */
     --color-info: 96 165 250; /* Blue-400 */
@@ -68,11 +68,11 @@
   }
 
   .btn-primary {
-    @apply bg-indigo-600 dark:bg-indigo-500 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:ring-indigo-500 shadow-sm hover:shadow;
+    @apply bg-primary-600 dark:bg-primary-500 text-white hover:bg-primary-700 dark:hover:bg-primary-600 focus:ring-primary-500 shadow-sm hover:shadow;
   }
 
   .btn-secondary {
-    @apply bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-indigo-500 shadow-sm;
+    @apply bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-primary-500 shadow-sm;
   }
 
   .btn-success {
@@ -92,12 +92,12 @@
   }
 
   .btn-text {
-    @apply text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300;
+    @apply text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300;
   }
 
   /* Input styles */
   .input {
-    @apply w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all;
+    @apply w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
   }
 
   /* Smooth animations */

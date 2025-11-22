@@ -11,7 +11,7 @@ export default function Notification({ notification }: NotificationProps) {
   const styles = {
     success: 'bg-green-500/95 text-white border-green-400',
     error: 'bg-red-500/95 text-white border-red-400',
-    info: 'bg-indigo-500/95 text-white border-indigo-400',
+    info: 'bg-primary-500/95 text-white border-primary-400',
   };
 
   const Icon = {

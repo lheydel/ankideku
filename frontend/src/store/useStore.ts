@@ -37,6 +37,9 @@ const useStore = create<StoreState>((set, get) => ({
   prevCard: () => set((state) => ({
     currentIndex: Math.max(state.currentIndex - 1, 0)
   })),
+  goToCard: (index: number) => set((state) => ({
+    currentIndex: Math.max(0, Math.min(index, state.queue.length - 1))
+  })),
   skipCard: () => {
     const state = get();
     const skipped = state.queue[state.currentIndex];

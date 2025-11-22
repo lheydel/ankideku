@@ -43,10 +43,10 @@ export default function DeckSelector() {
 
   if (loading) {
     return (
-      <div className="p-6 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
+      <div className="p-6 bg-gradient-to-r from-primary-50 to-blue-50 rounded-xl border border-primary-100">
         <div className="flex items-center gap-3">
-          <SpinnerIcon className="w-5 h-5 text-indigo-600" />
-          <span className="text-indigo-900 font-medium">Loading decks...</span>
+          <SpinnerIcon className="w-5 h-5 text-primary-600" />
+          <span className="text-primary-900 font-medium">Loading decks...</span>
         </div>
       </div>
     );
@@ -79,7 +79,7 @@ export default function DeckSelector() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-          <DeckIcon className="w-4 h-4 text-indigo-600" />
+          <DeckIcon className="w-4 h-4 text-primary-600" />
           Select Deck
         </label>
         <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
@@ -104,14 +104,14 @@ export default function DeckSelector() {
       </div>
 
       {selectedDeck && (
-        <div className="p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl fade-in">
+        <div className="p-4 bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-100 rounded-xl fade-in">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
               <CheckIcon className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-indigo-600 mb-0.5">Selected Deck</p>
-              <p className="text-sm font-semibold text-indigo-900 truncate">{selectedDeck}</p>
+              <p className="text-xs font-medium text-primary-600 mb-0.5">Selected Deck</p>
+              <p className="text-sm font-semibold text-primary-900 truncate">{selectedDeck}</p>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import useStore from '../store/useStore.js';
 import { ClipboardIcon, EyeIcon, TagIcon, CheckIcon, ClockIcon, CloseIcon } from './ui/Icons.js';
 import { getDisplayField } from '../utils/getDisplayField.js';
@@ -7,16 +7,27 @@ import { Button } from './ui/Button.js';
 type TabType = 'queue' | 'history';
 
 export default function Queue() {
-  const { queue, currentIndex, actionsHistory, fieldDisplayConfig } = useStore();
+  const { queue, currentIndex, actionsHistory, fieldDisplayConfig, goToCard } = useStore();
   const [activeTab, setActiveTab] = useState<TabType>('queue');
   const [searchQuery, setSearchQuery] = useState('');
+  const currentItemRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to current item
+  useEffect(() => {
+    if (currentItemRef.current && activeTab === 'queue') {
+      currentItemRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      });
+    }
+  }, [currentIndex, activeTab]);
 
   if (queue.length === 0 && actionsHistory.length === 0) {
     return null;
   }
 
-  const reviewed = currentIndex;
-  const total = queue.length;
+  const reviewed = actionsHistory.length;
+  const total = queue.length + actionsHistory.length;
 
   // Filter queue items based on search
   const filteredQueue = queue.filter((item) => {
@@ -41,7 +52,7 @@ export default function Queue() {
             onClick={() => setActiveTab('queue')}
             className={`flex-1 px-4 py-3 text-sm font-semibold transition-colors ${
               activeTab === 'queue'
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 bg-primary-50/50 dark:bg-primary-900/30'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >
@@ -51,7 +62,7 @@ export default function Queue() {
             onClick={() => setActiveTab('history')}
             className={`flex-1 px-4 py-3 text-sm font-semibold transition-colors ${
               activeTab === 'history'
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 bg-primary-50/50 dark:bg-primary-900/30'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >
@@ -67,7 +78,7 @@ export default function Queue() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={`Search ${activeTab}...`}
-              className="w-full px-3 py-2 pr-8 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400"
+              className="w-full px-3 py-2 pr-8 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400"
             />
             {searchQuery && (
               <Button
@@ -85,11 +96,11 @@ export default function Queue() {
           <div className="px-4 pb-3 space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-600 dark:text-gray-400 font-medium">Progress</span>
-              <span className="text-indigo-600 dark:text-indigo-400 font-bold">{reviewed} / {total}</span>
+              <span className="text-primary-600 dark:text-primary-400 font-bold">{reviewed} / {total}</span>
             </div>
             <div className="bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-indigo-600 to-indigo-500 dark:from-indigo-500 dark:to-indigo-400 h-full rounded-full transition-all duration-500 ease-out shadow-sm"
+                className="bg-gradient-to-r from-primary-600 to-primary-500 dark:from-primary-500 dark:to-primary-400 h-full rounded-full transition-all duration-500 ease-out shadow-sm"
                 style={{ width: `${total > 0 ? (reviewed / total) * 100 : 0}%` }}
               />
             </div>
@@ -104,25 +115,27 @@ export default function Queue() {
             // Queue Items
             filteredQueue.length > 0 ? (
               <div className="space-y-2">
-                {filteredQueue.slice(currentIndex, currentIndex + 10).map((item, idx) => {
+                {filteredQueue.map((item, idx) => {
                   const globalIdx = queue.indexOf(item);
                   const isCurrent = globalIdx === currentIndex;
                   return (
                     <div
                       key={item.noteId}
-                      className={`relative rounded-lg border transition-all ${
+                      ref={isCurrent ? currentItemRef : null}
+                      onClick={() => goToCard(globalIdx)}
+                      className={`relative rounded-lg border transition-all cursor-pointer ${
                         isCurrent
-                          ? 'bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/30 dark:to-blue-900/30 border-indigo-200 dark:border-indigo-700 shadow-sm ring-2 ring-indigo-100 dark:ring-indigo-800'
+                          ? 'bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/30 dark:to-blue-900/30 border-primary-200 dark:border-primary-700 shadow-sm ring-2 ring-primary-100 dark:ring-primary-800'
                           : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:shadow-sm'
                       }`}
                     >
                       {isCurrent && (
-                        <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-indigo-600 to-indigo-500 dark:from-indigo-500 dark:to-indigo-400 rounded-r"></div>
+                        <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-primary-600 to-primary-500 dark:from-primary-500 dark:to-primary-400 rounded-r"></div>
                       )}
                       <div className="p-3">
                         <div className="flex items-center gap-2">
                           {isCurrent ? (
-                            <div className="w-6 h-6 bg-indigo-600 dark:bg-indigo-500 rounded-md flex items-center justify-center flex-shrink-0">
+                            <div className="w-6 h-6 bg-primary-600 dark:bg-primary-500 rounded-md flex items-center justify-center flex-shrink-0">
                               <EyeIcon className="w-3.5 h-3.5 text-white" />
                             </div>
                           ) : (
@@ -156,10 +169,23 @@ export default function Queue() {
             // History Items
             filteredHistory.length > 0 ? (
               <div className="space-y-2">
-                {filteredHistory.map((item) => (
+                {filteredHistory.map((item) => {
+                  // Find if this card still exists in the queue
+                  const queueIndex = queue.findIndex(q => q.noteId === item.noteId);
+                  const isInQueue = queueIndex !== -1;
+
+                  return (
                   <div
                     key={item.timestamp}
-                    className="rounded-lg border bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:shadow-sm transition-all"
+                    onClick={() => {
+                      if (isInQueue) {
+                        goToCard(queueIndex);
+                        setActiveTab('queue');
+                      }
+                    }}
+                    className={`rounded-lg border bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:shadow-sm transition-all ${
+                      isInQueue ? 'cursor-pointer' : 'opacity-75'
+                    }`}
                   >
                     <div className="p-3">
                       <div className="flex items-center gap-2">
@@ -201,7 +227,8 @@ export default function Queue() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8">
@@ -220,7 +247,7 @@ export default function Queue() {
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
               <div className="flex items-center gap-2 mb-1">
-                <CheckIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <CheckIcon className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Done</span>
               </div>
               <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{reviewed}</p>

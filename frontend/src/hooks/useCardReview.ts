@@ -12,6 +12,7 @@ export function useCardReview() {
     skipCard,
     setQueue,
     addToHistory,
+    removeFromQueue,
   } = useStore();
 
   const handleAccept = useCallback(async (
@@ -22,7 +23,9 @@ export function useCardReview() {
     if (!card) return;
 
     try {
-      await ankiApi.updateNote(card.noteId, card.changes, selectedDeck);
+      // Use the deck name from the card's original data to ensure cache updates correctly
+      const deckName = card.original.deckName || selectedDeck;
+      await ankiApi.updateNote(card.noteId, card.changes, deckName);
 
       addToHistory({
         action: 'accept',
@@ -31,11 +34,12 @@ export function useCardReview() {
         original: card.original,
       });
 
+      // Remove from queue
+      removeFromQueue(currentIndex);
+
       onSuccess('Changes accepted and applied');
 
-      if (currentIndex < queue.length - 1) {
-        nextCard();
-      } else {
+      if (queue.length <= 1) {
         onSuccess('All suggestions reviewed!');
         setQueue([]);
       }
@@ -43,7 +47,7 @@ export function useCardReview() {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       onError('Failed to apply changes: ' + errorMessage);
     }
-  }, [getCurrentCard, selectedDeck, currentIndex, queue.length, nextCard, setQueue, addToHistory]);
+  }, [getCurrentCard, selectedDeck, currentIndex, queue.length, removeFromQueue, setQueue, addToHistory]);
 
   const handleReject = useCallback((onSuccess: (message: string) => void) => {
     const card = getCurrentCard();
@@ -53,17 +57,19 @@ export function useCardReview() {
       action: 'reject',
       noteId: card.noteId,
       changes: card.changes,
+      original: card.original,
     });
+
+    // Remove from queue
+    removeFromQueue(currentIndex);
 
     onSuccess('Suggestion rejected');
 
-    if (currentIndex < queue.length - 1) {
-      nextCard();
-    } else {
+    if (queue.length <= 1) {
       onSuccess('All suggestions reviewed!');
       setQueue([]);
     }
-  }, [getCurrentCard, currentIndex, queue.length, nextCard, setQueue, addToHistory]);
+  }, [getCurrentCard, currentIndex, queue.length, removeFromQueue, setQueue, addToHistory]);
 
   const handleSkip = useCallback((onSuccess: (message: string) => void) => {
     skipCard();

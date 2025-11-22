@@ -3,6 +3,7 @@ import useStore from '../store/useStore.js';
 import DiffMatchPatch from 'diff-match-patch';
 import { WarningIcon, CheckIcon, ArchiveIcon, DeckIcon, BrushIcon, ClipboardIcon, BulbIcon, ClockIcon, CloseIcon, ArrowRightIcon, KeyboardIcon } from './ui/Icons.js';
 import { Button } from './ui/Button.js';
+import { Breadcrumb } from './ui/Breadcrumb.js';
 
 const dmp = new DiffMatchPatch();
 
@@ -16,18 +17,18 @@ interface CardFieldProps {
 
 function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldProps) {
   return (
-    <div className={`py-3 border-b border-gray-100 last:border-b-0 ${isChanged ? 'bg-yellow-50/30' : ''}`}>
+    <div className={`py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${isChanged ? 'bg-yellow-50/30 dark:bg-yellow-900/20' : ''}`}>
       <div className="flex items-center gap-2 mb-1.5">
         {isChanged ? (
-          <WarningIcon className="w-3.5 h-3.5 text-amber-600" />
+          <WarningIcon className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
         ) : (
-          <CheckIcon className="w-3.5 h-3.5 text-gray-400" />
+          <CheckIcon className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
         )}
-        <span className={`text-xs font-semibold uppercase tracking-wide leading-none ${isChanged ? 'text-amber-700' : 'text-gray-500'}`}>
+        <span className={`text-xs font-semibold uppercase tracking-wide leading-none ${isChanged ? 'text-amber-700 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>
           {fieldName}
         </span>
       </div>
-      <div className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed">
+      <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
         {showDiff && diffs ? (
           diffs.map((diff, i) => {
             const [operation, text] = diff;
@@ -35,7 +36,7 @@ function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldPr
               if (operation === 1) return null;
               if (operation === -1) {
                 return (
-                  <span key={i} className="bg-red-100 text-red-900 px-0.5 rounded line-through">
+                  <span key={i} className="bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-200 px-0.5 rounded line-through">
                     {text}
                   </span>
                 );
@@ -45,7 +46,7 @@ function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldPr
               if (operation === -1) return null;
               if (operation === 1) {
                 return (
-                  <span key={i} className="bg-green-200 text-green-900 px-0.5 rounded font-medium">
+                  <span key={i} className="bg-green-200 dark:bg-green-900/40 text-green-900 dark:text-green-200 px-0.5 rounded font-medium">
                     {text}
                   </span>
                 );
@@ -54,7 +55,7 @@ function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldPr
             }
           })
         ) : (
-          value || <span className="text-gray-400 italic text-xs">(empty)</span>
+          value || <span className="text-gray-400 dark:text-gray-500 italic text-xs">(empty)</span>
         )}
       </div>
     </div>
@@ -68,15 +69,34 @@ interface ComparisonViewProps {
 }
 
 export default function ComparisonView({ onAccept, onReject, onSkip }: ComparisonViewProps) {
-  const { getCurrentCard, currentIndex, queue } = useStore();
+  const { getCurrentCard, currentIndex, queue, isProcessing, setQueue } = useStore();
 
   const card = getCurrentCard();
 
   if (!card) {
     return (
-      <div className="card text-center py-16">
-        <ArchiveIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-500 font-medium">No card to review</p>
+      <div className="space-y-6">
+        {isProcessing && <Breadcrumb onClick={() => setQueue([])} />}
+        <div className="card text-center py-16">
+          {isProcessing ? (
+            <>
+              <div className="w-16 h-16 bg-gradient-to-br from-primary-100 to-blue-100 dark:from-primary-900 dark:to-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-pulse">
+                <BulbIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Analyzing Cards...
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                AI is processing your deck. Suggestions will appear here as they're generated.
+              </p>
+            </>
+            ) : (
+            <>
+              <ArchiveIcon className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400 font-medium">No card to review</p>
+            </>
+          )}
+        </div>
       </div>
     );
   }
@@ -86,23 +106,26 @@ export default function ComparisonView({ onAccept, onReject, onSkip }: Compariso
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb onClick={() => setQueue([])} />
+
       {/* Header Card with Metadata */}
-      <div className="card p-5 bg-gradient-to-r from-white to-gray-50">
+      <div className="card p-5 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-750">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
-              <DeckIcon className="w-4 h-4 text-indigo-600" />
-              <span className="font-semibold text-gray-700">{original.deckName || 'Unknown'}</span>
+              <DeckIcon className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+              <span className="font-semibold text-gray-700 dark:text-gray-300">{original.deckName || 'Unknown'}</span>
             </div>
-            <div className="h-4 w-px bg-gray-300"></div>
+            <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
             <div className="flex items-center gap-2 text-sm">
-              <BrushIcon className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-600">{original.modelName}</span>
+              <BrushIcon className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <span className="text-gray-600 dark:text-gray-400">{original.modelName}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-indigo-100 px-3 py-1.5 rounded-full">
-            <ClipboardIcon className="w-4 h-4 text-indigo-700" />
-            <span className="text-sm font-bold text-indigo-900">
+          <div className="flex items-center gap-2 bg-primary-100 dark:bg-primary-900/30 px-3 py-1.5 rounded-full">
+            <ClipboardIcon className="w-4 h-4 text-primary-700 dark:text-primary-400" />
+            <span className="text-sm font-bold text-primary-900 dark:text-primary-200">
               {currentIndex + 1} / {queue.length}
             </span>
           </div>
@@ -111,14 +134,14 @@ export default function ComparisonView({ onAccept, onReject, onSkip }: Compariso
 
       {/* AI Reasoning */}
       {reasoning && (
-        <div className="card p-5 bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-50 border-indigo-200">
+        <div className="card p-5 bg-gradient-to-br from-primary-50 via-blue-50 to-primary-50 dark:from-primary-900/20 dark:via-blue-900/20 dark:to-primary-900/20 border-primary-200 dark:border-primary-800">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 bg-primary-600 dark:bg-primary-500 rounded-lg flex items-center justify-center flex-shrink-0">
               <BulbIcon className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-indigo-900 mb-1 leading-none">AI Reasoning</p>
-              <p className="text-sm text-indigo-800 leading-relaxed">{reasoning}</p>
+              <p className="text-sm font-semibold text-primary-900 dark:text-primary-200 mb-1 leading-none">AI Reasoning</p>
+              <p className="text-sm text-primary-800 dark:text-primary-300 leading-relaxed">{reasoning}</p>
             </div>
           </div>
         </div>
@@ -128,10 +151,10 @@ export default function ComparisonView({ onAccept, onReject, onSkip }: Compariso
       <div className="grid grid-cols-2 gap-6">
         {/* Original Card */}
         <div className="card overflow-hidden">
-          <div className="bg-gradient-to-r from-gray-100 to-gray-50 px-5 py-3 border-b border-gray-200">
+          <div className="bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-750 px-5 py-3 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
-              <ClockIcon className="w-5 h-5 text-gray-600" />
-              <span className="font-semibold text-gray-900">Original Card</span>
+              <ClockIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <span className="font-semibold text-gray-900 dark:text-gray-100">Original Card</span>
             </div>
           </div>
           <div className="px-5">
@@ -155,11 +178,11 @@ export default function ComparisonView({ onAccept, onReject, onSkip }: Compariso
         </div>
 
         {/* Suggested Card */}
-        <div className="card overflow-hidden border-l-4 border-l-green-500">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-5 py-3 border-b border-green-200">
+        <div className="card overflow-hidden border-l-4 border-l-green-500 dark:border-l-green-600">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 px-5 py-3 border-b border-green-200 dark:border-green-800">
             <div className="flex items-center gap-2">
-              <CheckIcon className="w-5 h-5 text-green-600" />
-              <span className="font-semibold text-green-900">Suggested Card</span>
+              <CheckIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <span className="font-semibold text-green-900 dark:text-green-200">Suggested Card</span>
             </div>
           </div>
           <div className="px-5">
@@ -186,13 +209,13 @@ export default function ComparisonView({ onAccept, onReject, onSkip }: Compariso
 
       {changedFields.length === 0 && (
         <div className="card text-center py-12">
-          <CheckIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No changes detected</p>
+          <CheckIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-500 dark:text-gray-400 font-medium">No changes detected</p>
         </div>
       )}
 
       {/* Action Buttons */}
-      <div className="card p-6 bg-gradient-to-b from-white to-gray-50">
+      <div className="card p-6 bg-gradient-to-b from-white to-gray-50 dark:from-gray-800 dark:to-gray-750">
         <div className="flex items-center justify-between gap-4">
           <div className="flex gap-3">
             <Button
@@ -216,7 +239,7 @@ export default function ComparisonView({ onAccept, onReject, onSkip }: Compariso
 
           <Button
             onClick={onAccept}
-            variant="success"
+            variant="primary"
             size="lg"
             icon={<CheckIcon className="w-6 h-6" />}
             className="shadow-lg shadow-green-500/30"
@@ -227,11 +250,11 @@ export default function ComparisonView({ onAccept, onReject, onSkip }: Compariso
         </div>
 
         {/* Keyboard Shortcuts Hint */}
-        <div className="mt-4 pt-4 border-t border-gray-200 text-center">
-          <p className="text-xs text-gray-500 flex items-center justify-center gap-2">
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
             <KeyboardIcon className="w-3.5 h-3.5" />
             Press
-            <kbd className="px-2 py-1 bg-gray-100 text-gray-700 rounded font-mono text-xs border border-gray-300">?</kbd>
+            <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded font-mono text-xs border border-gray-300 dark:border-gray-600">?</kbd>
             for keyboard shortcuts
           </p>
         </div>
