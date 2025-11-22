@@ -5,10 +5,11 @@ import Sidebar from './components/Sidebar.js';
 import Settings from './components/Settings.js';
 import Notification from './components/ui/Notification.js';
 import { Button } from './components/ui/Button.js';
-import { LightningIcon, ChatIcon, SettingsIcon } from './components/ui/Icons.js';
+import { LightningIcon, ChatIcon, SettingsIcon, MoonIcon, SunIcon } from './components/ui/Icons.js';
 import useStore from './store/useStore.js';
 import { useNotification } from './hooks/useNotification.js';
 import { useCardReview } from './hooks/useCardReview.js';
+import { useTheme } from './hooks/useTheme.js';
 
 function App() {
   const { queue } = useStore();
@@ -17,28 +18,37 @@ function App() {
 
   const { notification, showNotification } = useNotification();
   const { handleAccept, handleReject, handleSkip } = useCardReview();
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200">
       {/* Notification Toast */}
       {notification && <Notification notification={notification} />}
 
       {/* Modern Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40">
+      <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-40 transition-colors duration-200">
         <div className="px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-500 dark:to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
               <LightningIcon className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-indigo-800 bg-clip-text text-transparent leading-none">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-indigo-800 dark:from-indigo-400 dark:to-indigo-600 bg-clip-text text-transparent leading-none">
                 AnkiDeku
               </h1>
-              <p className="text-sm text-gray-500 mt-1 leading-none">AI-Powered Deck Revision</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 leading-none">AI-Powered Deck Revision</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+            <Button
+              onClick={toggleTheme}
+              variant="secondary"
+              size="md"
+              icon={theme === 'dark' ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
+            >
+              <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            </Button>
             <Button
               onClick={() => setSettingsOpen(true)}
               variant="secondary"
@@ -70,13 +80,13 @@ function App() {
             // Empty state
             <div className="min-h-full flex items-center justify-center p-8">
               <div className="text-center max-w-md">
-                <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <LightningIcon className="w-10 h-10 text-indigo-600" />
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-blue-100 dark:from-indigo-900 dark:to-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <LightningIcon className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
                   Ready to Improve Your Decks
                 </h2>
-                <p className="text-gray-600 mb-6">
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
                   Open the AI Assistant, select a deck, and describe what you'd like to improve.
                 </p>
                 <Button
