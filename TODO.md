@@ -1,6 +1,6 @@
 # AnkiDeku Development TODO
 
-**Last Updated**: 2025-11-22
+**Last Updated**: 2025-01-22
 
 ---
 
@@ -80,6 +80,34 @@
   - [x] Auto-update cache when accepting changes
   - [x] Batch fetching from Anki (100 cards at a time)
 
+- [x] **UI Redesign - Single Page Layout**
+  - [x] Remove welcome/setup page
+  - [x] Create chat-based AI Assistant sidebar (Sidebar.tsx)
+  - [x] Deck selector integrated into sidebar
+  - [x] Processing progress display in sidebar
+  - [x] Multiline textarea with Shift+Enter for new line
+  - [x] Hideable sidebar with toggle button
+
+- [x] **Queue Enhancement**
+  - [x] Two tabs: Queue and History
+  - [x] Search functionality for both tabs
+  - [x] Color-coded history items (green=accept, red=reject, gray=skip)
+  - [x] Display field configuration per note type
+
+- [x] **Settings System**
+  - [x] Settings modal component with field display config
+  - [x] Backend settings service (backend/src/services/settings.ts)
+  - [x] Settings persistence in database/settings.json
+  - [x] GET /api/settings endpoint
+  - [x] PUT /api/settings/field-display endpoint
+  - [x] Compact dropdown UI for field selection
+  - [x] Auto-sync settings when modal opens
+
+- [x] **Database Structure**
+  - [x] Rename cache/ directory to database/
+  - [x] database/decks/ for cached notes
+  - [x] database/settings.json for user settings
+
 ### ⏳ Pending
 
 - [ ] **Keyboard Shortcuts**
@@ -111,13 +139,6 @@
   - [ ] Concurrent edit detection (check modified timestamp)
   - [ ] Force update confirmation dialog
 
-- [ ] **Testing**
-  - [ ] Test with real Anki deck (small deck first)
-  - [ ] Test batch processing (100+ cards)
-  - [ ] Test error handling (AnkiConnect down, network issues)
-  - [ ] Test revision logging (JSON files created correctly)
-  - [ ] End-to-end workflow test
-
 ---
 
 ## Phase 2 - Polish (UX Improvements)
@@ -143,18 +164,8 @@
   - [ ] Estimated time remaining
   - [ ] Cancellable operations
 
-- [ ] **Settings Panel**
-  - [ ] Deck presets (save favorite deck selections)
-  - [ ] Theme selection (light/dark/auto)
-  - [ ] Font size preference
-  - [ ] Keyboard shortcut customization
-  - [ ] Auto-advance delay
-
-- [ ] **Batch Operations**
-  - [ ] Accept all remaining
-  - [ ] Reject all remaining
-  - [ ] Filter queue by confidence/type
-  - [ ] Confirmation dialogs for bulk actions
+- [x] **Settings Panel**
+  - [x] Field display configuration per note type (✅ Completed)
 
 ---
 
@@ -221,14 +232,24 @@
 
 ## Notes
 
-- **Backend runs on**: http://localhost:3000 (TypeScript)
+- **Backend runs on**: http://localhost:3001 (TypeScript)
 - **Frontend runs on**: http://localhost:5173 (TypeScript)
 - **AnkiConnect**: http://localhost:8765
-- **Current stage**: Phase 1 MVP complete! Full TypeScript codebase.
-- **Next session**: Add keyboard shortcuts and revision logging
-- **Latest update**:
+- **Current stage**: Phase 1 MVP complete! Full TypeScript codebase with chat UI.
+- **Next session**: Integrate actual AI processing and add keyboard shortcuts
+- **Latest update** (2025-01-22):
+  - ✅ UI redesigned to single-page layout with chat-based sidebar
+  - ✅ Queue enhanced with tabs (Queue/History) and search
+  - ✅ Settings system for field display configuration
+  - ✅ Backend settings persistence (database/settings.json)
+  - ✅ Fixed React duplicate key warnings
+  - ✅ Fixed prompt state synchronization issue
+  - ✅ Renamed cache/ to database/ for better organization
+- **Previous updates**:
   - ✅ Complete TypeScript conversion (backend + frontend)
   - ✅ Filesystem cache system for fast deck loading
-  - ✅ Batch fetching to handle large decks (5k+ cards)
-  - ✅ All tests passing - API endpoints working correctly
-  - 📝 All JavaScript files migrated to TypeScript with proper type safety
+  - ✅ Hierarchical caching with sub-deck support
+  - ✅ Background incremental sync using Anki's edited:N query
+  - ✅ Recursive binary splitting for batch retry logic
+  - ✅ Batch fetching to handle large decks (8k+ cards tested)
+  - 📝 Port changed from 3000 to 3001

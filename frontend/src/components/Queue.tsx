@@ -1,59 +1,240 @@
+import { useState } from 'react';
 import useStore from '../store/useStore.js';
+import { ClipboardIcon, EyeIcon, TagIcon, CheckIcon, ClockIcon, CloseIcon } from './ui/Icons.js';
+import { getDisplayField } from '../utils/getDisplayField.js';
+import { Button } from './ui/Button.js';
+
+type TabType = 'queue' | 'history';
 
 export default function Queue() {
-  const { queue, currentIndex } = useStore();
+  const { queue, currentIndex, actionsHistory, fieldDisplayConfig } = useStore();
+  const [activeTab, setActiveTab] = useState<TabType>('queue');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  if (queue.length === 0) {
+  if (queue.length === 0 && actionsHistory.length === 0) {
     return null;
   }
 
   const reviewed = currentIndex;
   const total = queue.length;
 
-  return (
-    <div className="bg-white border-r border-gray-200 w-64 flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h3 className="font-semibold text-gray-900">Review Queue</h3>
-        <p className="text-sm text-gray-600 mt-1">
-          {reviewed} / {total} reviewed
-        </p>
-        <div className="mt-2 bg-gray-200 rounded-full h-2">
-          <div
-            className="bg-primary h-2 rounded-full transition-all"
-            style={{ width: `${(reviewed / total) * 100}%` }}
-          />
-        </div>
-      </div>
+  // Filter queue items based on search
+  const filteredQueue = queue.filter((item) => {
+    if (!searchQuery) return true;
+    const displayValue = getDisplayField(item.original, fieldDisplayConfig);
+    return displayValue.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
-      {/* Queue items */}
-      <div className="flex-1 overflow-y-auto">
-        {queue.slice(currentIndex, currentIndex + 5).map((item, idx) => (
-          <div
-            key={item.noteId}
-            className={`p-3 border-b border-gray-100 ${
-              idx === 0 ? 'bg-blue-50 border-l-4 border-l-primary' : 'hover:bg-gray-50'
+  // Filter history items based on search
+  const filteredHistory = actionsHistory.filter((item) => {
+    if (!searchQuery || !item.original) return true;
+    const displayValue = getDisplayField(item.original, fieldDisplayConfig);
+    return displayValue.toLowerCase().includes(searchQuery.toLowerCase());
+  }).reverse(); // Show most recent first
+
+  return (
+    <div className="bg-white border-r border-gray-200/50 w-72 flex flex-col shadow-sm">
+      {/* Header with Tabs */}
+      <div className="border-b border-gray-100">
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('queue')}
+            className={`flex-1 px-4 py-3 text-sm font-semibold transition-colors ${
+              activeTab === 'queue'
+                ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <div className="text-sm font-medium text-gray-900 truncate">
-              {Object.values(item.original.fields)[0]?.value || 'No content'}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {item.changes ? Object.keys(item.changes).length : 0} field(s) changed
-            </div>
-          </div>
-        ))}
-      </div>
+            Queue {queue.length > 0 && `(${queue.length})`}
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 px-4 py-3 text-sm font-semibold transition-colors ${
+              activeTab === 'history'
+                ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            History {actionsHistory.length > 0 && `(${actionsHistory.length})`}
+          </button>
+        </div>
 
-      {/* Stats */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <div className="text-xs text-gray-600 space-y-1">
-          <div className="flex justify-between">
-            <span>Remaining:</span>
-            <span className="font-medium">{total - reviewed}</span>
+        {/* Search Bar */}
+        <div className="p-3">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Search ${activeTab}...`}
+              className="w-full px-3 py-2 pr-8 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            {searchQuery && (
+              <Button
+                onClick={() => setSearchQuery('')}
+                variant="ghost"
+                icon={<CloseIcon className="w-3.5 h-3.5 text-gray-400" />}
+                className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-gray-200"
+              />
+            )}
           </div>
         </div>
+
+        {/* Progress Bar (only show for queue tab) */}
+        {activeTab === 'queue' && queue.length > 0 && (
+          <div className="px-4 pb-3 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-600 font-medium">Progress</span>
+              <span className="text-indigo-600 font-bold">{reviewed} / {total}</span>
+            </div>
+            <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-indigo-600 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out shadow-sm"
+                style={{ width: `${total > 0 ? (reviewed / total) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-3">
+          {activeTab === 'queue' ? (
+            // Queue Items
+            filteredQueue.length > 0 ? (
+              <div className="space-y-2">
+                {filteredQueue.slice(currentIndex, currentIndex + 10).map((item, idx) => {
+                  const globalIdx = queue.indexOf(item);
+                  const isCurrent = globalIdx === currentIndex;
+                  return (
+                    <div
+                      key={item.noteId}
+                      className={`relative rounded-lg border transition-all ${
+                        isCurrent
+                          ? 'bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200 shadow-sm ring-2 ring-indigo-100'
+                          : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                      }`}
+                    >
+                      {isCurrent && (
+                        <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-indigo-600 to-indigo-500 rounded-r"></div>
+                      )}
+                      <div className="p-3">
+                        <div className="flex items-center gap-2">
+                          {isCurrent ? (
+                            <div className="w-6 h-6 bg-indigo-600 rounded-md flex items-center justify-center flex-shrink-0">
+                              <EyeIcon className="w-3.5 h-3.5 text-white" />
+                            </div>
+                          ) : (
+                            <div className="w-6 h-6 bg-gray-100 rounded-md flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-semibold text-gray-500">{globalIdx + 1}</span>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-medium truncate ${isCurrent ? 'text-gray-900' : 'text-gray-700'}`}>
+                              {getDisplayField(item.original, fieldDisplayConfig)}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <TagIcon className="w-3 h-3 text-gray-400" />
+                              <span className="text-xs text-gray-500">
+                                {item.changes ? Object.keys(item.changes).length : 0} change{Object.keys(item.changes || {}).length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-500">No cards match your search</p>
+              </div>
+            )
+          ) : (
+            // History Items
+            filteredHistory.length > 0 ? (
+              <div className="space-y-2">
+                {filteredHistory.map((item) => (
+                  <div
+                    key={item.timestamp}
+                    className="rounded-lg border bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all"
+                  >
+                    <div className="p-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${
+                          item.action === 'accept'
+                            ? 'bg-green-100'
+                            : item.action === 'reject'
+                            ? 'bg-red-100'
+                            : 'bg-gray-100'
+                        }`}>
+                          {item.action === 'accept' ? (
+                            <CheckIcon className="w-3.5 h-3.5 text-green-600" />
+                          ) : item.action === 'reject' ? (
+                            <CloseIcon className="w-3.5 h-3.5 text-red-600" />
+                          ) : (
+                            <ClockIcon className="w-3.5 h-3.5 text-gray-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate text-gray-900">
+                            {item.original ? getDisplayField(item.original, fieldDisplayConfig) : 'No content'}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-xs font-medium ${
+                              item.action === 'accept'
+                                ? 'text-green-600'
+                                : item.action === 'reject'
+                                ? 'text-red-600'
+                                : 'text-gray-600'
+                            }`}>
+                              {item.action === 'accept' ? 'Accepted' : item.action === 'reject' ? 'Rejected' : 'Skipped'}
+                            </span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(item.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-500">
+                  {searchQuery ? 'No history matches your search' : 'No history yet'}
+                </p>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* Stats Footer */}
+      {activeTab === 'queue' && queue.length > 0 && (
+        <div className="p-4 border-t border-gray-100 bg-gradient-to-b from-gray-50 to-white">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-lg p-3 border border-gray-200">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckIcon className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="text-xs font-medium text-gray-600">Done</span>
+              </div>
+              <p className="text-lg font-bold text-gray-900">{reviewed}</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 border border-gray-200">
+              <div className="flex items-center gap-2 mb-1">
+                <ClockIcon className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-medium text-gray-600">Left</span>
+              </div>
+              <p className="text-lg font-bold text-gray-900">{total - reviewed}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

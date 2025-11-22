@@ -27,7 +27,9 @@ This prevents multiple background processes from accumulating.
 ## Development Notes
 
 - Full TypeScript codebase (backend + frontend)
-- Filesystem cache in `cache/decks/` for fast loading
+- Persistent storage in `database/` directory:
+  - `database/decks/` - Deck note caches
+  - `database/settings.json` - User settings (field display config, etc.)
 - Batch processing (100 cards at a time) for large decks
 - All `.js` and `.jsx` files have been migrated to `.ts` and `.tsx`
 
@@ -48,9 +50,36 @@ curl http://localhost:3000/api/anki/ping
 curl http://localhost:3000/api/decks
 ```
 
+## Frontend Code Practices
+
+**Component Organization:**
+- All reusable UI icons are in `frontend/src/components/ui/Icons.tsx`
+- Custom hooks are in `frontend/src/hooks/` for business logic separation
+- UI components in `frontend/src/components/ui/` for reusable UI elements
+- Main feature components in `frontend/src/components/`
+
+**Code Quality Standards:**
+- **No inline SVG duplication** - Always use icon components from `Icons.tsx`
+- **Separate business logic from UI** - Extract logic into custom hooks
+- **Use custom hooks for:**
+  - State management patterns (e.g., `useNotification`)
+  - API calls and data fetching (e.g., `useCardGeneration`)
+  - Complex user interactions (e.g., `useCardReview`)
+- **Reusable components** - Create shared components in `ui/` folder
+- **Type safety** - All components and hooks have proper TypeScript types
+
+**Key Files:**
+- `frontend/src/components/ui/Icons.tsx` - 21 icon components
+- `frontend/src/hooks/useNotification.ts` - Notification management
+- `frontend/src/hooks/useCardGeneration.ts` - Card suggestion generation
+- `frontend/src/hooks/useCardReview.ts` - Review actions (accept/reject/skip)
+
 ## Important Reminders
 
 1. **Always ask user to start servers** - don't start them automatically
 2. TypeScript is configured and working for both backend and frontend
-3. Cache files are stored in `cache/decks/` directory
+3. **Database directory** - All persistent data is stored in `database/`:
+   - Deck caches in `database/decks/`
+   - User settings in `database/settings.json`
 4. Refer to `TODO.md` for project status and next steps
+5. **Keep frontend clean** - Use icon components and custom hooks, avoid duplication

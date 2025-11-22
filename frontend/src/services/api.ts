@@ -5,7 +5,12 @@ import type {
   GetNotesResponse,
   SyncResponse,
   CacheInfo,
+  FieldDisplayConfig,
 } from '../types/index.js';
+
+interface UserSettings {
+  fieldDisplayConfig: FieldDisplayConfig;
+}
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -61,6 +66,18 @@ export const ankiApi = {
   // Batch update notes
   batchUpdateNotes: async (updates: Array<{ noteId: number; fields: Record<string, string> }>): Promise<{ success: boolean; results: any[] }> => {
     const response = await api.post<{ success: boolean; results: any[] }>('/notes/batch-update', { updates });
+    return response.data;
+  },
+
+  // Get user settings
+  getSettings: async (): Promise<UserSettings> => {
+    const response = await api.get<UserSettings>('/settings');
+    return response.data;
+  },
+
+  // Update field display configuration
+  updateFieldDisplayConfig: async (config: FieldDisplayConfig): Promise<{ success: boolean }> => {
+    const response = await api.put<{ success: boolean }>('/settings/field-display', { config });
     return response.data;
   },
 };

@@ -2,7 +2,9 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import ankiConnect from './services/ankiConnect.js';
 import cache from './services/cache.js';
+import settings from './services/settings.js';
 import type { GetNotesResponse, SyncResponse, CacheInfo, ErrorResponse } from './types/index.js';
+import type { FieldDisplayConfig } from './services/settings.js';
 
 const app = express();
 const PORT = 3001;
@@ -160,6 +162,29 @@ app.post('/api/notes/batch-update', async (req: Request, res: Response) => {
     const { updates } = req.body as { updates: Array<{ noteId: number; fields: Record<string, string> }> };
     const results = await ankiConnect.batchUpdateNotes(updates);
     res.json({ success: true, results });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: errorMessage } as ErrorResponse);
+  }
+});
+
+// Get user settings
+app.get('/api/settings', async (_req: Request, res: Response) => {
+  try {
+    const userSettings = await settings.loadSettings();
+    res.json(userSettings);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: errorMessage } as ErrorResponse);
+  }
+});
+
+// Update field display configuration
+app.put('/api/settings/field-display', async (req: Request, res: Response) => {
+  try {
+    const { config } = req.body as { config: FieldDisplayConfig };
+    await settings.updateFieldDisplayConfig(config);
+    res.json({ success: true });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     res.status(500).json({ error: errorMessage } as ErrorResponse);

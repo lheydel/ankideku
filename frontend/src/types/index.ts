@@ -54,6 +54,10 @@ export interface CardSuggestion {
   reasoning?: string;
 }
 
+export interface FieldDisplayConfig {
+  [modelName: string]: string; // Maps model name to field name to display
+}
+
 export interface StoreState {
   // Connection state
   ankiConnected: boolean;
@@ -91,6 +95,11 @@ export interface StoreState {
   // Actions history
   actionsHistory: ActionHistoryEntry[];
   addToHistory: (action: Omit<ActionHistoryEntry, 'timestamp'>) => void;
+
+  // Settings
+  fieldDisplayConfig: FieldDisplayConfig;
+  setFieldDisplayConfig: (config: FieldDisplayConfig) => void;
+  updateFieldDisplay: (modelName: string, fieldName: string) => void;
 
   // Reset
   reset: () => void;

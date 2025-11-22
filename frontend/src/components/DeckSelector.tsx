@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ankiApi } from '../services/api.js';
 import useStore from '../store/useStore.js';
+import { SpinnerIcon, WarningIcon, RefreshIcon, DeckIcon, ChevronDownIcon, CheckIcon } from './ui/Icons.js';
 
 export default function DeckSelector() {
   const { decks, selectedDeck, setDecks, selectDeck, setAnkiConnected } = useStore();
@@ -42,24 +43,31 @@ export default function DeckSelector() {
 
   if (loading) {
     return (
-      <div className="p-4 bg-gray-100 rounded-lg">
-        <div className="animate-pulse">Loading decks...</div>
+      <div className="p-6 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
+        <div className="flex items-center gap-3">
+          <SpinnerIcon className="w-5 h-5 text-indigo-600" />
+          <span className="text-indigo-900 font-medium">Loading decks...</span>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-red-800 font-medium">Connection Error</p>
-            <p className="text-red-600 text-sm mt-1">{error}</p>
+      <div className="p-6 bg-red-50 border border-red-200 rounded-xl">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <WarningIcon className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-red-900 font-semibold">Connection Error</p>
+              <p className="text-red-700 text-sm mt-1">{error}</p>
+            </div>
           </div>
           <button
             onClick={checkConnection}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+            className="btn btn-danger flex-shrink-0"
           >
+            <RefreshIcon className="w-4 h-4 inline mr-2" />
             Retry
           </button>
         </div>
@@ -68,30 +76,44 @@ export default function DeckSelector() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Select Deck</h2>
-        <span className="text-sm text-gray-500">{deckEntries.length} decks available</span>
+        <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <DeckIcon className="w-4 h-4 text-indigo-600" />
+          Select Deck
+        </label>
+        <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
+          {deckEntries.length} available
+        </span>
       </div>
 
-      <select
-        value={selectedDeck || ''}
-        onChange={(e) => selectDeck(e.target.value)}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-      >
-        <option value="">Choose a deck...</option>
-        {deckEntries.map(([name, id]) => (
-          <option key={id} value={name}>
-            {name}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          value={selectedDeck || ''}
+          onChange={(e) => selectDeck(e.target.value)}
+          className="input appearance-none pr-10 cursor-pointer"
+        >
+          <option value="">Choose a deck...</option>
+          {deckEntries.map(([name, id]) => (
+            <option key={id} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <ChevronDownIcon className="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </div>
 
       {selectedDeck && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <span className="font-medium">Selected:</span> {selectedDeck}
-          </p>
+        <div className="p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <CheckIcon className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-indigo-600 mb-0.5">Selected Deck</p>
+              <p className="text-sm font-semibold text-indigo-900 truncate">{selectedDeck}</p>
+            </div>
+          </div>
         </div>
       )}
     </div>

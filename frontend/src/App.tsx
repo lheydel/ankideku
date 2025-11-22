@@ -1,230 +1,116 @@
 import { useState } from 'react';
-import DeckSelector from './components/DeckSelector.js';
-import PromptInput from './components/PromptInput.js';
-import Queue from './components/Queue.js';
 import ComparisonView from './components/ComparisonView.js';
+import Queue from './components/Queue.js';
+import Sidebar from './components/Sidebar.js';
+import Settings from './components/Settings.js';
+import Notification from './components/ui/Notification.js';
+import { Button } from './components/ui/Button.js';
+import { LightningIcon, ChatIcon, SettingsIcon } from './components/ui/Icons.js';
 import useStore from './store/useStore.js';
-import { ankiApi } from './services/api.js';
-import type { NotificationState, Note, CardSuggestion } from './types/index.js';
+import { useNotification } from './hooks/useNotification.js';
+import { useCardReview } from './hooks/useCardReview.js';
 
 function App() {
-  const {
-    selectedDeck,
-    prompt,
-    setQueue,
-    setProcessing,
-    setProgress,
-    addToPromptHistory,
-    queue,
-    getCurrentCard,
-    nextCard,
-    skipCard,
-    currentIndex,
-    addToHistory,
-  } = useStore();
+  const { queue } = useStore();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<NotificationState | null>(null);
-
-  const handleGenerate = async () => {
-    if (!selectedDeck || !prompt.trim()) return;
-
-    try {
-      setError(null);
-      setProcessing(true);
-      setProgress(0, 0);
-
-      // Add to prompt history
-      addToPromptHistory(prompt);
-
-      // Fetch all notes from the deck (cache-first)
-      console.log('Fetching notes from deck:', selectedDeck);
-      const response = await ankiApi.getDeckNotes(selectedDeck);
-      const notes = response.notes || (response as any); // Handle both old and new format
-      console.log(`Fetched ${notes.length} notes ${response.fromCache ? '(from cache at ' + response.cachedAt + ')' : '(from Anki)'}`);
-
-      if (response.fromCache) {
-        showNotification(`Loaded ${notes.length} cards from cache`, 'info');
-      }
-
-      setProgress(notes.length, notes.length);
-
-      // For now, create mock suggestions (we'll integrate real AI later)
-      // This simulates finding issues in some cards
-      const mockSuggestions: CardSuggestion[] = notes.slice(0, Math.min(10, notes.length)).map((note: Note) => {
-        // Create a mock change for the first field
-        const firstFieldName = Object.keys(note.fields)[0];
-        const originalValue = note.fields[firstFieldName].value;
-
-        return {
-          noteId: note.noteId,
-          original: note,
-          changes: {
-            [firstFieldName]: originalValue + ' [AI: suggestion placeholder]',
-          },
-          reasoning: 'This is a placeholder. AI integration coming soon!',
-        };
-      });
-
-      setQueue(mockSuggestions);
-      setProcessing(false);
-
-      console.log(`Generated ${mockSuggestions.length} suggestions`);
-    } catch (err) {
-      console.error('Error generating suggestions:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate suggestions';
-      setError(errorMessage);
-      setProcessing(false);
-    }
-  };
-
-  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
-
-  const handleAccept = async () => {
-    const card = getCurrentCard();
-    if (!card) return;
-
-    try {
-      // Update note in Anki and cache
-      await ankiApi.updateNote(card.noteId, card.changes, selectedDeck);
-
-      // Log the action
-      addToHistory({
-        action: 'accept',
-        noteId: card.noteId,
-        changes: card.changes,
-        original: card.original,
-      });
-
-      showNotification('Changes accepted and applied', 'success');
-
-      // Move to next card or finish
-      if (currentIndex < queue.length - 1) {
-        nextCard();
-      } else {
-        showNotification('All suggestions reviewed!', 'success');
-        setQueue([]);
-      }
-    } catch (err) {
-      console.error('Error accepting changes:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      showNotification('Failed to apply changes: ' + errorMessage, 'error');
-    }
-  };
-
-  const handleReject = () => {
-    const card = getCurrentCard();
-    if (!card) return;
-
-    // Log the rejection
-    addToHistory({
-      action: 'reject',
-      noteId: card.noteId,
-      changes: card.changes,
-    });
-
-    showNotification('Suggestion rejected', 'info');
-
-    // Move to next card or finish
-    if (currentIndex < queue.length - 1) {
-      nextCard();
-    } else {
-      showNotification('All suggestions reviewed!', 'success');
-      setQueue([]);
-    }
-  };
-
-  const handleSkip = () => {
-    skipCard();
-    showNotification('Card skipped - moved to end of queue', 'info');
-  };
+  const { notification, showNotification } = useNotification();
+  const { handleAccept, handleReject, handleSkip } = useCardReview();
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Notification Toast */}
-      {notification && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div
-            className={`px-6 py-3 rounded-lg shadow-lg ${
-              notification.type === 'success'
-                ? 'bg-green-500 text-white'
-                : notification.type === 'error'
-                ? 'bg-red-500 text-white'
-                : 'bg-blue-500 text-white'
-            }`}
-          >
-            {notification.message}
+      {notification && <Notification notification={notification} />}
+
+      {/* Modern Header */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40">
+        <div className="px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <LightningIcon className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-indigo-800 bg-clip-text text-transparent leading-none">
+                AnkiDeku
+              </h1>
+              <p className="text-sm text-gray-500 mt-1 leading-none">AI-Powered Deck Revision</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setSettingsOpen(true)}
+              variant="secondary"
+              size="md"
+              icon={<SettingsIcon className="w-4 h-4" />}
+            >
+              <span>Settings</span>
+            </Button>
+            <Button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              variant="primary"
+              size="md"
+              icon={<ChatIcon className="w-4 h-4" />}
+            >
+              {sidebarOpen ? 'Hide' : 'Show'} Assistant
+            </Button>
           </div>
         </div>
-      )}
-
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <h1 className="text-2xl font-bold text-gray-900">AnkiDeku</h1>
-        <p className="text-sm text-gray-600">AI-Powered Deck Revision</p>
       </header>
 
-      <div className="flex h-[calc(100vh-73px)]">
-        {/* Sidebar - Queue */}
-        {queue.length > 0 && <Queue />}
+      {/* Main Content */}
+      <div className="flex h-[calc(100vh-81px)]">
+        {/* Queue Sidebar - Left */}
+        <Queue />
 
-        {/* Main Content */}
+        {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto">
           {queue.length === 0 ? (
-            // Setup view
-            <div className="max-w-2xl mx-auto p-8 space-y-6">
-              <DeckSelector />
-              <PromptInput onGenerate={handleGenerate} />
-
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-800 font-medium">Error</p>
-                  <p className="text-red-600 text-sm mt-1">{error}</p>
+            // Empty state
+            <div className="min-h-full flex items-center justify-center p-8">
+              <div className="text-center max-w-md">
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <LightningIcon className="w-10 h-10 text-indigo-600" />
                 </div>
-              )}
-
-              <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="font-semibold text-blue-900 mb-2">How it works</h3>
-                <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
-                  <li>Select a deck from your Anki collection</li>
-                  <li>Enter instructions for AI (e.g., "Fix typos")</li>
-                  <li>AI processes all cards and suggests improvements</li>
-                  <li>Review suggestions and accept/reject each one</li>
-                  <li>Changes are applied directly to your Anki deck</li>
-                </ol>
+                <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                  Ready to Improve Your Decks
+                </h2>
+                <p className="text-gray-600 mb-6">
+                  Open the AI Assistant, select a deck, and describe what you'd like to improve.
+                </p>
+                <Button
+                  onClick={() => setSidebarOpen(true)}
+                  variant="primary"
+                  icon={<ChatIcon className="w-5 h-5" />}
+                >
+                  Open AI Assistant
+                </Button>
               </div>
             </div>
           ) : (
             // Review view
             <div className="p-8">
-              <div className="max-w-5xl mx-auto">
-                <div className="mb-6 flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    Review Suggestions
-                  </h2>
-                  <button
-                    onClick={() => setQueue([])}
-                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-                  >
-                    Start New Review
-                  </button>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <ComparisonView
-                    onAccept={handleAccept}
-                    onReject={handleReject}
-                    onSkip={handleSkip}
-                  />
-                </div>
+              <div className="max-w-6xl mx-auto space-y-6">
+                <ComparisonView
+                  onAccept={() => handleAccept(
+                    (msg) => showNotification(msg, 'success'),
+                    (msg) => showNotification(msg, 'error')
+                  )}
+                  onReject={() => handleReject((msg) => showNotification(msg, 'info'))}
+                  onSkip={() => handleSkip((msg) => showNotification(msg, 'info'))}
+                />
               </div>
             </div>
           )}
         </div>
+
+        {/* AI Assistant Sidebar - Right */}
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       </div>
+
+      {/* Settings Modal */}
+      <Settings isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

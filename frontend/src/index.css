@@ -3,7 +3,120 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Modern color palette */
+    --color-primary: 79 70 229; /* Indigo-600 */
+    --color-primary-hover: 67 56 202; /* Indigo-700 */
+    --color-primary-light: 238 242 255; /* Indigo-50 */
+
+    --color-success: 34 197 94; /* Green-500 */
+    --color-error: 239 68 68; /* Red-500 */
+    --color-warning: 245 158 11; /* Amber-500 */
+    --color-info: 59 130 246; /* Blue-500 */
+
+    --color-bg: 249 250 251; /* Gray-50 */
+    --color-surface: 255 255 255; /* White */
+    --color-border: 229 231 235; /* Gray-200 */
+
+    --color-text-primary: 17 24 39; /* Gray-900 */
+    --color-text-secondary: 107 114 128; /* Gray-500 */
+    --color-text-tertiary: 156 163 175; /* Gray-400 */
+  }
+
   body {
-    @apply font-sans antialiased;
+    @apply font-sans antialiased bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  /* Modern card style */
+  .card {
+    @apply bg-white rounded-xl border border-gray-100 shadow-sm;
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  }
+
+  /* Modern button variants */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium leading-none transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500 shadow-sm hover:shadow;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-indigo-500 shadow-sm;
+  }
+
+  .btn-success {
+    @apply bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 shadow-sm hover:shadow;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-sm hover:shadow;
+  }
+
+  .btn-warning {
+    @apply bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500 shadow-sm hover:shadow;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-white/60 text-gray-600;
+  }
+
+  .btn-text {
+    @apply text-indigo-600 hover:text-indigo-700;
+  }
+
+  /* Input styles */
+  .input {
+    @apply w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all;
+  }
+
+  /* Smooth animations */
+  .fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
   }
 }

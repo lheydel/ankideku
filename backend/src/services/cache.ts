@@ -5,7 +5,8 @@ import type { Note, CachedDeckData, CacheInfo } from '../types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const CACHE_DIR = path.join(__dirname, '../../../cache/decks');
+const DATABASE_DIR = path.join(__dirname, '../../../database');
+const CACHE_DIR = path.join(DATABASE_DIR, 'decks');
 
 class CacheService {
   /**

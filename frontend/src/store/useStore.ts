@@ -64,6 +64,13 @@ const useStore = create<StoreState>((set, get) => ({
     actionsHistory: [...state.actionsHistory, { ...action, timestamp: new Date().toISOString() }]
   })),
 
+  // Settings
+  fieldDisplayConfig: {},
+  setFieldDisplayConfig: (config) => set({ fieldDisplayConfig: config }),
+  updateFieldDisplay: (modelName: string, fieldName: string) => set((state) => ({
+    fieldDisplayConfig: { ...state.fieldDisplayConfig, [modelName]: fieldName }
+  })),
+
   // Reset
   reset: () => set({
     selectedDeck: null,
