@@ -54,7 +54,7 @@ export class FileWatcherService extends EventEmitter {
       }
     });
 
-    const handleFileChange = async (filePath: string) => {
+    const handleStateChange = async (filePath: string) => {
       try {
         const basename = path.basename(filePath);
 
@@ -63,7 +63,22 @@ export class FileWatcherService extends EventEmitter {
           const state = JSON.parse(content);
           this.emit('state:change', { sessionId, state });
           console.log(`State changed for session ${sessionId}: ${state.state}`);
-        } else if (basename.startsWith('suggestion-') && basename.endsWith('.json')) {
+        }
+      } catch (error) {
+        console.error(`Error processing file ${filePath}:`, error);
+        this.emit('error', {
+          sessionId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          filePath
+        });
+      }
+    };
+
+    const handleNewSuggestion = async (filePath: string) => {
+      try {
+        const basename = path.basename(filePath);
+
+        if (basename.startsWith('suggestion-') && basename.endsWith('.json')) {
           const content = await fs.readFile(filePath, 'utf-8');
           const suggestion: CardSuggestion = JSON.parse(content);
 
@@ -83,8 +98,8 @@ export class FileWatcherService extends EventEmitter {
       }
     };
 
-    watcher.on('add', handleFileChange);
-    watcher.on('change', handleFileChange);
+    watcher.on('add', handleNewSuggestion);
+    watcher.on('change', handleStateChange);
 
     watcher.on('ready', () => {
       console.log(`File watcher ready for session ${sessionId}`);

@@ -109,12 +109,64 @@ export class SessionService {
   }
 
   /**
+   * Refresh the original fields of a suggestion with current state from Anki
+   * @param sessionId - Session ID
+   * @param noteId - Note ID of the suggestion
+   * @returns Updated suggestion
+   */
+  async refreshSuggestionOriginal(sessionId: string, noteId: number): Promise<CardSuggestion> {
+    const suggestionsDir = path.join(this.sessionsDir, sessionId, 'suggestions');
+    const suggestionPath = path.join(suggestionsDir, `suggestion-${noteId}.json`);
+
+    try {
+      const content = await fs.readFile(suggestionPath, 'utf-8');
+      const suggestion: CardSuggestion = JSON.parse(content);
+
+      // Import ankiConnect here to avoid circular dependency
+      const { default: ankiConnect } = await import('./ankiConnect.js');
+
+      // Fetch current note state from Anki
+      const currentNotes = await ankiConnect.notesInfo([noteId]);
+      if (currentNotes.length === 0) {
+        throw new Error(`Note ${noteId} not found in Anki`);
+      }
+
+      const currentNote = currentNotes[0];
+
+      // Update the original fields with current values from Anki
+      for (const [fieldName, fieldData] of Object.entries(suggestion.original.fields)) {
+        if (currentNote.fields[fieldName] !== undefined) {
+          // currentNote.fields[fieldName] is already a NoteField object with {value, order}
+          // We only want to update the value string
+          const currentField = currentNote.fields[fieldName];
+          if (typeof currentField === 'string') {
+            // If it's a plain string (shouldn't happen but handle it)
+            fieldData.value = currentField;
+          } else {
+            // It's a NoteField object, extract just the value
+            fieldData.value = currentField.value;
+          }
+        }
+      }
+
+      // Save the updated suggestion back to file
+      await fs.writeFile(suggestionPath, JSON.stringify(suggestion, null, 2));
+
+      return suggestion;
+    } catch (error) {
+      console.error(`Failed to refresh suggestion original for note ${noteId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Mark a suggestion as accepted or rejected
    * @param sessionId - Session ID
    * @param noteId - Note ID of the suggestion
    * @param accepted - true if accepted, false if rejected
+   * @param appliedChanges - The actual changes that were applied (may differ from original suggestion if edited)
    */
-  async markSuggestionStatus(sessionId: string, noteId: number, accepted: boolean): Promise<void> {
+  async markSuggestionStatus(sessionId: string, noteId: number, accepted: boolean, appliedChanges?: Record<string, string>): Promise<void> {
     const suggestionsDir = path.join(this.sessionsDir, sessionId, 'suggestions');
     const suggestionPath = path.join(suggestionsDir, `suggestion-${noteId}.json`);
 
@@ -124,9 +176,67 @@ export class SessionService {
 
       suggestion.accepted = accepted;
 
+      // If accepted and changes were applied, update the original to reflect the new state
+      if (accepted && appliedChanges) {
+        // Update the original fields with the applied changes
+        for (const [fieldName, newValue] of Object.entries(appliedChanges)) {
+          if (suggestion.original.fields[fieldName]) {
+            suggestion.original.fields[fieldName].value = newValue;
+          }
+        }
+      }
+
       await fs.writeFile(suggestionPath, JSON.stringify(suggestion, null, 2));
     } catch (error) {
       console.error(`Failed to update suggestion status for note ${noteId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save edited changes made by the user to a suggestion
+   * @param sessionId - Session ID
+   * @param noteId - Note ID
+   * @param editedChanges - The edited field values
+   */
+  async saveEditedChanges(sessionId: string, noteId: number, editedChanges: Record<string, string>): Promise<void> {
+    const suggestionsDir = path.join(this.sessionsDir, sessionId, 'suggestions');
+    const suggestionPath = path.join(suggestionsDir, `suggestion-${noteId}.json`);
+
+    try {
+      const content = await fs.readFile(suggestionPath, 'utf-8');
+      const suggestion: CardSuggestion = JSON.parse(content);
+
+      suggestion.editedChanges = editedChanges;
+
+      await fs.writeFile(suggestionPath, JSON.stringify(suggestion, null, 2));
+      console.log(`Saved edited changes for note ${noteId} in session ${sessionId}`);
+    } catch (error) {
+      console.error(`Failed to save edited changes for note ${noteId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Revert/remove all edited changes made by the user to a suggestion
+   * @param sessionId - Session ID
+   * @param noteId - Note ID
+   */
+  async revertEditedChanges(sessionId: string, noteId: number): Promise<void> {
+    const suggestionsDir = path.join(this.sessionsDir, sessionId, 'suggestions');
+    const suggestionPath = path.join(suggestionsDir, `suggestion-${noteId}.json`);
+
+    try {
+      const content = await fs.readFile(suggestionPath, 'utf-8');
+      const suggestion: CardSuggestion = JSON.parse(content);
+
+      // Delete the editedChanges field entirely
+      delete suggestion.editedChanges;
+
+      await fs.writeFile(suggestionPath, JSON.stringify(suggestion, null, 2));
+      console.log(`Reverted edited changes for note ${noteId} in session ${sessionId}`);
+    } catch (error) {
+      console.error(`Failed to revert edited changes for note ${noteId}:`, error);
       throw error;
     }
   }

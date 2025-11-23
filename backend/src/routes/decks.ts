@@ -7,6 +7,19 @@ import type { GetNotesResponse, SyncResponse, CacheInfo } from '../types/index.j
 const router = Router();
 
 /**
+ * Get all deck names and IDs
+ */
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const decks = await ankiConnect.getDeckNamesAndIds();
+    res.json(decks);
+  } catch (error) {
+    console.error('Error fetching decks:', error);
+    sendErrorResponse(res, error, 500);
+  }
+});
+
+/**
  * Get notes from a deck (cache-first with incremental sync)
  */
 router.get('/:deckName/notes', async (req: Request, res: Response) => {

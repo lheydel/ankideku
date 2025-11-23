@@ -6,6 +6,7 @@ import Settings from './components/Settings.js';
 import Notification from './components/ui/Notification.js';
 import ConfirmDialog from './components/ui/ConfirmDialog.js';
 import OutputViewer from './components/ui/OutputViewer.js';
+import { ConflictDialog } from './components/ui/ConflictDialog.js';
 import { Button } from './components/ui/Button.js';
 import { LightningIcon, ChatIcon, SettingsIcon, MoonIcon, SunIcon, Logo } from './components/ui/Icons.js';
 import { SessionCard } from './components/SessionCard.js';
@@ -25,7 +26,14 @@ function App() {
   const [outputViewerSession, setOutputViewerSession] = useState<string | null>(null);
 
   const { notification, showNotification } = useNotification();
-  const { handleAccept, handleReject, handleSkip } = useCardReview();
+  const {
+    handleAccept,
+    handleReject,
+    handleSkip,
+    conflictDetected,
+    handleViewNewVersion,
+    handleCancelConflict
+  } = useCardReview();
   const { theme, toggleTheme } = useTheme();
   const { sessions, loadSession, listSessions, deleteSession, clearSession } = useSessionManagement();
 
@@ -60,9 +68,10 @@ function App() {
           original: firstSuggestion.original,
           changes: firstSuggestion.changes,
           reasoning: firstSuggestion.reasoning,
-          readonly: true,
+          readonly: false,
           status: firstSuggestion.action as 'accept' | 'reject' | undefined,
-          timestamp: firstSuggestion.timestamp
+          timestamp: firstSuggestion.timestamp,
+          editedChanges: firstSuggestion.editedChanges
         });
       }
     } catch (error) {
@@ -70,7 +79,7 @@ function App() {
     }
   }, [loadSession, setQueue, setSelectedCard, showNotification]);
 
-  const handleBackToSessions = useCallback(() => {
+  const handleClearSession = useCallback(() => {
     setQueue([]);
     clearSession();
     setSelectedCard(null);
@@ -170,12 +179,13 @@ function App() {
               <div className="max-w-6xl mx-auto space-y-6">
                 <ComparisonView
                   currentSessionData={currentSessionData}
-                  onBackToSessions={handleBackToSessions}
-                  onAccept={() => handleAccept(
+                  onBackToSessions={handleClearSession}
+                  onAccept={(editedChanges) => handleAccept(
                     (msg) => showNotification(msg, 'success'),
-                    (msg) => showNotification(msg, 'error')
+                    (msg) => showNotification(msg, 'error'),
+                    editedChanges
                   )}
-                  onReject={() => handleReject((msg) => showNotification(msg, 'info'))}
+                  onReject={(editedChanges) => handleReject((msg) => showNotification(msg, 'info'), editedChanges)}
                   onSkip={() => handleSkip((msg) => showNotification(msg, 'info'))}
                 />
               </div>
@@ -188,10 +198,8 @@ function App() {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentSessionData={currentSessionData}
-          onNewSession={() => {
-            clearSession();
-            setQueue([]);
-          }}
+          onNewSession={handleClearSession}
+          onViewLogs={currentSession ? () => setOutputViewerSession(currentSession) : undefined}
         />
       </div>
 
@@ -218,6 +226,13 @@ function App() {
           onClose={() => setOutputViewerSession(null)}
         />
       )}
+
+      {/* Conflict Detection Dialog */}
+      <ConflictDialog
+        isOpen={conflictDetected}
+        onCancel={handleCancelConflict}
+        onViewNewVersion={handleViewNewVersion}
+      />
     </div>
   );
 }

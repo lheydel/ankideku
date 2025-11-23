@@ -207,13 +207,9 @@ export class ClaudeSpawnerService {
                 const duration = message.duration_ms || 0;
                 const turns = message.num_turns || 0;
                 const cost = message.total_cost_usd || 0;
-                const resultText = message.result || '';
 
                 console.log(`[Claude ${sessionId}] ${isSuccess ? 'Completed' : 'Failed'} - Turns: ${turns}, Duration: ${(duration/1000).toFixed(1)}s, Cost: $${cost.toFixed(4)}`);
                 combinedStream.write(`[RESULT] Status: ${message.subtype}, Turns: ${turns}, Duration: ${duration}ms, Cost: $${cost}\n`);
-                if (resultText) {
-                  combinedStream.write(`[RESULT TEXT] ${resultText}\n`);
-                }
                 break;
 
               default:

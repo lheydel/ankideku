@@ -42,7 +42,7 @@ export const ankiApi = {
     return response.data;
   },
 
-  // Sync/refresh deck cache from Anki
+  // Sync/refresh deck cache from Anki (incremental sync)
   syncDeck: async (deckName: string): Promise<SyncResponse> => {
     const response = await api.post<SyncResponse>(`/decks/${encodeURIComponent(deckName)}/sync`);
     return response.data;
@@ -104,6 +104,30 @@ export const ankiApi = {
   searchHistory: async (query: string): Promise<ActionHistoryEntry[]> => {
     const response = await api.get<{ history: ActionHistoryEntry[] }>(`/history/search?q=${encodeURIComponent(query)}`);
     return response.data.history;
+  },
+
+  // Save edited changes to a suggestion
+  saveEditedChanges: async (sessionId: string, noteId: number, editedChanges: Record<string, string>): Promise<{ success: boolean }> => {
+    const response = await api.put<{ success: boolean }>(`/sessions/${sessionId}/suggestions/${noteId}/edited-changes`, { editedChanges });
+    return response.data;
+  },
+
+  // Revert/remove all edited changes from a suggestion
+  revertEditedChanges: async (sessionId: string, noteId: number): Promise<{ success: boolean }> => {
+    const response = await api.delete<{ success: boolean }>(`/sessions/${sessionId}/suggestions/${noteId}/edited-changes`);
+    return response.data;
+  },
+
+  // Get a single note by ID
+  getNote: async (noteId: number): Promise<any> => {
+    const response = await api.get(`/notes/${noteId}`);
+    return response.data;
+  },
+
+  // Refresh a suggestion's original fields with current Anki state
+  refreshSuggestionOriginal: async (sessionId: string, noteId: number): Promise<any> => {
+    const response = await api.put(`/sessions/${sessionId}/suggestions/${noteId}/refresh-original`);
+    return response.data;
   },
 };
 

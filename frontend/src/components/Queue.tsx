@@ -162,7 +162,8 @@ export default function Queue() {
                           original: item.original,
                           changes: item.changes,
                           reasoning: item.reasoning,
-                          readonly: false
+                          readonly: false,
+                          editedChanges: item.editedChanges
                         });
                       }}
                     />
@@ -196,7 +197,8 @@ export default function Queue() {
                           reasoning: item.reasoning,
                           readonly: true,
                           status: item.action as 'accept' | 'reject',
-                          timestamp: item.timestamp
+                          timestamp: item.timestamp,
+                          editedChanges: item.editedChanges
                         });
                       }}
                     />

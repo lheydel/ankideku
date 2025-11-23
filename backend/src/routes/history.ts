@@ -28,7 +28,8 @@ router.post('/sessions/:sessionId/history', async (req, res) => {
 
     // Mark the suggestion as accepted/rejected so it doesn't appear in the queue anymore
     const accepted = action.action === 'accept';
-    await sessionService.markSuggestionStatus(sessionId, action.noteId, accepted);
+    // Pass the applied changes so the suggestion file's original can be updated to reflect the new state
+    await sessionService.markSuggestionStatus(sessionId, action.noteId, accepted, accepted ? action.changes : undefined);
 
     res.json({ success: true, message: 'Action saved to history' });
   } catch (error) {

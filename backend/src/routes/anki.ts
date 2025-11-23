@@ -17,16 +17,4 @@ router.get('/ping', async (_req: Request, res: Response) => {
   }
 });
 
-/**
- * Get all decks
- */
-router.get('/decks', async (_req: Request, res: Response) => {
-  try {
-    const decks = await ankiConnect.getDeckNamesAndIds();
-    res.json(decks);
-  } catch (error) {
-    sendErrorResponse(res, error, 500);
-  }
-});
-
 export default router;

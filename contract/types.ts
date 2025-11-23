@@ -94,6 +94,7 @@ export interface CardSuggestion {
   changes: Record<string, string>;
   reasoning: string;
   accepted?: boolean | null; // null/undefined = pending, true = accepted, false = rejected
+  editedChanges?: Record<string, string>; // Manual edits made by user (if any)
 }
 
 export interface SessionData {
@@ -121,4 +122,5 @@ export interface ActionHistoryEntry {
   timestamp: string;
   sessionId?: string;
   deckName?: string;
+  editedChanges?: Record<string, string>; // Manual edits made by user (if any)
 }

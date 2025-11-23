@@ -46,8 +46,9 @@ export const Button: React.FC<ButtonProps> = ({
   const variantClass = variantClasses[variant];
   const sizeClass = isIconOnly ? 'p-2' : sizeClasses[size];
   const widthClass = fullWidth ? 'w-full' : '';
+  const disabledClass = disabled || loading ? 'opacity-50 cursor-not-allowed' : '';
 
-  const buttonClasses = `btn ${variantClass} ${sizeClass} ${widthClass} ${className}`.trim();
+  const buttonClasses = `btn ${variantClass} ${sizeClass} ${widthClass} ${disabledClass} ${className}`.trim();
 
   return (
     <button

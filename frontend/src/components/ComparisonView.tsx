@@ -1,11 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import useStore from '../store/useStore.js';
 import DiffMatchPatch from 'diff-match-patch';
-import { WarningIcon, CheckIcon, ArchiveIcon, DeckIcon, BrushIcon, ClipboardIcon, BulbIcon, ClockIcon, CloseIcon, ArrowRightIcon, KeyboardIcon } from './ui/Icons.js';
+import { WarningIcon, CheckIcon, ArchiveIcon, DeckIcon, BrushIcon, ClipboardIcon, BulbIcon, ClockIcon, CloseIcon, ArrowRightIcon, KeyboardIcon, EditIcon, EyeIcon, RefreshIcon } from './ui/Icons.js';
 import { Button } from './ui/Button.js';
 import { Breadcrumb } from './ui/Breadcrumb.js';
+import ConfirmDialog from './ui/ConfirmDialog.js';
 import type { SessionData } from '../types/index.js';
 import { isSessionActive } from '../utils/sessionUtils.js';
+import { ankiApi } from '../services/api.js';
 
 const dmp = new DiffMatchPatch();
 
@@ -18,9 +20,11 @@ interface CardFieldProps {
   isChanged: boolean;
   showDiff?: 'original' | 'suggested';
   diffs?: Diff[];
+  readonly?: boolean;
+  onChange?: (value: string) => void;
 }
 
-function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldProps) {
+function CardField({ fieldName, value, isChanged, showDiff, diffs, readonly, onChange }: CardFieldProps) {
   return (
     <div className={`py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${isChanged ? 'bg-yellow-50/30 dark:bg-yellow-900/20' : ''}`}>
       <div className="flex items-center gap-2 mb-1.5">
@@ -33,36 +37,45 @@ function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldPr
           {fieldName}
         </span>
       </div>
-      <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
-        {showDiff && diffs ? (
-          diffs.map((diff, i) => {
-            const [operation, text] = diff;
-            if (showDiff === 'original') {
-              if (operation === 1) return null;
-              if (operation === -1) {
-                return (
-                  <span key={i} className="bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-200 px-0.5 rounded line-through">
-                    {text}
-                  </span>
-                );
+      {!readonly && onChange ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 min-h-[60px] focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400"
+          rows={3}
+        />
+      ) : (
+        <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
+          {showDiff && diffs ? (
+            diffs.map((diff, i) => {
+              const [operation, text] = diff;
+              if (showDiff === 'original') {
+                if (operation === 1) return null;
+                if (operation === -1) {
+                  return (
+                    <span key={i} className="bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-200 px-0.5 rounded line-through">
+                      {text}
+                    </span>
+                  );
+                }
+                return <span key={i}>{text}</span>;
+              } else {
+                if (operation === -1) return null;
+                if (operation === 1) {
+                  return (
+                    <span key={i} className="bg-green-200 dark:bg-green-900/40 text-green-900 dark:text-green-200 px-0.5 rounded font-medium">
+                      {text}
+                    </span>
+                  );
+                }
+                return <span key={i}>{text}</span>;
               }
-              return <span key={i}>{text}</span>;
-            } else {
-              if (operation === -1) return null;
-              if (operation === 1) {
-                return (
-                  <span key={i} className="bg-green-200 dark:bg-green-900/40 text-green-900 dark:text-green-200 px-0.5 rounded font-medium">
-                    {text}
-                  </span>
-                );
-              }
-              return <span key={i}>{text}</span>;
-            }
-          })
-        ) : (
-          value || <span className="text-gray-400 dark:text-gray-500 italic text-xs">(empty)</span>
-        )}
-      </div>
+            })
+          ) : (
+            value || <span className="text-gray-400 dark:text-gray-500 italic text-xs">(empty)</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -70,15 +83,73 @@ function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldPr
 interface ComparisonViewProps {
   currentSessionData: SessionData | null;
   onBackToSessions: () => void;
-  onAccept: () => void;
-  onReject: () => void;
+  onAccept: (editedChanges?: Record<string, string>) => void;
+  onReject: (editedChanges?: Record<string, string>) => void;
   onSkip: () => void;
 }
 
 export default function ComparisonView({ currentSessionData, onBackToSessions, onAccept, onReject, onSkip }: ComparisonViewProps) {
-  const { selectedCard, queue, currentIndex } = useStore();
+  const { selectedCard, queue, currentIndex, currentSession, setSelectedCard, setQueue } = useStore();
   const isProcessing = isSessionActive(currentSessionData);
   const card = selectedCard;
+
+  // State for tracking manual edits and toggle between edited/original suggestions
+  const [editedChanges, setEditedChanges] = useState<Record<string, string>>({});
+  const [showOriginalSuggestions, setShowOriginalSuggestions] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [showRevertConfirm, setShowRevertConfirm] = useState(false);
+
+  // Reset state when card changes
+  useEffect(() => {
+    if (card) {
+      // Initialize with editedChanges if available, otherwise use AI changes
+      const initialChanges = card.editedChanges || card.changes || {};
+      setEditedChanges(initialChanges);
+      setShowOriginalSuggestions(false);
+      setIsEditing(false);
+    }
+  }, [card]);
+
+  // Save edited changes to backend when exiting edit mode
+  const handleSaveEdits = async () => {
+    if (!card || !currentSession) return;
+
+    // Filter out fields that haven't actually changed from the original AI suggestion
+    const actuallyEditedChanges: Record<string, string> = {};
+    let hasAnyChanges = false;
+
+    Object.entries(editedChanges).forEach(([fieldName, editedValue]) => {
+      const originalAISuggestion = card.changes?.[fieldName] || card.original.fields[fieldName]?.value || '';
+      if (editedValue !== originalAISuggestion) {
+        actuallyEditedChanges[fieldName] = editedValue;
+        hasAnyChanges = true;
+      }
+    });
+
+    // Only save if there are actual changes
+    if (hasAnyChanges) {
+      try {
+        await ankiApi.saveEditedChanges(currentSession, card.noteId, actuallyEditedChanges);
+        console.log('Saved edited changes to backend');
+
+        // Update the card in the queue to reflect the saved edits
+        const updatedQueue = queue.map(item =>
+          item.noteId === card.noteId
+            ? { ...item, editedChanges: actuallyEditedChanges }
+            : item
+        );
+        setQueue(updatedQueue);
+
+        // Update selected card in store to reflect the saved edits
+        setSelectedCard({
+          ...card,
+          editedChanges: actuallyEditedChanges
+        });
+      } catch (error) {
+        console.error('Failed to save edited changes:', error);
+      }
+    }
+  };
 
   if (!card) {
     return (
@@ -108,8 +179,11 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
     );
   }
 
-  const { original, changes, reasoning } = card;
+  const { original, changes, reasoning, editedChanges: loadedEditedChanges } = card;
   const changedFields = Object.keys(changes || {});
+
+  // Check if there are any manual edits
+  const hasManualEdits = loadedEditedChanges && Object.keys(loadedEditedChanges).length > 0;
 
   return (
     <div className="space-y-6">
@@ -168,8 +242,21 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
             {Object.entries(original.fields)
               .sort(([, a], [, b]) => a.order - b.order)
               .map(([fieldName, fieldData]) => {
-                const isChanged = changedFields.includes(fieldName);
-                const diffs = isChanged ? dmp.diff_main(fieldData.value || '', changes[fieldName] || '') : [];
+                // Determine what's being compared against (AI suggestion or edited version)
+                const comparisonValue = showOriginalSuggestions
+                  ? (changes[fieldName] || fieldData.value)
+                  : (editedChanges[fieldName] || changes[fieldName] || fieldData.value);
+
+                // Check if this field has been changed
+                const hasAIChange = changedFields.includes(fieldName);
+                const editedValue = editedChanges[fieldName];
+                const hasUserEdit = editedValue !== undefined && editedValue !== (changes[fieldName] || fieldData.value);
+                // const isChanged = hasAIChange || hasUserEdit;
+
+                // Calculate diff from original to the comparison value
+                const diffs = dmp.diff_main(fieldData.value || '', comparisonValue || '');
+                const isChanged = diffs.some(d => d[0] !== 0);
+
                 return (
                   <CardField
                     key={fieldName}
@@ -185,28 +272,106 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
         </div>
 
         {/* Suggested Card */}
-        <div className="card overflow-hidden border-l-4 border-l-green-500 dark:border-l-green-600">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 px-5 py-3 border-b border-green-200 dark:border-green-800">
-            <div className="flex items-center gap-2">
-              <CheckIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-              <span className="font-semibold text-green-900 dark:text-green-200">Suggested Card</span>
+        <div className={`card overflow-hidden border-l-4 ${
+          showOriginalSuggestions || !hasManualEdits
+            ? 'border-l-green-500 dark:border-l-green-600'
+            : 'border-l-blue-500 dark:border-l-blue-600'
+        }`}>
+          <div className={`px-5 py-3 border-b ${
+            showOriginalSuggestions || !hasManualEdits
+              ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800'
+              : 'bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-900/20 dark:to-sky-900/20 border-blue-200 dark:border-blue-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckIcon className={`w-5 h-5 ${
+                  showOriginalSuggestions || !hasManualEdits
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-blue-600 dark:text-blue-400'
+                }`} />
+                <span className={`font-semibold ${
+                  showOriginalSuggestions || !hasManualEdits
+                    ? 'text-green-900 dark:text-green-200'
+                    : 'text-blue-900 dark:text-blue-200'
+                }`}>
+                  {isEditing ? 'Editing Card' : showOriginalSuggestions ? 'Original AI Suggestion' : hasManualEdits ? 'Manually Edited Card' : 'Suggested Card'}
+                </span>
+              </div>
+              {!card.readonly && (
+                <div className="flex gap-2">
+                  {(isEditing || hasManualEdits) && (
+                    <button
+                      onClick={() => setShowOriginalSuggestions(!showOriginalSuggestions)}
+                      className="px-2.5 py-1.5 text-xs font-medium bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-650 transition-colors flex items-center gap-1.5"
+                      title={showOriginalSuggestions ? "Show edited version" : "View original AI suggestion"}
+                    >
+                      <EyeIcon className="w-3.5 h-3.5" />
+                      {showOriginalSuggestions ? 'Edited' : 'AI'}
+                    </button>
+                  )}
+                  <button
+                    onClick={async () => {
+                      if (isEditing) {
+                        // User is clicking "Done" - save changes before exiting edit mode
+                        await handleSaveEdits();
+                      }
+                      setIsEditing(!isEditing);
+                    }}
+                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+                      isEditing
+                        ? 'bg-primary-600 dark:bg-primary-500 text-white hover:bg-primary-700 dark:hover:bg-primary-600'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-650'
+                    }`}
+                  >
+                    <EditIcon className="w-3.5 h-3.5" />
+                    {isEditing ? 'Done' : 'Edit'}
+                  </button>
+                  {hasManualEdits && !isEditing && (
+                      <button
+                          onClick={() => setShowRevertConfirm(true)}
+                          className="px-2.5 py-1.5 text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors flex items-center gap-1.5"
+                          title="Revert to AI suggestion"
+                      >
+                        <RefreshIcon className="w-3.5 h-3.5" />
+                      </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="px-5">
             {Object.entries(original.fields)
               .sort(([, a], [, b]) => a.order - b.order)
               .map(([fieldName, fieldData]) => {
-                const isChanged = changedFields.includes(fieldName);
-                const suggestedValue = changes[fieldName] || fieldData.value;
-                const diffs = isChanged ? dmp.diff_main(fieldData.value || '', suggestedValue || '') : [];
+                // Use original AI suggestion if showing original, otherwise use edited
+                const displayValue = showOriginalSuggestions
+                  ? (changes[fieldName] || fieldData.value)
+                  : (editedChanges[fieldName] || changes[fieldName] || fieldData.value);
+
+                // Check if this field has been changed (either by AI or by user edits)
+                const hasAIChange = changedFields.includes(fieldName);
+                const editedValue = editedChanges[fieldName];
+                const hasUserEdit = editedValue !== undefined && editedValue !== (changes[fieldName] || fieldData.value);
+                const isChanged = hasAIChange || hasUserEdit;
+
+                // Calculate diffs based on current display value vs original
+                const diffs = dmp.diff_main(fieldData.value || '', displayValue || '');
+
                 return (
                   <CardField
                     key={fieldName}
                     fieldName={fieldName}
-                    value={suggestedValue}
+                    value={displayValue}
                     isChanged={isChanged}
-                    showDiff={isChanged ? 'suggested' : undefined}
+                    showDiff={!isEditing && isChanged ? 'suggested' : undefined}
                     diffs={diffs}
+                    readonly={!isEditing || showOriginalSuggestions}
+                    onChange={(newValue) => {
+                      setEditedChanges(prev => ({
+                        ...prev,
+                        [fieldName]: newValue
+                      }));
+                    }}
                   />
                 );
               })}
@@ -252,50 +417,113 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
         </div>
       ) : (
         <div className="card p-6 bg-gradient-to-b from-white to-gray-50 dark:from-gray-800 dark:to-gray-750">
+          {/* Warning message when viewing AI suggestion with manual edits */}
+          {hasManualEdits && showOriginalSuggestions && (
+            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="flex items-start gap-2">
+                <WarningIcon className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  You're viewing the original AI suggestion. Switch to "Edited" to review or apply your manual changes.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-4">
             <div className="flex gap-3">
               <Button
-                onClick={onReject}
+                onClick={() => {
+                  // Only pass fields that were actually edited
+                  const actuallyEditedChanges: Record<string, string> = {};
+                  Object.entries(editedChanges).forEach(([fieldName, editedValue]) => {
+                    const originalAISuggestion = card.changes?.[fieldName] || card.original.fields[fieldName]?.value || '';
+                    if (editedValue !== originalAISuggestion) {
+                      actuallyEditedChanges[fieldName] = editedValue;
+                    }
+                  });
+                  onReject(Object.keys(actuallyEditedChanges).length > 0 ? actuallyEditedChanges : undefined);
+                }}
                 variant="danger"
                 icon={<CloseIcon className="w-5 h-5" />}
+                disabled={hasManualEdits && showOriginalSuggestions}
               >
                 Reject
-                <kbd className="hidden sm:inline-block ml-2 px-2 py-0.5 bg-red-700/20 text-red-200 rounded text-xs">R</kbd>
               </Button>
 
               <Button
                 onClick={onSkip}
                 variant="warning"
                 icon={<ArrowRightIcon className="w-5 h-5" />}
+                disabled={hasManualEdits && showOriginalSuggestions}
               >
                 Skip
-                <kbd className="hidden sm:inline-block ml-2 px-2 py-0.5 bg-amber-600/30 text-amber-100 rounded text-xs">S</kbd>
               </Button>
             </div>
 
             <Button
-              onClick={onAccept}
+              onClick={() => {
+                // Only pass fields that were actually edited
+                const actuallyEditedChanges: Record<string, string> = {};
+                Object.entries(editedChanges).forEach(([fieldName, editedValue]) => {
+                  const originalAISuggestion = card.changes?.[fieldName] || card.original.fields[fieldName]?.value || '';
+                  if (editedValue !== originalAISuggestion) {
+                    actuallyEditedChanges[fieldName] = editedValue;
+                  }
+                });
+                onAccept(Object.keys(actuallyEditedChanges).length > 0 ? actuallyEditedChanges : undefined);
+              }}
               variant="primary"
               size="lg"
               icon={<CheckIcon className="w-6 h-6" />}
               className="shadow-lg shadow-green-500/30"
+              disabled={hasManualEdits && showOriginalSuggestions}
             >
               <span className="font-semibold">Accept Changes</span>
-              <kbd className="hidden sm:inline-block ml-2 px-2.5 py-1 bg-green-700/20 text-green-100 rounded text-sm">↵</kbd>
             </Button>
-          </div>
-
-          {/* Keyboard Shortcuts Hint */}
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
-              <KeyboardIcon className="w-3.5 h-3.5" />
-              Press
-              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded font-mono text-xs border border-gray-300 dark:border-gray-600">?</kbd>
-              for keyboard shortcuts
-            </p>
           </div>
         </div>
       )}
+
+      {/* Revert Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showRevertConfirm}
+        title="Revert Manual Edits"
+        message="Are you sure you want to revert all manual edits? This will restore the original AI suggestion and cannot be undone."
+        confirmText="Revert"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={async () => {
+          if (currentSession && card.noteId) {
+            try {
+              await ankiApi.revertEditedChanges(currentSession, card.noteId);
+              // Reset local state
+              setEditedChanges(card.changes || {});
+              setShowOriginalSuggestions(false);
+
+              // Update the card in the queue to remove editedChanges
+              const updatedQueue = queue.map(item =>
+                item.noteId === card.noteId
+                  ? { ...item, editedChanges: undefined }
+                  : item
+              );
+              setQueue(updatedQueue);
+
+              // Update selected card in store to remove editedChanges
+              if (card) {
+                setSelectedCard({
+                  ...card,
+                  editedChanges: undefined
+                });
+              }
+              setShowRevertConfirm(false);
+            } catch (error) {
+              console.error('Failed to revert edits:', error);
+              setShowRevertConfirm(false);
+            }
+          }
+        }}
+        onCancel={() => setShowRevertConfirm(false)}
+      />
     </div>
   );
 }

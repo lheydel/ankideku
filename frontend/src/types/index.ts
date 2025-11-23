@@ -71,8 +71,6 @@ export interface StoreState {
   currentIndex: number;
   setQueue: (queue: CardSuggestion[]) => void;
   addToQueue: (suggestion: CardSuggestion) => void;
-  nextCard: () => void;
-  prevCard: () => void;
   goToCard: (index: number) => void;
   skipCard: () => void;
   removeFromQueue: (index: number) => void;
@@ -113,4 +111,5 @@ export interface ComparisonCard {
   readonly: boolean;
   status?: 'accept' | 'reject'; // Only present when readonly
   timestamp?: string; // Only present when readonly
+  editedChanges?: Record<string, string>; // Manual edits made by user
 }

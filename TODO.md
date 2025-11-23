@@ -1,6 +1,6 @@
 # AnkiDeku Development TODO
 
-**Last Updated**: 2025-11-22
+**Last Updated**: 2025-11-23
 
 ---
 
@@ -54,6 +54,10 @@
   - [x] Display metadata (deck, note type, last modified)
   - [x] Character-level diff with colors (red=delete, green=add)
   - [x] AI reasoning display panel
+  - [x] Edit mode with manual field editing
+  - [x] Toggle between original AI suggestions and edited versions
+  - [x] Auto-save edited changes to backend (debounced)
+  - [x] Preserve edits when accepting/rejecting cards
 
 - [x] **Action Buttons & Logic**
   - [x] Accept button (apply suggestion + move to next)
@@ -119,21 +123,6 @@
   - [x] database/ai-sessions/ for AI processing sessions
 
 ### ⏳ Pending
-
-- [ ] **Keyboard Shortcuts**
-  - [ ] Enter/A - Accept
-  - [ ] Backspace/R - Reject
-  - [ ] S - Skip
-  - [ ] E - Edit mode
-  - [ ] J/K - Navigate cards
-  - [ ] ? - Show shortcuts help
-
-- [ ] **Edit Mode**
-  - [ ] Inline field editing
-  - [ ] Preview changes before applying
-  - [ ] Validation (field length, format)
-  - [ ] Save/Cancel buttons
-  - [ ] Keyboard shortcuts (Ctrl+Enter save, Esc cancel)
 
 - [ ] **Connection Monitoring**
   - [ ] Periodic health check (every 10s)
@@ -204,6 +193,8 @@
   - [x] Update queue in real-time as suggestions arrive
   - [x] Progress tracking during processing
   - [x] Session completion notification
+  - [x] Auto-select first suggestion when it arrives (UX improvement)
+  - [x] Prevent auto-selection when viewing history items
 
 - [x] **Session Directory Structure**
   - [x] database/ai-sessions/{sessionId}/
@@ -276,9 +267,25 @@
 - **Backend runs on**: http://localhost:3001 (TypeScript)
 - **Frontend runs on**: http://localhost:5173 (TypeScript)
 - **AnkiConnect**: http://localhost:8765
-- **Current stage**: Phase 3 AI integration complete! Full real-time AI workflow operational.
-- **Next priorities**: Keyboard shortcuts, edit mode, connection monitoring
-- **Latest update** (2025-11-22):
+- **Current stage**: Phase 3 AI integration complete! Full real-time AI workflow operational with edit mode.
+- **Next priorities**: Connection monitoring, prompt templates, progress tracking enhancements
+- **Latest update** (2025-11-23):
+  - ✅ **Edit Mode Implementation**
+    - Manual field editing in comparison view
+    - Toggle between original AI suggestions and edited versions
+    - Auto-save edited changes to backend (debounced, 1s delay)
+    - Preserve edits when accepting/rejecting cards
+    - Warning indicator when viewing AI suggestion with manual edits
+    - Disable actions when viewing AI suggestion (must switch to edited version first)
+  - ✅ **UX Improvements**
+    - Auto-select first suggestion when it arrives in empty queue
+    - Prevent auto-selection interruption when viewing history
+    - Removed keyboard shortcut hints from UI (cleaner interface)
+  - ✅ **History Enhancement**
+    - Click history items to view readonly comparison
+    - Proper handling of edited changes in history
+    - Timestamp display for accepted/rejected cards
+- **Previous update** (2025-11-22):
   - ✅ **Phase 3 AI Integration COMPLETE!**
     - Real-time AI processing with Claude Code CLI
     - WebSocket-based live suggestion updates

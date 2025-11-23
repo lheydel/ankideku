@@ -119,6 +119,25 @@ router.get('/active', (req: Request, res: Response): void => {
 });
 
 /**
+ * GET /api/sessions
+ * List all available sessions with metadata
+ *
+ * Returns: { sessions: Array<{ sessionId: string, timestamp: string, deckName: string, totalCards: number }> }
+ */
+router.get('/', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const sessions = await sessionService.listSessionsWithMetadata();
+
+    res.json({ sessions });
+  } catch (error) {
+    console.error('Error listing sessions:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to list sessions'
+    });
+  }
+});
+
+/**
  * GET /api/sessions/:sessionId
  * Load an existing session with all suggestions and history
  *
@@ -164,25 +183,6 @@ router.get('/:sessionId', async (req: Request, res: Response): Promise<void> => 
     console.error('Error loading session:', error);
     res.status(404).json({
       error: error instanceof Error ? error.message : 'Session not found'
-    });
-  }
-});
-
-/**
- * GET /api/sessions
- * List all available sessions with metadata
- *
- * Returns: { sessions: Array<{ sessionId: string, timestamp: string, deckName: string, totalCards: number }> }
- */
-router.get('/', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const sessions = await sessionService.listSessionsWithMetadata();
-
-    res.json({ sessions });
-  } catch (error) {
-    console.error('Error listing sessions:', error);
-    res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to list sessions'
     });
   }
 });
@@ -247,6 +247,28 @@ router.post('/:sessionId/cancel', async (req: Request, res: Response): Promise<v
 });
 
 /**
+ * PUT /api/sessions/:sessionId/suggestions/:noteId/refresh-original
+ * Refresh a suggestion's original fields with current state from Anki
+ *
+ * Returns: Updated CardSuggestion
+ */
+router.put('/:sessionId/suggestions/:noteId/refresh-original', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sessionId, noteId } = req.params;
+    const noteIdNum = parseInt(noteId);
+
+    const updatedSuggestion = await sessionService.refreshSuggestionOriginal(sessionId, noteIdNum);
+
+    res.json(updatedSuggestion);
+  } catch (error) {
+    console.error('Error refreshing suggestion original:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to refresh suggestion original'
+    });
+  }
+});
+
+/**
  * GET /api/sessions/:sessionId/status
  * Get status of a session
  *
@@ -272,6 +294,55 @@ router.get('/:sessionId/status', async (req: Request, res: Response): Promise<vo
     console.error('Error getting session status:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to get session status'
+    });
+  }
+});
+
+/**
+ * PUT /api/sessions/:sessionId/suggestions/:noteId/edited-changes
+ * Save edited changes made by the user to a suggestion
+ *
+ * Body: { editedChanges: Record<string, string> }
+ * Returns: { success: boolean }
+ */
+router.put('/:sessionId/suggestions/:noteId/edited-changes', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sessionId, noteId } = req.params;
+    const { editedChanges } = req.body;
+
+    if (!editedChanges || typeof editedChanges !== 'object') {
+      res.status(400).json({ error: 'editedChanges is required and must be an object' });
+      return;
+    }
+
+    await sessionService.saveEditedChanges(sessionId, parseInt(noteId), editedChanges);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving edited changes:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to save edited changes'
+    });
+  }
+});
+
+/**
+ * DELETE /api/sessions/:sessionId/suggestions/:noteId/edited-changes
+ * Revert/remove all edited changes made by the user to a suggestion
+ *
+ * Returns: { success: boolean }
+ */
+router.delete('/:sessionId/suggestions/:noteId/edited-changes', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sessionId, noteId } = req.params;
+
+    await sessionService.revertEditedChanges(sessionId, parseInt(noteId));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error reverting edited changes:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to revert edited changes'
     });
   }
 });

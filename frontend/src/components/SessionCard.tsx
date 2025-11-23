@@ -60,7 +60,7 @@ export function SessionCard({ session, onLoad, onDelete, onViewOutput }: Session
             }}
             className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 underline cursor-pointer"
           >
-            View Output
+            View Logs
           </span>
         </div>
       </button>

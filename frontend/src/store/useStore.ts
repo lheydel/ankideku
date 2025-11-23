@@ -61,12 +61,6 @@ const useStore = create<StoreState>((set, get) => ({
   addToQueue: (suggestion: CardSuggestion) => set((state) => ({
     queue: [...state.queue, suggestion]
   })),
-  nextCard: () => set((state) => ({
-    currentIndex: Math.min(state.currentIndex + 1, state.queue.length - 1)
-  })),
-  prevCard: () => set((state) => ({
-    currentIndex: Math.max(state.currentIndex - 1, 0)
-  })),
   goToCard: (index: number) => set((state) => ({
     currentIndex: Math.max(0, Math.min(index, state.queue.length - 1))
   })),

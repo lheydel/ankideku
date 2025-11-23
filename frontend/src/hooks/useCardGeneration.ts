@@ -13,7 +13,10 @@ export function useCardGeneration() {
     setProgress,
     addToPromptHistory,
     currentSession,
+    currentSessionData,
     updateSessionState,
+    selectedCard,
+    setSelectedCard,
   } = useStore();
 
   const { createSession, loadSession } = useSessionManagement();
@@ -23,7 +26,18 @@ export function useCardGeneration() {
   const handleNewSuggestion = useCallback((suggestion: CardSuggestion) => {
     addToQueue(suggestion);
     setSuggestionCount(prev => prev + 1);
-  }, [addToQueue]);
+
+    // Auto-select the first suggestion if no card is currently being viewed
+    if (selectedCard == null) {
+      setSelectedCard({
+        noteId: suggestion.noteId,
+        original: suggestion.original,
+        changes: suggestion.changes,
+        reasoning: suggestion.reasoning,
+        readonly: false
+      });
+    }
+  }, [addToQueue, selectedCard, setSelectedCard]);
 
   // Handle state changes from WebSocket
   const handleStateChange = useCallback((state: SessionStateData) => {
@@ -49,6 +63,7 @@ export function useCardGeneration() {
   // Set up WebSocket listener
   useWebSocket({
     sessionId: currentSession,
+    sessionState: currentSessionData?.state,
     onSuggestion: handleNewSuggestion,
     onStateChange: handleStateChange,
     onSessionComplete: handleSessionComplete,

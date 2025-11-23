@@ -24,9 +24,10 @@ interface SidebarProps {
   onClose: () => void;
   currentSessionData: SessionData | null;
   onNewSession: () => void;
+  onViewLogs?: () => void;
 }
 
-export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSession }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSession, onViewLogs }: SidebarProps) {
   const {
     decks,
     selectedDeck,
@@ -40,6 +41,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     setPrompt,
   } = useStore();
 
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
@@ -76,7 +78,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     loadSettings();
   }, []);
 
-  // Restore chat history when session is loaded
+  // Restore chat history when session is loaded, or reset when cleared
   useEffect(() => {
     if (currentSessionData) {
       const { request, suggestions, cancelled, state } = currentSessionData;
@@ -133,6 +135,17 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
 
       // Update selected deck to match session
       selectDeck(request.deckName);
+      progressMessageIdRef.current = null;
+    } else {
+      // No session loaded - reset to welcome message
+      setMessages([
+        {
+          id: '0',
+          type: 'system',
+          content: 'Welcome! Select a deck and describe what you want to improve.',
+          timestamp: new Date(),
+        },
+      ]);
       progressMessageIdRef.current = null;
     }
   }, [currentSessionData]);
@@ -271,6 +284,15 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
           <h2 className="font-bold text-gray-900 dark:text-gray-100">AI Assistant</h2>
         </div>
         <div className="flex items-center gap-2">
+          {currentSessionData && onViewLogs && (
+            <Button
+              onClick={onViewLogs}
+              variant="secondary"
+              size="sm"
+            >
+              View Logs
+            </Button>
+          )}
           {currentSessionData && (
             <Button
               onClick={() => {
@@ -284,6 +306,8 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
                   },
                 ]);
                 setInput('');
+                // Focus the input field after state updates
+                setTimeout(() => inputRef.current?.focus(), 0);
               }}
               variant="secondary"
               size="sm"
@@ -386,6 +410,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
       <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex gap-2 items-end">
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
