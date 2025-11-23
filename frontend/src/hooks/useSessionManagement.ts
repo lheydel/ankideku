@@ -4,7 +4,7 @@ import { sessionApi } from '../services/sessionApi';
 import useStore from '../store/useStore';
 
 export function useSessionManagement() {
-  const { currentSession, currentSessionData, sessions, setCurrentSession, setCurrentSessionData, setSessions } = useStore();
+  const { currentSession, currentSessionData, sessions, setCurrentSession, setCurrentSessionData, setSessions, setSessionHistory } = useStore();
 
   const listSessions = useCallback(async (): Promise<SessionMetadata[]> => {
     const { sessions } = await sessionApi.listSessions();
@@ -30,8 +30,16 @@ export function useSessionManagement() {
     const data: SessionData = await sessionApi.loadSession(sessionId);
     setCurrentSession(sessionId);
     setCurrentSessionData(data);
+
+    // Load history if it exists
+    if (data.history) {
+      setSessionHistory(data.history);
+    } else {
+      setSessionHistory([]);
+    }
+
     return data;
-  }, [setCurrentSession, setCurrentSessionData]);
+  }, [setCurrentSession, setCurrentSessionData, setSessionHistory]);
 
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
     await sessionApi.deleteSession(sessionId);

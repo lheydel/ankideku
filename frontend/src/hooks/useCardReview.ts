@@ -5,6 +5,7 @@ import useStore from '../store/useStore';
 export function useCardReview() {
   const {
     selectedDeck,
+    currentSession,
     queue,
     currentIndex,
     getCurrentCard,
@@ -13,6 +14,7 @@ export function useCardReview() {
     setQueue,
     addToHistory,
     removeFromQueue,
+    setSelectedCard,
   } = useStore();
 
   const handleAccept = useCallback(async (
@@ -27,15 +29,46 @@ export function useCardReview() {
       const deckName = card.original.deckName || selectedDeck;
       await ankiApi.updateNote(card.noteId, card.changes, deckName);
 
-      addToHistory({
-        action: 'accept',
+      const historyEntry = {
+        action: 'accept' as const,
         noteId: card.noteId,
         changes: card.changes,
         original: card.original,
-      });
+        reasoning: card.reasoning,
+        timestamp: new Date().toISOString(),
+        sessionId: currentSession || undefined,
+        deckName: deckName || undefined,
+      };
+
+      // Add to local history
+      addToHistory(historyEntry);
+
+      // Persist to backend if we have a session
+      if (currentSession) {
+        try {
+          await ankiApi.saveHistoryAction(currentSession, historyEntry);
+        } catch (err) {
+          console.error('Failed to save history to backend:', err);
+          // Don't fail the whole operation if history save fails
+        }
+      }
 
       // Remove from queue
       removeFromQueue(currentIndex);
+
+      // Update selected card to the next one in queue
+      const nextCard = queue[currentIndex]; // After removal, currentIndex points to the next card
+      if (nextCard) {
+        setSelectedCard({
+          noteId: nextCard.noteId,
+          original: nextCard.original,
+          changes: nextCard.changes,
+          reasoning: nextCard.reasoning,
+          readonly: false
+        });
+      } else {
+        setSelectedCard(null);
+      }
 
       onSuccess('Changes accepted and applied');
 
@@ -47,21 +80,53 @@ export function useCardReview() {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       onError('Failed to apply changes: ' + errorMessage);
     }
-  }, [getCurrentCard, selectedDeck, currentIndex, queue.length, removeFromQueue, setQueue, addToHistory]);
+  }, [getCurrentCard, selectedDeck, currentSession, currentIndex, queue, removeFromQueue, setQueue, addToHistory, setSelectedCard]);
 
-  const handleReject = useCallback((onSuccess: (message: string) => void) => {
+  const handleReject = useCallback(async (onSuccess: (message: string) => void) => {
     const card = getCurrentCard();
     if (!card) return;
 
-    addToHistory({
-      action: 'reject',
+    const deckName = card.original.deckName || selectedDeck;
+    const historyEntry = {
+      action: 'reject' as const,
       noteId: card.noteId,
       changes: card.changes,
       original: card.original,
-    });
+      reasoning: card.reasoning,
+      timestamp: new Date().toISOString(),
+      sessionId: currentSession || undefined,
+      deckName: deckName || undefined,
+    };
+
+    // Add to local history
+    addToHistory(historyEntry);
+
+    // Persist to backend if we have a session
+    if (currentSession) {
+      try {
+        await ankiApi.saveHistoryAction(currentSession, historyEntry);
+      } catch (err) {
+        console.error('Failed to save history to backend:', err);
+        // Don't fail the whole operation if history save fails
+      }
+    }
 
     // Remove from queue
     removeFromQueue(currentIndex);
+
+    // Update selected card to the next one in queue
+    const nextCard = queue[currentIndex]; // After removal, currentIndex points to the next card
+    if (nextCard) {
+      setSelectedCard({
+        noteId: nextCard.noteId,
+        original: nextCard.original,
+        changes: nextCard.changes,
+        reasoning: nextCard.reasoning,
+        readonly: false
+      });
+    } else {
+      setSelectedCard(null);
+    }
 
     onSuccess('Suggestion rejected');
 
@@ -69,7 +134,7 @@ export function useCardReview() {
       onSuccess('All suggestions reviewed!');
       setQueue([]);
     }
-  }, [getCurrentCard, currentIndex, queue.length, removeFromQueue, setQueue, addToHistory]);
+  }, [getCurrentCard, selectedDeck, currentSession, currentIndex, queue, removeFromQueue, setQueue, addToHistory, setSelectedCard]);
 
   const handleSkip = useCallback((onSuccess: (message: string) => void) => {
     skipCard();

@@ -4,16 +4,20 @@ import DiffMatchPatch from 'diff-match-patch';
 import { WarningIcon, CheckIcon, ArchiveIcon, DeckIcon, BrushIcon, ClipboardIcon, BulbIcon, ClockIcon, CloseIcon, ArrowRightIcon, KeyboardIcon } from './ui/Icons.js';
 import { Button } from './ui/Button.js';
 import { Breadcrumb } from './ui/Breadcrumb.js';
-import { SessionState, type SessionData } from '../types/index.js';
+import type { SessionData } from '../types/index.js';
+import { isSessionActive } from '../utils/sessionUtils.js';
 
 const dmp = new DiffMatchPatch();
+
+type DiffOperation = -1 | 0 | 1;
+type Diff = [DiffOperation, string];
 
 interface CardFieldProps {
   fieldName: string;
   value: string;
   isChanged: boolean;
-  showDiff?: boolean;
-  diffs?: any[];
+  showDiff?: 'original' | 'suggested';
+  diffs?: Diff[];
 }
 
 function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldProps) {
@@ -72,12 +76,9 @@ interface ComparisonViewProps {
 }
 
 export default function ComparisonView({ currentSessionData, onBackToSessions, onAccept, onReject, onSkip }: ComparisonViewProps) {
-  const { getCurrentCard, currentIndex, queue, setQueue } = useStore();
-
-  // Check if session is actively processing
-  const isProcessing = currentSessionData?.state?.state === SessionState.PENDING || currentSessionData?.state?.state === SessionState.RUNNING;
-
-  const card = getCurrentCard();
+  const { selectedCard, queue, currentIndex } = useStore();
+  const isProcessing = isSessionActive(currentSessionData);
+  const card = selectedCard;
 
   if (!card) {
     return (
@@ -220,51 +221,81 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="card p-6 bg-gradient-to-b from-white to-gray-50 dark:from-gray-800 dark:to-gray-750">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex gap-3">
-            <Button
-              onClick={onReject}
-              variant="danger"
-              icon={<CloseIcon className="w-5 h-5" />}
-            >
-              Reject
-              <kbd className="hidden sm:inline-block ml-2 px-2 py-0.5 bg-red-700/20 text-red-200 rounded text-xs">R</kbd>
-            </Button>
+      {/* Action Buttons or Status */}
+      {card.readonly ? (
+        <div className="card p-6 bg-gradient-to-b from-white to-gray-50 dark:from-gray-800 dark:to-gray-750">
+          <div className={`px-4 py-3 rounded-lg border-2 ${
+            card.status === 'accept'
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
+              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+          }`}>
+            <div className="flex items-center gap-3">
+              {card.status === 'accept' ? (
+                <CheckIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+              ) : (
+                <CloseIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
+              )}
+              <div className="flex-1">
+                <p className={`text-sm font-semibold ${
+                  card.status === 'accept'
+                    ? 'text-green-700 dark:text-green-300'
+                    : 'text-red-700 dark:text-red-300'
+                }`}>
+                  {card.status === 'accept' ? 'Accepted' : 'Rejected'}
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                  {new Date(card.timestamp || '').toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="card p-6 bg-gradient-to-b from-white to-gray-50 dark:from-gray-800 dark:to-gray-750">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex gap-3">
+              <Button
+                onClick={onReject}
+                variant="danger"
+                icon={<CloseIcon className="w-5 h-5" />}
+              >
+                Reject
+                <kbd className="hidden sm:inline-block ml-2 px-2 py-0.5 bg-red-700/20 text-red-200 rounded text-xs">R</kbd>
+              </Button>
+
+              <Button
+                onClick={onSkip}
+                variant="warning"
+                icon={<ArrowRightIcon className="w-5 h-5" />}
+              >
+                Skip
+                <kbd className="hidden sm:inline-block ml-2 px-2 py-0.5 bg-amber-600/30 text-amber-100 rounded text-xs">S</kbd>
+              </Button>
+            </div>
 
             <Button
-              onClick={onSkip}
-              variant="warning"
-              icon={<ArrowRightIcon className="w-5 h-5" />}
+              onClick={onAccept}
+              variant="primary"
+              size="lg"
+              icon={<CheckIcon className="w-6 h-6" />}
+              className="shadow-lg shadow-green-500/30"
             >
-              Skip
-              <kbd className="hidden sm:inline-block ml-2 px-2 py-0.5 bg-amber-600/30 text-amber-100 rounded text-xs">S</kbd>
+              <span className="font-semibold">Accept Changes</span>
+              <kbd className="hidden sm:inline-block ml-2 px-2.5 py-1 bg-green-700/20 text-green-100 rounded text-sm">↵</kbd>
             </Button>
           </div>
 
-          <Button
-            onClick={onAccept}
-            variant="primary"
-            size="lg"
-            icon={<CheckIcon className="w-6 h-6" />}
-            className="shadow-lg shadow-green-500/30"
-          >
-            <span className="font-semibold">Accept Changes</span>
-            <kbd className="hidden sm:inline-block ml-2 px-2.5 py-1 bg-green-700/20 text-green-100 rounded text-sm">↵</kbd>
-          </Button>
+          {/* Keyboard Shortcuts Hint */}
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
+              <KeyboardIcon className="w-3.5 h-3.5" />
+              Press
+              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded font-mono text-xs border border-gray-300 dark:border-gray-600">?</kbd>
+              for keyboard shortcuts
+            </p>
+          </div>
         </div>
-
-        {/* Keyboard Shortcuts Hint */}
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
-            <KeyboardIcon className="w-3.5 h-3.5" />
-            Press
-            <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded font-mono text-xs border border-gray-300 dark:border-gray-600">?</kbd>
-            for keyboard shortcuts
-          </p>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type {
   SyncResponse,
   CacheInfo,
   FieldDisplayConfig,
+  ActionHistoryEntry,
 } from '../types/index.js';
 
 interface UserSettings {
@@ -79,6 +80,30 @@ export const ankiApi = {
   updateFieldDisplayConfig: async (config: FieldDisplayConfig): Promise<{ success: boolean }> => {
     const response = await api.put<{ success: boolean }>('/settings/field-display', { config });
     return response.data;
+  },
+
+  // Save review action to history
+  saveHistoryAction: async (sessionId: string, action: ActionHistoryEntry): Promise<{ success: boolean }> => {
+    const response = await api.post<{ success: boolean }>(`/sessions/${sessionId}/history`, action);
+    return response.data;
+  },
+
+  // Get session history
+  getSessionHistory: async (sessionId: string): Promise<ActionHistoryEntry[]> => {
+    const response = await api.get<{ history: ActionHistoryEntry[] }>(`/sessions/${sessionId}/history`);
+    return response.data.history;
+  },
+
+  // Get global history
+  getGlobalHistory: async (): Promise<ActionHistoryEntry[]> => {
+    const response = await api.get<{ history: ActionHistoryEntry[] }>('/history/global');
+    return response.data.history;
+  },
+
+  // Search history
+  searchHistory: async (query: string): Promise<ActionHistoryEntry[]> => {
+    const response = await api.get<{ history: ActionHistoryEntry[] }>(`/history/search?q=${encodeURIComponent(query)}`);
+    return response.data.history;
   },
 };
 

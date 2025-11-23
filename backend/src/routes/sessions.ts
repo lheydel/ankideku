@@ -3,6 +3,7 @@ import * as path from 'path';
 import { SessionService } from '../services/sessionService.js';
 import { FileWatcherService } from '../services/fileWatcher.js';
 import { ClaudeSpawnerService } from '../services/claudeSpawner.js';
+import { historyService } from '../services/historyService.js';
 
 const router = express.Router();
 
@@ -119,9 +120,9 @@ router.get('/active', (req: Request, res: Response): void => {
 
 /**
  * GET /api/sessions/:sessionId
- * Load an existing session with all suggestions
+ * Load an existing session with all suggestions and history
  *
- * Returns: { sessionId: string, request: SessionRequest, suggestions: CardSuggestion[], state?: SessionStateData, cancelled?: { cancelled: true, timestamp: string } }
+ * Returns: { sessionId: string, request: SessionRequest, suggestions: CardSuggestion[], history: ActionHistoryEntry[], state?: SessionStateData, cancelled?: { cancelled: true, timestamp: string } }
  */
 router.get('/:sessionId', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -132,6 +133,9 @@ router.get('/:sessionId', async (req: Request, res: Response): Promise<void> => 
 
     // Load all suggestions
     const suggestions = await sessionService.loadSession(sessionId);
+
+    // Load history
+    const history = await historyService.getSessionHistory(sessionId);
 
     // Get session state
     const state = await sessionService.getSessionState(sessionId);
@@ -152,6 +156,7 @@ router.get('/:sessionId', async (req: Request, res: Response): Promise<void> => 
       sessionId,
       request,
       suggestions,
+      history,
       ...(state && { state }),
       ...(cancelled && { cancelled })
     });

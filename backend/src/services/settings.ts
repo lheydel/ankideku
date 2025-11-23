@@ -1,11 +1,5 @@
 import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATABASE_DIR = path.join(__dirname, '../../../database');
-const SETTINGS_FILE = path.join(DATABASE_DIR, 'settings.json');
+import { DATABASE_DIR, SETTINGS_FILE } from '../constants.js';
 
 export interface FieldDisplayConfig {
   [modelName: string]: string; // Maps model name to field name to display

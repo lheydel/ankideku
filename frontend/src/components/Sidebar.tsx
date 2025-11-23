@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ankiApi } from '../services/api.js';
 import useStore from '../store/useStore.js';
 import { DeckIcon, ChevronDownIcon, LightningIcon, CloseIcon, ChatIcon } from './ui/Icons.js';
+import { SessionStateBadge } from './ui/SessionStateBadge.js';
 import { useCardGeneration } from '../hooks/useCardGeneration.js';
 import { useSessionManagement } from '../hooks/useSessionManagement.js';
 import { Button } from './ui/Button.js';
+import { formatTime } from '../utils/formatUtils.js';
+import { LAYOUT } from '../constants/layout.js';
 import type { SessionData } from '../types';
 import { SessionState } from '../types';
 
@@ -21,40 +24,6 @@ interface SidebarProps {
   onClose: () => void;
   currentSessionData: SessionData | null;
   onNewSession: () => void;
-}
-
-// Helper function to get state badge styling
-function getStateBadge(state: SessionState) {
-  const badges = {
-    [SessionState.PENDING]: {
-      label: 'Pending',
-      className: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
-    },
-    [SessionState.RUNNING]: {
-      label: 'Running',
-      className: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
-    },
-    [SessionState.COMPLETED]: {
-      label: 'Completed',
-      className: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
-    },
-    [SessionState.FAILED]: {
-      label: 'Failed',
-      className: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'
-    },
-    [SessionState.CANCELLED]: {
-      label: 'Cancelled',
-      className: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-    }
-  };
-
-  const badge = badges[state];
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${badge.className}`}>
-      {badge.label}
-    </span>
-  );
 }
 
 export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSession }: SidebarProps) {
@@ -142,7 +111,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
         {
           id: '0',
           type: 'system',
-          content: `Session loaded from ${sessionDate.toLocaleDateString()} at ${sessionDate.toLocaleTimeString('en-US', { hour12: false })}`,
+          content: `Session loaded from ${sessionDate.toLocaleDateString()} at ${formatTime(sessionDate)}`,
           timestamp: sessionDate
         },
         {
@@ -293,7 +262,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
   return (
     <div
       className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-lg flex flex-col transition-colors duration-200"
-      style={{ width: '28rem' }}
+      style={{ width: LAYOUT.SIDEBAR_WIDTH }}
     >
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/30 dark:to-blue-900/30">
@@ -393,7 +362,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
             >
               {message.state && (
                 <div className="mb-2">
-                  {getStateBadge(message.state)}
+                  <SessionStateBadge state={message.state} />
                 </div>
               )}
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -406,7 +375,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
-                {message.timestamp.toLocaleTimeString('en-US', { hour12: false })}
+                {formatTime(message.timestamp)}
               </p>
             </div>
           </div>

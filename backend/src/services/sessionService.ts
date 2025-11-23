@@ -1,18 +1,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { Note, SessionRequest, CardSuggestion, SessionState, SessionStateData } from '../types/index.js';
 import { PromptGenerator } from '../processors/promptGenerator.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.join(__dirname, '../../..');
-const DATABASE_DIR = path.join(PROJECT_ROOT, 'database');
-const DECKS_DIR = path.join(DATABASE_DIR, 'decks');
-const SESSIONS_DIR = path.join(DATABASE_DIR, 'ai-sessions');
+import { DATABASE_DIR, DECKS_DIR, AI_SESSIONS_DIR } from '../constants.js';
 
 export class SessionService {
-  private sessionsDir = SESSIONS_DIR;
+  private sessionsDir = AI_SESSIONS_DIR;
 
   constructor() {
     this.ensureSessionsDir();
@@ -99,7 +92,12 @@ export class SessionService {
         if (file.startsWith('suggestion-') && file.endsWith('.json')) {
           const filePath = path.join(suggestionsDir, file);
           const content = await fs.readFile(filePath, 'utf-8');
-          suggestions.push(JSON.parse(content));
+          const suggestion: CardSuggestion = JSON.parse(content);
+
+          // Only include suggestions that haven't been processed yet
+          if (suggestion.accepted === null || suggestion.accepted === undefined) {
+            suggestions.push(suggestion);
+          }
         }
       }
 
@@ -107,6 +105,29 @@ export class SessionService {
     } catch (error) {
       console.error(`Failed to load session ${sessionId}:`, error);
       throw new Error(`Session ${sessionId} not found`);
+    }
+  }
+
+  /**
+   * Mark a suggestion as accepted or rejected
+   * @param sessionId - Session ID
+   * @param noteId - Note ID of the suggestion
+   * @param accepted - true if accepted, false if rejected
+   */
+  async markSuggestionStatus(sessionId: string, noteId: number, accepted: boolean): Promise<void> {
+    const suggestionsDir = path.join(this.sessionsDir, sessionId, 'suggestions');
+    const suggestionPath = path.join(suggestionsDir, `suggestion-${noteId}.json`);
+
+    try {
+      const content = await fs.readFile(suggestionPath, 'utf-8');
+      const suggestion: CardSuggestion = JSON.parse(content);
+
+      suggestion.accepted = accepted;
+
+      await fs.writeFile(suggestionPath, JSON.stringify(suggestion, null, 2));
+    } catch (error) {
+      console.error(`Failed to update suggestion status for note ${noteId}:`, error);
+      throw error;
     }
   }
 
@@ -406,3 +427,6 @@ export class SessionService {
     }
   }
 }
+
+// Singleton instance
+export const sessionService = new SessionService();

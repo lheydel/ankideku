@@ -1,12 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import type { Note, CachedDeckData, CacheInfo } from '../types/index.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATABASE_DIR = path.join(__dirname, '../../../database');
-const CACHE_DIR = path.join(DATABASE_DIR, 'decks');
+import { DECKS_DIR as CACHE_DIR } from '../constants.js';
 
 class CacheService {
   /**

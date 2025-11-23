@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { StoreState, DeckInfo, CardSuggestion, ActionHistoryEntry, SessionData, SessionMetadata } from '../types/index.js';
+import type { StoreState, DeckInfo, CardSuggestion, ActionHistoryEntry, SessionData, SessionMetadata, ComparisonCard } from '../types/index.js';
 
 const useStore = create<StoreState>((set, get) => ({
   // Connection state
@@ -93,9 +93,28 @@ const useStore = create<StoreState>((set, get) => ({
 
   // Actions history
   actionsHistory: [],
+  globalHistory: [],
+  historyViewMode: 'session',
   addToHistory: (action: Omit<ActionHistoryEntry, 'timestamp'>) => set((state) => ({
     actionsHistory: [...state.actionsHistory, { ...action, timestamp: new Date().toISOString() }]
   })),
+  loadGlobalHistory: async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/history/global');
+      const data = await response.json();
+      set({ globalHistory: data.history || [] });
+    } catch (error) {
+      console.error('Failed to load global history:', error);
+    }
+  },
+  toggleHistoryView: () => set((state) => ({
+    historyViewMode: state.historyViewMode === 'session' ? 'global' : 'session'
+  })),
+  setSessionHistory: (history: ActionHistoryEntry[]) => set({ actionsHistory: history }),
+
+  // Comparison view
+  selectedCard: null,
+  setSelectedCard: (card: ComparisonCard | null) => set({ selectedCard: card }),
 
   // Settings
   fieldDisplayConfig: {},

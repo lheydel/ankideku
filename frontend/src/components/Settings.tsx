@@ -13,7 +13,11 @@ interface SettingsProps {
 export default function Settings({ isOpen, onClose }: SettingsProps) {
   const { queue, actionsHistory, fieldDisplayConfig, setFieldDisplayConfig } = useStore();
 
-  // Get all unique model types from queue and history
+  const [localConfig, setLocalConfig] = useState(fieldDisplayConfig);
+  const [saving, setSaving] = useState(false);
+  const [modelFieldsCache, setModelFieldsCache] = useState<Record<string, string[]>>({});
+
+  // Get all unique model types from queue, history, AND saved config
   const modelTypes = useMemo(() => {
     const models = new Map<string, Note>();
 
@@ -31,11 +35,16 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
       }
     });
 
-    return Array.from(models.entries());
-  }, [queue, actionsHistory]);
+    // Add from saved config (even if not in queue/history)
+    Object.keys(fieldDisplayConfig).forEach(modelName => {
+      if (!models.has(modelName)) {
+        // We'll need to fetch fields for this model from Anki
+        models.set(modelName, null as any);
+      }
+    });
 
-  const [localConfig, setLocalConfig] = useState(fieldDisplayConfig);
-  const [saving, setSaving] = useState(false);
+    return Array.from(models.entries());
+  }, [queue, actionsHistory, fieldDisplayConfig]);
 
   // Sync localConfig with store when modal opens
   useEffect(() => {
@@ -85,35 +94,53 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         <div className="flex-1 overflow-y-auto p-6">
           {modelTypes.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">No note types found. Review some cards to configure display settings.</p>
+              <p className="text-gray-500 dark:text-gray-400">No note types found in queue, history, or settings.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {modelTypes.map(([modelName, sampleNote]) => {
-                const fields = Object.keys(sampleNote.fields).sort(
-                  (a, b) => sampleNote.fields[a].order - sampleNote.fields[b].order
-                );
-                const currentField = localConfig[modelName] || fields[0];
+                // If we have a sample note, show dropdown with fields
+                if (sampleNote) {
+                  const fields = Object.keys(sampleNote.fields).sort(
+                    (a, b) => sampleNote.fields[a].order - sampleNote.fields[b].order
+                  );
+                  const currentField = localConfig[modelName] || fields[0];
 
-                return (
-                  <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{modelName}</h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{fields.length} field{fields.length !== 1 ? 's' : ''} available</p>
+                  return (
+                    <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{modelName}</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{fields.length} field{fields.length !== 1 ? 's' : ''} available</p>
+                      </div>
+                      <select
+                        value={currentField}
+                        onChange={(e) => handleFieldChange(modelName, e.target.value)}
+                        className="px-3 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
+                      >
+                        {fields.map(fieldName => (
+                          <option key={fieldName} value={fieldName}>
+                            {fieldName}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <select
-                      value={currentField}
-                      onChange={(e) => handleFieldChange(modelName, e.target.value)}
-                      className="px-3 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
-                    >
-                      {fields.map(fieldName => (
-                        <option key={fieldName} value={fieldName}>
-                          {fieldName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                );
+                  );
+                } else {
+                  // No sample note available, show configured value as text
+                  const currentField = localConfig[modelName] || 'Not configured';
+
+                  return (
+                    <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{modelName}</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Configured value (no sample notes available)</p>
+                      </div>
+                      <div className="px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm min-w-[200px]">
+                        {currentField}
+                      </div>
+                    </div>
+                  );
+                }
               })}
             </div>
           )}

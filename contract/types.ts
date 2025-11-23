@@ -93,15 +93,32 @@ export interface CardSuggestion {
   original: Note;
   changes: Record<string, string>;
   reasoning: string;
+  accepted?: boolean | null; // null/undefined = pending, true = accepted, false = rejected
 }
 
 export interface SessionData {
   sessionId: string;
   request: SessionRequest;
   suggestions: CardSuggestion[];
+  history?: ActionHistoryEntry[]; // Review history for this session
   state?: SessionStateData; // Current session state
   cancelled?: {
     cancelled: true;
     timestamp: string;
   };
+}
+
+// ============================================================================
+// Review History Types
+// ============================================================================
+
+export interface ActionHistoryEntry {
+  action: 'accept' | 'reject';
+  noteId: number;
+  changes: Record<string, string>;
+  original?: Note;
+  reasoning?: string;
+  timestamp: string;
+  sessionId?: string;
+  deckName?: string;
 }

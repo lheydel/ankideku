@@ -12,7 +12,8 @@ export type {
   CardSuggestion,
   SessionData,
   SessionStateData,
-  SessionState
+  SessionState,
+  ActionHistoryEntry
 } from '../../../contract/types';
 
 // Re-export SessionState const object for value access
@@ -79,7 +80,16 @@ export interface StoreState {
 
   // Actions history
   actionsHistory: ActionHistoryEntry[];
+  globalHistory: ActionHistoryEntry[];
+  historyViewMode: 'session' | 'global';
   addToHistory: (action: Omit<ActionHistoryEntry, 'timestamp'>) => void;
+  loadGlobalHistory: () => Promise<void>;
+  toggleHistoryView: () => void;
+  setSessionHistory: (history: ActionHistoryEntry[]) => void;
+
+  // Comparison view
+  selectedCard: ComparisonCard | null;
+  setSelectedCard: (card: ComparisonCard | null) => void;
 
   // Settings
   fieldDisplayConfig: FieldDisplayConfig;
@@ -90,15 +100,17 @@ export interface StoreState {
   reset: () => void;
 }
 
-export interface ActionHistoryEntry {
-  action: 'accept' | 'reject' | 'skip';
-  noteId: number;
-  changes: Record<string, string>;
-  original?: Note;
-  timestamp: string;
-}
-
 export interface NotificationState {
   message: string;
   type: 'success' | 'error' | 'info';
+}
+
+export interface ComparisonCard {
+  noteId: number;
+  original: Note;
+  changes: Record<string, string>;
+  reasoning?: string;
+  readonly: boolean;
+  status?: 'accept' | 'reject'; // Only present when readonly
+  timestamp?: string; // Only present when readonly
 }
