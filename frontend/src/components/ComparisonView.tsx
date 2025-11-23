@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import {useMemo, useState, useEffect, useCallback} from 'react';
 import useStore from '../store/useStore.js';
 import DiffMatchPatch from 'diff-match-patch';
 import { WarningIcon, CheckIcon, ArchiveIcon, DeckIcon, BrushIcon, ClipboardIcon, BulbIcon, ClockIcon, CloseIcon, ArrowRightIcon, KeyboardIcon, EditIcon, EyeIcon, RefreshIcon } from './ui/Icons.js';
@@ -46,14 +46,16 @@ function CardField({ fieldName, value, isChanged, showDiff, diffs, readonly, onC
         />
       ) : (
         <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
-          {showDiff && diffs ? (
+          {!value
+            ? <span className="text-gray-400 dark:text-gray-500 italic text-xs">(empty)</span>
+            : showDiff && diffs ? (
             diffs.map((diff, i) => {
               const [operation, text] = diff;
               if (showDiff === 'original') {
                 if (operation === 1) return null;
                 if (operation === -1) {
                   return (
-                    <span key={i} className="bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-200 px-0.5 rounded line-through">
+                    <span key={i} className="bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-200 px-0.5 rounded">
                       {text}
                     </span>
                   );
@@ -98,6 +100,9 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
   const [showOriginalSuggestions, setShowOriginalSuggestions] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
 
   // Reset state when card changes
   useEffect(() => {
@@ -107,6 +112,8 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
       setEditedChanges(initialChanges);
       setShowOriginalSuggestions(false);
       setIsEditing(false);
+      setIsAccepting(false);
+      setIsRejecting(false);
     }
   }, [card]);
 
@@ -185,6 +192,66 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
   // Check if there are any manual edits
   const hasManualEdits = loadedEditedChanges && Object.keys(loadedEditedChanges).length > 0;
 
+  // Handle accept with loading state
+  const handleAcceptClick = async (editedChanges?: Record<string, string>) => {
+    setIsAccepting(true);
+    try {
+      await onAccept(editedChanges);
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  // Handle reject with loading state
+  const handleRejectClick = async (editedChanges?: Record<string, string>) => {
+    setIsRejecting(true);
+    try {
+      await onReject(editedChanges);
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  // Copy current comparison to clipboard for external LLM review
+  const handleCopyToClipboard = async () => {
+    if (!card) return;
+
+    const displayChanges = showOriginalSuggestions
+      ? changes
+      : (hasManualEdits ? editedChanges : changes);
+
+    // Build formatted text for LLM
+    let text = `# Anki Card Review Request\n\n`;
+
+    if (reasoning) {
+      text += `## AI Reasoning\n${reasoning}\n\n`;
+    }
+
+    text += `## Original Card\n`;
+    Object.entries(original.fields)
+      .sort(([, a], [, b]) => a.order - b.order)
+      .forEach(([fieldName, fieldData]) => {
+        text += `**${fieldName}:** ${fieldData.value || '(empty)'}\n`;
+      });
+
+    text += `\n## ${showOriginalSuggestions ? 'AI Suggested Changes' : hasManualEdits ? 'Manually Edited Changes' : 'Suggested Changes'}\n`;
+    Object.entries(original.fields)
+      .sort(([, a], [, b]) => a.order - b.order)
+      .forEach(([fieldName, fieldData]) => {
+        const suggestedValue = displayChanges[fieldName] ?? fieldData.value;
+        const hasChange = suggestedValue !== fieldData.value;
+        text += `**${fieldName}:** ${suggestedValue || '(empty)'}${hasChange ? ' *(modified)*' : ''}\n`;
+      });
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -204,11 +271,25 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
               <span className="text-gray-600 dark:text-gray-400">{original.modelName}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-primary-100 dark:bg-primary-900/30 px-3 py-1.5 rounded-full">
-            <ClipboardIcon className="w-4 h-4 text-primary-700 dark:text-primary-400" />
-            <span className="text-sm font-bold text-primary-900 dark:text-primary-200">
-              {currentIndex + 1} / {queue.length}
-            </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleCopyToClipboard}
+              className={`px-3 py-1.5 text-sm font-medium border rounded-md transition-colors flex items-center gap-2 ${
+                copySuccess
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-650'
+              }`}
+              title="Copy to clipboard for external LLM review"
+            >
+              <ClipboardIcon className="w-4 h-4" />
+              {copySuccess ? 'Copied!' : 'Copy for Review'}
+            </button>
+            <div className="flex items-center gap-2 bg-primary-100 dark:bg-primary-900/30 px-3 py-1.5 rounded-full">
+              <ClipboardIcon className="w-4 h-4 text-primary-700 dark:text-primary-400" />
+              <span className="text-sm font-bold text-primary-900 dark:text-primary-200">
+                {currentIndex + 1} / {queue.length}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -244,14 +325,8 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
               .map(([fieldName, fieldData]) => {
                 // Determine what's being compared against (AI suggestion or edited version)
                 const comparisonValue = showOriginalSuggestions
-                  ? (changes[fieldName] || fieldData.value)
-                  : (editedChanges[fieldName] || changes[fieldName] || fieldData.value);
-
-                // Check if this field has been changed
-                const hasAIChange = changedFields.includes(fieldName);
-                const editedValue = editedChanges[fieldName];
-                const hasUserEdit = editedValue !== undefined && editedValue !== (changes[fieldName] || fieldData.value);
-                // const isChanged = hasAIChange || hasUserEdit;
+                  ? (changes[fieldName] ?? fieldData.value)
+                  : (editedChanges[fieldName] ?? changes[fieldName] ?? fieldData.value);
 
                 // Calculate diff from original to the comparison value
                 const diffs = dmp.diff_main(fieldData.value || '', comparisonValue || '');
@@ -345,8 +420,8 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
               .map(([fieldName, fieldData]) => {
                 // Use original AI suggestion if showing original, otherwise use edited
                 const displayValue = showOriginalSuggestions
-                  ? (changes[fieldName] || fieldData.value)
-                  : (editedChanges[fieldName] || changes[fieldName] || fieldData.value);
+                  ? (changes[fieldName] ?? fieldData.value)
+                  : (editedChanges[fieldName] ?? changes[fieldName] ?? fieldData.value);
 
                 // Check if this field has been changed (either by AI or by user edits)
                 const hasAIChange = changedFields.includes(fieldName);
@@ -441,11 +516,12 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
                       actuallyEditedChanges[fieldName] = editedValue;
                     }
                   });
-                  onReject(Object.keys(actuallyEditedChanges).length > 0 ? actuallyEditedChanges : undefined);
+                  handleRejectClick(Object.keys(actuallyEditedChanges).length > 0 ? actuallyEditedChanges : undefined);
                 }}
                 variant="danger"
                 icon={<CloseIcon className="w-5 h-5" />}
-                disabled={hasManualEdits && showOriginalSuggestions}
+                disabled={hasManualEdits && showOriginalSuggestions || isAccepting || isRejecting}
+                loading={isRejecting}
               >
                 Reject
               </Button>
@@ -454,7 +530,7 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
                 onClick={onSkip}
                 variant="warning"
                 icon={<ArrowRightIcon className="w-5 h-5" />}
-                disabled={hasManualEdits && showOriginalSuggestions}
+                disabled={hasManualEdits && showOriginalSuggestions || isAccepting || isRejecting}
               >
                 Skip
               </Button>
@@ -470,13 +546,14 @@ export default function ComparisonView({ currentSessionData, onBackToSessions, o
                     actuallyEditedChanges[fieldName] = editedValue;
                   }
                 });
-                onAccept(Object.keys(actuallyEditedChanges).length > 0 ? actuallyEditedChanges : undefined);
+                handleAcceptClick(Object.keys(actuallyEditedChanges).length > 0 ? actuallyEditedChanges : undefined);
               }}
               variant="primary"
               size="lg"
               icon={<CheckIcon className="w-6 h-6" />}
               className="shadow-lg shadow-green-500/30"
-              disabled={hasManualEdits && showOriginalSuggestions}
+              disabled={hasManualEdits && showOriginalSuggestions || isAccepting || isRejecting}
+              loading={isAccepting}
             >
               <span className="font-semibold">Accept Changes</span>
             </Button>

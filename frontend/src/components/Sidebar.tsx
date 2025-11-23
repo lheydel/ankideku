@@ -406,28 +406,30 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
         ))}
       </div>
 
-      {/* Chat Input */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <div className="flex gap-2 items-end">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder="Describe what you want to improve... (Shift+Enter for new line)"
-            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
-            rows={3}
-          />
+      {/* Chat Input - Only show when no active session */}
+      {!currentSessionData && (
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="flex gap-2 items-end">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Describe what you want to improve... (Shift+Enter for new line)"
+              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
+              rows={3}
+            />
+          </div>
+          {!selectedDeck && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Select a deck to start</p>
+          )}
         </div>
-        {!selectedDeck && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Select a deck to start</p>
-        )}
-      </div>
+      )}
     </div>
   );
 }
