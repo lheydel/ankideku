@@ -42,3 +42,7 @@ export interface NoteUpdate {
 export interface BatchUpdateRequest {
   updates: NoteUpdate[];
 }
+
+// Session state management (re-export from contract for consistency)
+export { SessionState } from '../../../contract/types.js';
+export type { SessionStateData } from '../../../contract/types.js';

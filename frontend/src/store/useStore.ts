@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { StoreState, DeckInfo, CardSuggestion, ActionHistoryEntry } from '../types/index.js';
+import type { StoreState, DeckInfo, CardSuggestion, ActionHistoryEntry, SessionData, SessionMetadata } from '../types/index.js';
 
 const useStore = create<StoreState>((set, get) => ({
   // Connection state
@@ -27,10 +27,40 @@ const useStore = create<StoreState>((set, get) => ({
   setProcessing: (isProcessing: boolean) => set({ isProcessing }),
   setProgress: (progress: number, total: number) => set({ processingProgress: progress, processingTotal: total }),
 
+  // Session management
+  currentSession: null,
+  currentSessionData: null,
+  sessions: [],
+  setCurrentSession: (sessionId: string | null) => set({ currentSession: sessionId }),
+  setCurrentSessionData: (data: SessionData | null) => set({ currentSessionData: data }),
+  updateSessionState: (state: SessionStateData) => set((store) => {
+    // Update currentSessionData
+    const updatedSessionData = store.currentSessionData ? {
+      ...store.currentSessionData,
+      state
+    } : null;
+
+    // Update the session in the sessions list
+    const updatedSessions = store.sessions.map(session =>
+      session.sessionId === store.currentSession
+        ? { ...session, state }
+        : session
+    );
+
+    return {
+      currentSessionData: updatedSessionData,
+      sessions: updatedSessions
+    };
+  }),
+  setSessions: (sessions: SessionMetadata[]) => set({ sessions }),
+
   // Queue (notes with suggestions)
   queue: [],
   currentIndex: 0,
   setQueue: (queue: CardSuggestion[]) => set({ queue, currentIndex: 0 }),
+  addToQueue: (suggestion: CardSuggestion) => set((state) => ({
+    queue: [...state.queue, suggestion]
+  })),
   nextCard: () => set((state) => ({
     currentIndex: Math.min(state.currentIndex + 1, state.queue.length - 1)
   })),
@@ -81,6 +111,8 @@ const useStore = create<StoreState>((set, get) => ({
     isProcessing: false,
     processingProgress: 0,
     processingTotal: 0,
+    currentSession: null,
+    currentSessionData: null,
     queue: [],
     currentIndex: 0,
   }),

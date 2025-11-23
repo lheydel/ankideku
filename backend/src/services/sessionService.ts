@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { Note, SessionRequest, CardSuggestion } from '../types/index.js';
+import { Note, SessionRequest, CardSuggestion, SessionState, SessionStateData } from '../types/index.js';
 import { PromptGenerator } from '../processors/promptGenerator.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,6 +74,9 @@ export class SessionService {
       taskPrompt,
       'utf-8'
     );
+
+    // Set initial session state to PENDING
+    await this.setSessionState(sessionId, SessionState.PENDING);
 
     console.log(`Created session: ${sessionId} (${deckPaths.length} decks, ${totalCards} total cards)`);
     console.log(`Task file: ${path.join(sessionDir, 'claude-task.md')}`);
@@ -148,18 +151,20 @@ export class SessionService {
    * List all sessions with metadata (sorted by timestamp, newest first)
    * @returns Array of session metadata objects
    */
-  async listSessionsWithMetadata(): Promise<Array<{ sessionId: string; timestamp: string; deckName: string; totalCards: number }>> {
+  async listSessionsWithMetadata(): Promise<Array<{ sessionId: string; timestamp: string; deckName: string; totalCards: number; state?: SessionStateData }>> {
     try {
       const sessionIds = await this.listSessions();
       const sessionsWithMetadata = await Promise.all(
         sessionIds.map(async (sessionId) => {
           try {
             const request = await this.getSessionRequest(sessionId);
+            const state = await this.getSessionState(sessionId);
             return {
               sessionId: request.sessionId,
               timestamp: request.timestamp,
               deckName: request.deckName,
-              totalCards: request.totalCards
+              totalCards: request.totalCards,
+              ...(state && { state })
             };
           } catch (error) {
             // If we can't read the request, return minimal data
@@ -261,43 +266,128 @@ export class SessionService {
   }
 
   /**
-   * Mark a session as cancelled
+   * Set the state of a session
    * @param sessionId - Session ID
+   * @param state - New session state
+   * @param message - Optional message for context
+   * @param exitCode - Optional exit code for completed/failed states
    */
-  async markSessionCancelled(sessionId: string): Promise<void> {
+  async setSessionState(
+    sessionId: string,
+    state: SessionState,
+    message?: string,
+    exitCode?: number | null
+  ): Promise<void> {
     const sessionDir = path.join(this.sessionsDir, sessionId);
-    const cancelledPath = path.join(sessionDir, 'cancelled.json');
+    const statePath = path.join(sessionDir, 'state.json');
+
+    const stateData: SessionStateData = {
+      state,
+      timestamp: new Date().toISOString(),
+      ...(message && { message }),
+      ...(exitCode !== undefined && { exitCode })
+    };
 
     try {
       await fs.writeFile(
-        cancelledPath,
-        JSON.stringify({
-          cancelled: true,
-          timestamp: new Date().toISOString()
-        }, null, 2),
+        statePath,
+        JSON.stringify(stateData, null, 2),
         'utf-8'
       );
-      console.log(`Marked session ${sessionId} as cancelled`);
+      console.log(`Session ${sessionId} state updated to: ${state}`);
     } catch (error) {
-      console.error(`Failed to mark session ${sessionId} as cancelled:`, error);
+      console.error(`Failed to update session ${sessionId} state to ${state}:`, error);
     }
   }
 
   /**
-   * Check if a session was cancelled
+   * Get the current state of a session
+   * @param sessionId - Session ID
+   * @returns Session state data or null if not found
+   */
+  async getSessionState(sessionId: string): Promise<SessionStateData | null> {
+    const sessionDir = path.join(this.sessionsDir, sessionId);
+    const statePath = path.join(sessionDir, 'state.json');
+
+    try {
+      const content = await fs.readFile(statePath, 'utf-8');
+      return JSON.parse(content);
+    } catch (error) {
+      // Migration: Check for old cancelled.json format
+      const cancelledPath = path.join(sessionDir, 'cancelled.json');
+      try {
+        const cancelledContent = await fs.readFile(cancelledPath, 'utf-8');
+        const cancelled = JSON.parse(cancelledContent);
+
+        // Migrate old format to new format
+        const migratedState: SessionStateData = {
+          state: SessionState.CANCELLED,
+          timestamp: cancelled.timestamp || new Date().toISOString()
+        };
+
+        // Write the new state file
+        await this.setSessionState(sessionId, SessionState.CANCELLED);
+
+        return migratedState;
+      } catch {
+        // No state file found
+        return null;
+      }
+    }
+  }
+
+  /**
+   * Mark a session as cancelled
+   * @param sessionId - Session ID
+   * @param message - Optional cancellation message
+   */
+  async markSessionCancelled(sessionId: string, message?: string): Promise<void> {
+    await this.setSessionState(sessionId, SessionState.CANCELLED, message);
+  }
+
+  /**
+   * Mark a session as running
+   * @param sessionId - Session ID
+   */
+  async markSessionRunning(sessionId: string): Promise<void> {
+    await this.setSessionState(sessionId, SessionState.RUNNING);
+  }
+
+  /**
+   * Mark a session as completed
+   * @param sessionId - Session ID
+   * @param exitCode - Exit code from Claude process
+   */
+  async markSessionCompleted(sessionId: string, exitCode?: number | null): Promise<void> {
+    await this.setSessionState(sessionId, SessionState.COMPLETED, undefined, exitCode);
+  }
+
+  /**
+   * Mark a session as failed
+   * @param sessionId - Session ID
+   * @param errorMessage - Error message
+   * @param exitCode - Exit code from Claude process
+   */
+  async markSessionFailed(sessionId: string, errorMessage?: string, exitCode?: number | null): Promise<void> {
+    await this.setSessionState(sessionId, SessionState.FAILED, errorMessage, exitCode);
+  }
+
+  /**
+   * Check if a session was cancelled (backwards compatibility)
    * @param sessionId - Session ID
    * @returns Cancellation info or null
    */
   async getSessionCancellation(sessionId: string): Promise<{ cancelled: true; timestamp: string } | null> {
-    const sessionDir = path.join(this.sessionsDir, sessionId);
-    const cancelledPath = path.join(sessionDir, 'cancelled.json');
+    const state = await this.getSessionState(sessionId);
 
-    try {
-      const content = await fs.readFile(cancelledPath, 'utf-8');
-      return JSON.parse(content);
-    } catch (error) {
-      return null;
+    if (state && state.state === SessionState.CANCELLED) {
+      return {
+        cancelled: true,
+        timestamp: state.timestamp
+      };
     }
+
+    return null;
   }
 
   /**

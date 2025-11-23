@@ -4,6 +4,7 @@ import DiffMatchPatch from 'diff-match-patch';
 import { WarningIcon, CheckIcon, ArchiveIcon, DeckIcon, BrushIcon, ClipboardIcon, BulbIcon, ClockIcon, CloseIcon, ArrowRightIcon, KeyboardIcon } from './ui/Icons.js';
 import { Button } from './ui/Button.js';
 import { Breadcrumb } from './ui/Breadcrumb.js';
+import { SessionState, type SessionData } from '../types/index.js';
 
 const dmp = new DiffMatchPatch();
 
@@ -63,20 +64,25 @@ function CardField({ fieldName, value, isChanged, showDiff, diffs }: CardFieldPr
 }
 
 interface ComparisonViewProps {
+  currentSessionData: SessionData | null;
+  onBackToSessions: () => void;
   onAccept: () => void;
   onReject: () => void;
   onSkip: () => void;
 }
 
-export default function ComparisonView({ onAccept, onReject, onSkip }: ComparisonViewProps) {
-  const { getCurrentCard, currentIndex, queue, isProcessing, setQueue } = useStore();
+export default function ComparisonView({ currentSessionData, onBackToSessions, onAccept, onReject, onSkip }: ComparisonViewProps) {
+  const { getCurrentCard, currentIndex, queue, setQueue } = useStore();
+
+  // Check if session is actively processing
+  const isProcessing = currentSessionData?.state?.state === SessionState.PENDING || currentSessionData?.state?.state === SessionState.RUNNING;
 
   const card = getCurrentCard();
 
   if (!card) {
     return (
       <div className="space-y-6">
-        {isProcessing && <Breadcrumb onClick={() => setQueue([])} />}
+        {(isProcessing || queue.length > 0) && <Breadcrumb onClick={onBackToSessions} />}
         <div className="card text-center py-16">
           {isProcessing ? (
             <>
@@ -107,7 +113,7 @@ export default function ComparisonView({ onAccept, onReject, onSkip }: Compariso
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <Breadcrumb onClick={() => setQueue([])} />
+      <Breadcrumb onClick={onBackToSessions} />
 
       {/* Header Card with Metadata */}
       <div className="card p-5 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-750">

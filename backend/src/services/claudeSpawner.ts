@@ -1,6 +1,11 @@
-import { spawn, ChildProcess, execSync } from 'child_process';
+import { ChildProcess, execSync } from 'child_process';
+import spawn from 'cross-spawn';
+import kill from 'tree-kill';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
+
+// Note: execSync is still used for checking if Claude CLI is installed
 
 export interface SpawnOptions {
   sessionId: string;
@@ -61,7 +66,7 @@ export class ClaudeSpawnerService {
     console.log(`[Claude Spawner] Logs: ${combinedLogPath}`);
     console.log(`[Claude Spawner] Working directory: ${resolvedProjectRoot}`);
     console.log(`[Claude Spawner] Allowed directory: ${resolvedDatabaseDir}`);
-    console.log(`[Claude Spawner] Command: claude --permission-mode acceptEdits --add-dir "${resolvedDatabaseDir}" -- ${taskFilePath}`);
+    console.log(`[Claude Spawner] Command: cat ${taskFilePath} | claude --print --output-format stream-json --verbose --add-dir "${resolvedDatabaseDir}" --allowedTools "Read,Write,Edit,Bash"`);
     console.log(`[Claude Spawner] Platform: ${process.platform}`);
 
     // Check if Claude CLI is installed
@@ -74,7 +79,7 @@ export class ClaudeSpawnerService {
     const combinedStream = fs.createWriteStream(combinedLogPath, { flags: 'w' });
 
     // Write header to combined log
-    const header = `=== Claude Code Output Log ===\nSession: ${sessionId}\nStarted: ${new Date().toISOString()}\nCommand: claude --permission-mode acceptEdits --add-dir "${resolvedDatabaseDir}" -- ${taskFilePath}\nWorking Directory: ${resolvedProjectRoot}\nAllowed Directory: ${resolvedDatabaseDir}\nPlatform: ${process.platform}\nClaude CLI Installed: ${claudeInstalled}\n${'='.repeat(50)}\n\n`;
+    const header = `=== Claude Code Output Log ===\nSession: ${sessionId}\nStarted: ${new Date().toISOString()}\nCommand: cat ${taskFilePath} | claude --print --output-format stream-json --verbose --add-dir "${resolvedDatabaseDir}" --allowedTools "Read,Write,Edit,Bash"\nOutput Format: Streaming JSON (JSONL)\nWorking Directory: ${resolvedProjectRoot}\nAllowed Directory: ${resolvedDatabaseDir}\nPlatform: ${process.platform}\nClaude CLI Installed: ${claudeInstalled}\n${'='.repeat(50)}\n\n`;
     combinedStream.write(header);
 
     // Early return if Claude is not installed
@@ -93,38 +98,132 @@ export class ClaudeSpawnerService {
       });
     }
 
-    return new Promise((resolve, reject) => {
-      // Spawn claude CLI with the task file
-      // --permission-mode acceptEdits: Auto-accept Write/Edit operations for non-interactive execution
+    return new Promise(async (resolve, reject) => {
+      // Read the task file content to pipe to stdin
+      let taskContent: string;
+      try {
+        taskContent = await fsPromises.readFile(taskFilePath, 'utf-8');
+      } catch (error) {
+        reject(new Error(`Failed to read task file: ${error}`));
+        return;
+      }
+
+      // Spawn claude CLI in non-interactive mode with streaming JSON output
+      // --print: Run in non-interactive mode and print the final result
+      // --output-format stream-json: Stream progress as JSONL for real-time updates
+      // --verbose: Show full turn-by-turn output for debugging
       // --add-dir: Restrict file access to only the database directory for security
-      // --: Separator to prevent task file from being consumed by --add-dir
+      // --allowedTools: Explicitly allow file operations (Read, Write, Edit, Bash)
+      // Task content is piped to stdin (like: cat task.md | claude ...)
+      // Using cross-spawn for better Windows compatibility
       const claude = spawn('claude', [
-        '--permission-mode', 'acceptEdits',
+        '--print',
+        '--output-format', 'stream-json',
+        '--verbose',
         '--add-dir', resolvedDatabaseDir,
-        '--',  // End of options
-        taskFilePath
+        '--allowedTools', 'Read,Write,Edit,Bash'
       ], {
         cwd: resolvedProjectRoot,  // Run from project root so relative paths work
         env: process.env,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true  // Required on Windows for proper stdio capture
+        stdio: ['pipe', 'pipe', 'pipe']
+        // cross-spawn handles Windows quirks automatically - no need for shell: true
       });
 
       this.activeProcesses.set(sessionId, claude);
 
       let stdoutData = '';
       let stderrData = '';
+      let partialLine = ''; // Buffer for incomplete JSON lines
 
-      // Capture stdout
+      // Pipe the task content to stdin
+      if (claude.stdin) {
+        claude.stdin.write(taskContent);
+        claude.stdin.end();
+      }
+
+      // Capture and parse streaming JSON output
       claude.stdout?.on('data', (data: Buffer) => {
         const output = data.toString();
         stdoutData += output;
 
-        // Write to log files
+        // Write raw output to stdout log only (not combined)
         stdoutStream.write(output);
-        combinedStream.write(`[STDOUT] ${output}`);
 
-        console.log(`[Claude ${sessionId}]: ${output.trim()}`);
+        // Parse JSONL (JSON Lines) stream and write parsed version to combined log
+        const lines = (partialLine + output).split('\n');
+        partialLine = lines.pop() || ''; // Save incomplete line for next chunk
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          try {
+            const message = JSON.parse(line);
+
+            // Log based on message type
+            switch (message.type) {
+              case 'system':
+                // Handle system messages (init, etc.)
+                if (message.subtype === 'init') {
+                  console.log(`[Claude ${sessionId}] Session initialized - Model: ${message.model || 'N/A'}, Version: ${message.claude_code_version || 'N/A'}`);
+                  combinedStream.write(`[INIT] Session: ${message.session_id || 'N/A'}, Model: ${message.model}\n`);
+                }
+                break;
+
+              case 'user':
+                // Check if this is a tool result or actual user message
+                const isToolResult = message.message?.content?.[0]?.type === 'tool_result';
+                if (isToolResult) {
+                  const toolUseId = message.message.content[0].tool_use_id || 'unknown';
+                  console.log(`[Claude ${sessionId}] Tool result: ${toolUseId.substring(0, 20)}...`);
+                  combinedStream.write(`[TOOL_RESULT] ${toolUseId}\n`);
+                } else {
+                  console.log(`[Claude ${sessionId}] User prompt received`);
+                  combinedStream.write(`[USER] Task prompt\n`);
+                }
+                break;
+
+              case 'assistant':
+                // Log assistant's actions/thoughts
+                const contentArray = message.message?.content || [];
+                let logText = '';
+
+                for (const item of contentArray) {
+                  if (item.type === 'text') {
+                    logText += item.text + ' ';
+                  } else if (item.type === 'tool_use') {
+                    logText += `[Using ${item.name} tool] `;
+                  }
+                }
+
+                if (logText) {
+                  console.log(`[Claude ${sessionId}] ${logText.trim().substring(0, 100)}${logText.length > 100 ? '...' : ''}`);
+                  combinedStream.write(`[ASSISTANT] ${logText.trim()}\n`);
+                }
+                break;
+
+              case 'result':
+                // Final result with statistics
+                const isSuccess = message.subtype === 'success';
+                const duration = message.duration_ms || 0;
+                const turns = message.num_turns || 0;
+                const cost = message.total_cost_usd || 0;
+                const resultText = message.result || '';
+
+                console.log(`[Claude ${sessionId}] ${isSuccess ? 'Completed' : 'Failed'} - Turns: ${turns}, Duration: ${(duration/1000).toFixed(1)}s, Cost: $${cost.toFixed(4)}`);
+                combinedStream.write(`[RESULT] Status: ${message.subtype}, Turns: ${turns}, Duration: ${duration}ms, Cost: $${cost}\n`);
+                if (resultText) {
+                  combinedStream.write(`[RESULT TEXT] ${resultText}\n`);
+                }
+                break;
+
+              default:
+                console.log(`[Claude ${sessionId}] Unknown message type: ${message.type}`);
+            }
+          } catch (parseError) {
+            // Not valid JSON - might be plain text or incomplete
+            console.log(`[Claude ${sessionId}]: ${line.trim()}`);
+          }
+        }
       });
 
       // Capture stderr
@@ -161,11 +260,8 @@ export class ClaudeSpawnerService {
           output: stdoutData
         };
 
-        // Windows + shell:true quirk: exit code can be null even for successful completion
-        // If we got stdout and no stderr, consider it successful
-        const likelySuccessful = code === 0 || (code === null && stdoutData.length > 0 && stderrData.length === 0);
-
-        if (likelySuccessful) {
+        // cross-spawn provides reliable exit codes across platforms
+        if (code === 0) {
           result.success = true;
           console.log(`[Claude ${sessionId}]: Completed successfully (exit code: ${code})`);
           resolve(result);
@@ -231,24 +327,23 @@ export class ClaudeSpawnerService {
   killProcess(sessionId: string): boolean {
     const claudeProcess = this.activeProcesses.get(sessionId);
 
-    if (claudeProcess) {
+    if (claudeProcess && claudeProcess.pid) {
       console.log(`Killing Claude process for session: ${sessionId}`);
 
-      // On Windows with shell: true, we need to kill the entire process tree
-      if (claudeProcess.pid && process.platform === 'win32') {
-        try {
-          // Use taskkill to kill the process tree on Windows
-          execSync(`taskkill /pid ${claudeProcess.pid} /T /F`, { windowsHide: true });
+      // Use tree-kill to kill the entire process tree (cross-platform)
+      kill(claudeProcess.pid, 'SIGTERM', (error) => {
+        if (error) {
+          console.error(`Failed to kill process tree for ${sessionId}:`, error);
+          // Fallback to direct kill
+          try {
+            claudeProcess.kill('SIGTERM');
+          } catch (fallbackError) {
+            console.error(`Fallback kill also failed:`, fallbackError);
+          }
+        } else {
           console.log(`Killed process tree for PID ${claudeProcess.pid}`);
-        } catch (error) {
-          console.error(`Failed to kill process tree:`, error);
-          // Fallback to regular kill
-          claudeProcess.kill();
         }
-      } else {
-        // On Unix-like systems, use SIGTERM
-        claudeProcess.kill('SIGTERM');
-      }
+      });
 
       this.activeProcesses.delete(sessionId);
       return true;
@@ -283,16 +378,18 @@ export class ClaudeSpawnerService {
     for (const [sessionId, claudeProcess] of this.activeProcesses.entries()) {
       console.log(`Killing process for session: ${sessionId}`);
 
-      // On Windows with shell: true, we need to kill the entire process tree
-      if (claudeProcess.pid && process.platform === 'win32') {
-        try {
-          execSync(`taskkill /pid ${claudeProcess.pid} /T /F`, { windowsHide: true });
-        } catch (error) {
-          console.error(`Failed to kill process tree for ${sessionId}:`, error);
-          claudeProcess.kill('SIGTERM');
-        }
-      } else {
-        claudeProcess.kill('SIGTERM');
+      if (claudeProcess.pid) {
+        // Use tree-kill to kill the entire process tree (cross-platform)
+        kill(claudeProcess.pid, 'SIGTERM', (error) => {
+          if (error) {
+            console.error(`Failed to kill process tree for ${sessionId}:`, error);
+            try {
+              claudeProcess.kill('SIGTERM');
+            } catch (fallbackError) {
+              console.error(`Fallback kill also failed:`, fallbackError);
+            }
+          }
+        });
       }
     }
 

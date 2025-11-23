@@ -10,8 +10,13 @@ export type {
   PingResponse,
   SessionRequest,
   CardSuggestion,
-  SessionData
+  SessionData,
+  SessionStateData,
+  SessionState
 } from '../../../contract/types';
+
+// Re-export SessionState const object for value access
+export { SessionState } from '../../../contract/types';
 
 // Frontend-specific types
 
@@ -20,6 +25,7 @@ export interface SessionMetadata {
   timestamp: string;
   deckName: string;
   totalCards: number;
+  state?: SessionStateData;
 }
 
 export interface FieldDisplayConfig {
@@ -50,10 +56,20 @@ export interface StoreState {
   setProcessing: (isProcessing: boolean) => void;
   setProgress: (progress: number, total: number) => void;
 
+  // Session management
+  currentSession: string | null;
+  currentSessionData: SessionData | null;
+  sessions: SessionMetadata[];
+  setCurrentSession: (sessionId: string | null) => void;
+  setCurrentSessionData: (data: SessionData | null) => void;
+  updateSessionState: (state: SessionStateData) => void;
+  setSessions: (sessions: SessionMetadata[]) => void;
+
   // Queue
   queue: CardSuggestion[];
   currentIndex: number;
   setQueue: (queue: CardSuggestion[]) => void;
+  addToQueue: (suggestion: CardSuggestion) => void;
   nextCard: () => void;
   prevCard: () => void;
   goToCard: (index: number) => void;

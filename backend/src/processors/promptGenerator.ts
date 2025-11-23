@@ -19,6 +19,9 @@ export class PromptGenerator {
   static generatePrompt(request: SessionRequest): string {
     const deckFilesList = request.deckPaths.map((p, i) => `${i + 1}. \`${p}\``).join('\n');
 
+    // Build the full path for suggestions directory
+    const suggestionsPath = `database/ai-sessions/${request.sessionId}/suggestions`;
+
     return `# Anki Card Analysis Task
 
 You are analyzing Anki flashcards to suggest improvements based on the user's request.
@@ -55,7 +58,7 @@ ${request.deckPaths.length > 1 ?
 ## Output Format
 
 For each card that needs improvement, create a file named:
-\`${request.sessionId}/suggestions/suggestion-{noteId}.json\`
+\`${suggestionsPath}/suggestion-{noteId}.json\`
 
 With this exact JSON structure:
 \`\`\`json
@@ -85,7 +88,7 @@ With this exact JSON structure:
 - Include the FULL original card data in "original"
 - Only include changed fields in "changes"
 - Provide clear, specific reasoning for each change
-- Write files to: \`${request.sessionId}/suggestions/\`
+- Write files to: \`${suggestionsPath}/\`
 
 ## Instructions
 
@@ -100,7 +103,7 @@ There is a file watcher monitoring the suggestions directory in real-time. Each 
 2. For each note across ALL decks:
    - Analyze based on: "${request.prompt}"
    - **If changes are needed:**
-     - IMMEDIATELY use the Write tool to create \`${request.sessionId}/suggestions/suggestion-{noteId}.json\`
+     - IMMEDIATELY use the Write tool to create \`${suggestionsPath}/suggestion-{noteId}.json\`
      - Do NOT wait to analyze other cards first
      - Write the file right away so the file watcher can detect it
    - If no changes needed, skip to the next card

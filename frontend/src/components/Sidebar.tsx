@@ -6,12 +6,14 @@ import { useCardGeneration } from '../hooks/useCardGeneration.js';
 import { useSessionManagement } from '../hooks/useSessionManagement.js';
 import { Button } from './ui/Button.js';
 import type { SessionData } from '../types';
+import { SessionState } from '../types';
 
 interface Message {
   id: string;
   type: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  state?: SessionState; // Optional session state for status messages
 }
 
 interface SidebarProps {
@@ -19,6 +21,40 @@ interface SidebarProps {
   onClose: () => void;
   currentSessionData: SessionData | null;
   onNewSession: () => void;
+}
+
+// Helper function to get state badge styling
+function getStateBadge(state: SessionState) {
+  const badges = {
+    [SessionState.PENDING]: {
+      label: 'Pending',
+      className: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
+    },
+    [SessionState.RUNNING]: {
+      label: 'Running',
+      className: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+    },
+    [SessionState.COMPLETED]: {
+      label: 'Completed',
+      className: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+    },
+    [SessionState.FAILED]: {
+      label: 'Failed',
+      className: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'
+    },
+    [SessionState.CANCELLED]: {
+      label: 'Cancelled',
+      className: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+    }
+  };
+
+  const badge = badges[state];
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${badge.className}`}>
+      {badge.label}
+    </span>
+  );
 }
 
 export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSession }: SidebarProps) {
@@ -74,15 +110,39 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
   // Restore chat history when session is loaded
   useEffect(() => {
     if (currentSessionData) {
-      const { request, suggestions, cancelled } = currentSessionData;
+      const { request, suggestions, cancelled, state } = currentSessionData;
       const sessionDate = new Date(request.timestamp);
+
+      // Build status message based on state or cancelled flag
+      let statusContent: string;
+      let statusType: 'assistant' | 'system' = 'assistant';
+
+      if (state) {
+        // Use new state system
+        const stateMessages = {
+          [SessionState.PENDING]: `Session pending... (${suggestions.length} suggestions so far)`,
+          [SessionState.RUNNING]: `Session running... Found ${suggestions.length} suggestions for "${request.deckName}"`,
+          [SessionState.COMPLETED]: `Session complete! Found ${suggestions.length} suggestions for "${request.deckName}" (${request.totalCards} total cards)`,
+          [SessionState.FAILED]: `Session failed: ${state.message || 'Unknown error'}. Found ${suggestions.length} suggestions before failure.`,
+          [SessionState.CANCELLED]: `Session cancelled. Found ${suggestions.length} suggestions before cancellation for "${request.deckName}"`
+        };
+        statusContent = stateMessages[state.state];
+        statusType = state.state === SessionState.FAILED || state.state === SessionState.CANCELLED ? 'system' : 'assistant';
+      } else if (cancelled) {
+        // Fallback to old cancelled format
+        statusContent = `Session cancelled. Found ${suggestions.length} suggestions before cancellation for "${request.deckName}"`;
+        statusType = 'system';
+      } else {
+        // No state info - assume completed
+        statusContent = `Session complete! Found ${suggestions.length} suggestions for "${request.deckName}" (${request.totalCards} total cards)`;
+      }
 
       // Reconstruct chat history for this session
       const sessionMessages: Message[] = [
         {
           id: '0',
           type: 'system',
-          content: `Session loaded from ${sessionDate.toLocaleDateString()} at ${sessionDate.toLocaleTimeString()}`,
+          content: `Session loaded from ${sessionDate.toLocaleDateString()} at ${sessionDate.toLocaleTimeString('en-US', { hour12: false })}`,
           timestamp: sessionDate
         },
         {
@@ -93,11 +153,10 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
         },
         {
           id: '2',
-          type: cancelled ? 'system' : 'assistant',
-          content: cancelled
-            ? `Session cancelled. Found ${suggestions.length} suggestions before cancellation for "${request.deckName}"`
-            : `Session complete! Found ${suggestions.length} suggestions for "${request.deckName}" (${request.totalCards} total cards)`,
-          timestamp: cancelled ? new Date(cancelled.timestamp) : sessionDate
+          type: statusType,
+          content: statusContent,
+          timestamp: state ? new Date(state.timestamp) : (cancelled ? new Date(cancelled.timestamp) : sessionDate),
+          state: state?.state // Include state for badge display
         }
       ];
 
@@ -332,6 +391,11 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
               }`}
             >
+              {message.state && (
+                <div className="mb-2">
+                  {getStateBadge(message.state)}
+                </div>
+              )}
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
               <p
                 className={`text-xs mt-1 ${
@@ -342,7 +406,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
-                {message.timestamp.toLocaleTimeString()}
+                {message.timestamp.toLocaleTimeString('en-US', { hour12: false })}
               </p>
             </div>
           </div>

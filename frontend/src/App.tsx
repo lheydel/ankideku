@@ -14,9 +14,44 @@ import { useNotification } from './hooks/useNotification.js';
 import { useCardReview } from './hooks/useCardReview.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useSessionManagement } from './hooks/useSessionManagement.js';
+import { SessionState } from './types/index.js';
+
+// Helper function to get state badge styling
+function getStateBadge(state: SessionState) {
+  const badges = {
+    [SessionState.PENDING]: {
+      label: 'Pending',
+      className: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
+    },
+    [SessionState.RUNNING]: {
+      label: 'Running',
+      className: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+    },
+    [SessionState.COMPLETED]: {
+      label: 'Completed',
+      className: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+    },
+    [SessionState.FAILED]: {
+      label: 'Failed',
+      className: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'
+    },
+    [SessionState.CANCELLED]: {
+      label: 'Cancelled',
+      className: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+    }
+  };
+
+  const badge = badges[state];
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${badge.className}`}>
+      {badge.label}
+    </span>
+  );
+}
 
 function App() {
-  const { queue, setQueue, isProcessing } = useStore();
+  const { queue, setQueue, currentSessionData } = useStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
@@ -25,7 +60,7 @@ function App() {
   const { notification, showNotification } = useNotification();
   const { handleAccept, handleReject, handleSkip } = useCardReview();
   const { theme, toggleTheme } = useTheme();
-  const { sessions, currentSessionData, loadSession, listSessions, deleteSession, clearSession } = useSessionManagement();
+  const { sessions, loadSession, listSessions, deleteSession, clearSession } = useSessionManagement();
 
   // Load sessions on mount
   useEffect(() => {
@@ -98,7 +133,7 @@ function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto">
-          {queue.length === 0 && !isProcessing ? (
+          {queue.length === 0 && (!currentSessionData?.state || (currentSessionData.state.state !== SessionState.PENDING && currentSessionData.state.state !== SessionState.RUNNING)) ? (
             // Session selector view
             <div className="min-h-full p-8">
               <div className="max-w-4xl mx-auto">
@@ -163,6 +198,11 @@ function App() {
                               <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-blue-100 dark:from-primary-900 dark:to-blue-900 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <ClockIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                               </div>
+                              {session.state && (
+                                <div>
+                                  {getStateBadge(session.state.state)}
+                                </div>
+                              )}
                             </div>
 
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
@@ -176,7 +216,8 @@ function App() {
                                 year: 'numeric'
                               })} • {date.toLocaleTimeString('en-US', {
                                 hour: '2-digit',
-                                minute: '2-digit'
+                                minute: '2-digit',
+                                hour12: false
                               })}
                             </p>
 
@@ -185,15 +226,15 @@ function App() {
                                 <span>Load Session</span>
                                 <span className="group-hover:translate-x-1 transition-transform">→</span>
                               </div>
-                              <button
+                              <span
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOutputViewerSession(session.sessionId);
                                 }}
-                                className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 underline"
+                                className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 underline cursor-pointer"
                               >
                                 View Output
-                              </button>
+                              </span>
                             </div>
                           </button>
                         </div>
@@ -208,6 +249,11 @@ function App() {
             <div className="p-8">
               <div className="max-w-6xl mx-auto space-y-6">
                 <ComparisonView
+                  currentSessionData={currentSessionData}
+                  onBackToSessions={() => {
+                    setQueue([]);
+                    clearSession();
+                  }}
                   onAccept={() => handleAccept(
                     (msg) => showNotification(msg, 'success'),
                     (msg) => showNotification(msg, 'error')

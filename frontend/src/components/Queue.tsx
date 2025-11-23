@@ -220,7 +220,7 @@ export default function Queue() {
                             </span>
                             <span className="text-xs text-gray-400 dark:text-gray-500">•</span>
                             <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {new Date(item.timestamp).toLocaleTimeString()}
+                              {new Date(item.timestamp).toLocaleTimeString('en-US', { hour12: false })}
                             </span>
                           </div>
                         </div>

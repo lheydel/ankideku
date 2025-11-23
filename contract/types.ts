@@ -62,6 +62,23 @@ export interface PingResponse {
 // AI Session Types
 // ============================================================================
 
+export const SessionState = {
+  PENDING: 'pending',
+  RUNNING: 'running',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled'
+} as const;
+
+export type SessionState = typeof SessionState[keyof typeof SessionState];
+
+export interface SessionStateData {
+  state: SessionState;
+  timestamp: string;
+  message?: string; // Optional message for errors or additional context
+  exitCode?: number | null; // For completed/failed states
+}
+
 export interface SessionRequest {
   sessionId: string;
   prompt: string;
@@ -82,6 +99,7 @@ export interface SessionData {
   sessionId: string;
   request: SessionRequest;
   suggestions: CardSuggestion[];
+  state?: SessionStateData; // Current session state
   cancelled?: {
     cancelled: true;
     timestamp: string;

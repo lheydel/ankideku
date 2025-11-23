@@ -65,6 +65,12 @@ fileWatcher.on('suggestion:new', ({ sessionId, suggestion }) => {
   console.log(`Sent suggestion to session ${sessionId}: note ${suggestion.noteId}`);
 });
 
+fileWatcher.on('state:change', ({ sessionId, state }) => {
+  console.log(`[WebSocket] Emitting state:change to session ${sessionId}:`, state);
+  io.to(sessionId).emit('state:change', state);
+  console.log(`State changed for session ${sessionId}:`, state.state);
+});
+
 fileWatcher.on('session:complete', ({ sessionId, totalSuggestions }) => {
   io.to(sessionId).emit('session:complete', { totalSuggestions });
   console.log(`Session ${sessionId} complete: ${totalSuggestions} suggestions`);

@@ -27,7 +27,7 @@ export class FileWatcherService extends EventEmitter {
    * @param sessionId - Session ID to watch
    * @param sessionDir - Full path to session directory
    */
-  watchSession(sessionId: string, sessionDir: string): void {
+  async watchSession(sessionId: string, sessionDir: string): Promise<void> {
     if (this.watchers.has(sessionId)) {
       console.log(`Already watching session: ${sessionId}`);
       return;
@@ -38,15 +38,14 @@ export class FileWatcherService extends EventEmitter {
     // Initialize suggestion count
     this.suggestionCounts.set(sessionId, 0);
 
-    // Watch the suggestions subdirectory
+    // Watch both the suggestions subdirectory and state.json file
     const suggestionsDir = path.join(sessionDir, 'suggestions');
+    const stateFile = path.join(sessionDir, 'state.json');
 
-    const watcher = chokidar.watch(suggestionsDir, {
-      // Ignore non-suggestion files
-      ignored: (filePath: string) => {
-        const basename = path.basename(filePath);
-        return !basename.startsWith('suggestion-') || !basename.endsWith('.json');
-      },
+    // Ensure suggestions directory exists before watching
+    await fs.mkdir(suggestionsDir, { recursive: true });
+
+    const watcher = chokidar.watch([suggestionsDir, stateFile], {
       persistent: true,
       ignoreInitial: true, // Don't trigger events for existing files
       awaitWriteFinish: {
@@ -55,25 +54,23 @@ export class FileWatcherService extends EventEmitter {
       }
     });
 
-    watcher.on('add', async (filePath: string) => {
+    const handleFileChange = async (filePath: string) => {
       try {
         const basename = path.basename(filePath);
 
-        if (basename.startsWith('suggestion-') && basename.endsWith('.json')) {
-          // Read and parse suggestion file
+        if (basename === 'state.json') {
+          const content = await fs.readFile(filePath, 'utf-8');
+          const state = JSON.parse(content);
+          this.emit('state:change', { sessionId, state });
+          console.log(`State changed for session ${sessionId}: ${state.state}`);
+        } else if (basename.startsWith('suggestion-') && basename.endsWith('.json')) {
           const content = await fs.readFile(filePath, 'utf-8');
           const suggestion: CardSuggestion = JSON.parse(content);
 
-          // Increment count
           const count = (this.suggestionCounts.get(sessionId) || 0) + 1;
           this.suggestionCounts.set(sessionId, count);
 
-          // Emit suggestion:new event
-          this.emit('suggestion:new', {
-            sessionId,
-            suggestion
-          } as SuggestionEvent);
-
+          this.emit('suggestion:new', { sessionId, suggestion } as SuggestionEvent);
           console.log(`New suggestion for session ${sessionId}: note ${suggestion.noteId} (${count} total)`);
         }
       } catch (error) {
@@ -84,15 +81,19 @@ export class FileWatcherService extends EventEmitter {
           filePath
         });
       }
+    };
+
+    watcher.on('add', handleFileChange);
+    watcher.on('change', handleFileChange);
+
+    watcher.on('ready', () => {
+      console.log(`File watcher ready for session ${sessionId}`);
     });
 
     watcher.on('error', (error: unknown) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`Watcher error for session ${sessionId}:`, errorMessage);
-      this.emit('error', {
-        sessionId,
-        error: errorMessage
-      });
+      this.emit('error', { sessionId, error: errorMessage });
     });
 
     this.watchers.set(sessionId, watcher);

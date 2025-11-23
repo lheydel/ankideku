@@ -56,15 +56,31 @@ router.post('/new', async (req: Request, res: Response): Promise<void> => {
     const sessionDir = sessionService.getSessionDir(sessionId);
 
     // Start file watcher for this session
-    fileWatcher.watchSession(sessionId, sessionDir);
+    await fileWatcher.watchSession(sessionId, sessionDir);
 
     // Spawn Claude Code CLI in background (non-blocking)
+    // Mark as RUNNING when spawning starts
+    sessionService.markSessionRunning(sessionId);
+
     claudeSpawner.spawnClaude({ sessionId, sessionDir })
-      .then(() => {
+      .then((result) => {
         console.log(`Claude processing completed for session: ${sessionId}`);
+        // Mark as COMPLETED with exit code
+        sessionService.markSessionCompleted(sessionId, result.exitCode);
       })
-      .catch((error) => {
+      .catch(async (error) => {
         console.error(`Claude processing failed for session ${sessionId}:`, error);
+
+        // Check if session was already marked as cancelled (don't overwrite!)
+        const currentState = await sessionService.getSessionState(sessionId);
+        if (currentState?.state === 'cancelled') {
+          console.log(`Session ${sessionId} was cancelled, keeping CANCELLED state`);
+          return;
+        }
+
+        // Mark as FAILED with error message
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        sessionService.markSessionFailed(sessionId, errorMessage);
       })
       .finally(() => {
         // Stop watching after a delay to ensure all files are caught
@@ -105,7 +121,7 @@ router.get('/active', (req: Request, res: Response): void => {
  * GET /api/sessions/:sessionId
  * Load an existing session with all suggestions
  *
- * Returns: { sessionId: string, request: SessionRequest, suggestions: CardSuggestion[], cancelled?: { cancelled: true, timestamp: string } }
+ * Returns: { sessionId: string, request: SessionRequest, suggestions: CardSuggestion[], state?: SessionStateData, cancelled?: { cancelled: true, timestamp: string } }
  */
 router.get('/:sessionId', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -117,13 +133,26 @@ router.get('/:sessionId', async (req: Request, res: Response): Promise<void> => 
     // Load all suggestions
     const suggestions = await sessionService.loadSession(sessionId);
 
-    // Check if session was cancelled
+    // Get session state
+    const state = await sessionService.getSessionState(sessionId);
+
+    // Check if session was cancelled (backwards compatibility)
     const cancelled = await sessionService.getSessionCancellation(sessionId);
+
+    // If session is still running, start watching it for real-time updates
+    if (state && (state.state === 'pending' || state.state === 'running')) {
+      const sessionDir = sessionService.getSessionDir(sessionId);
+      if (!fileWatcher.isWatching(sessionId)) {
+        await fileWatcher.watchSession(sessionId, sessionDir);
+        console.log(`Started watching session ${sessionId} (state: ${state.state})`);
+      }
+    }
 
     res.json({
       sessionId,
       request,
       suggestions,
+      ...(state && { state }),
       ...(cancelled && { cancelled })
     });
   } catch (error) {
@@ -216,17 +245,21 @@ router.post('/:sessionId/cancel', async (req: Request, res: Response): Promise<v
  * GET /api/sessions/:sessionId/status
  * Get status of a session
  *
- * Returns: { sessionId: string, isRunning: boolean, isWatching: boolean, suggestionCount: number }
+ * Returns: { sessionId: string, isRunning: boolean, isWatching: boolean, suggestionCount: number, state?: SessionStateData }
  */
-router.get('/:sessionId/status', (req: Request, res: Response): void => {
+router.get('/:sessionId/status', async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId } = req.params;
+
+    // Get session state
+    const state = await sessionService.getSessionState(sessionId);
 
     const status = {
       sessionId,
       isRunning: claudeSpawner.isRunning(sessionId),
       isWatching: fileWatcher.isWatching(sessionId),
-      suggestionCount: fileWatcher.getSuggestionCount(sessionId)
+      suggestionCount: fileWatcher.getSuggestionCount(sessionId),
+      ...(state && { state })
     };
 
     res.json(status);

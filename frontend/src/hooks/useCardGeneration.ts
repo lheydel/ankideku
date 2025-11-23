@@ -2,42 +2,55 @@ import { useCallback, useState } from 'react';
 import useStore from '../store/useStore';
 import { useSessionManagement } from './useSessionManagement';
 import { useWebSocket } from './useWebSocket';
-import type { CardSuggestion } from '../types';
+import type { CardSuggestion, SessionStateData } from '../types';
 
 export function useCardGeneration() {
   const {
     selectedDeck,
     setQueue,
+    addToQueue,
     setProcessing,
     setProgress,
     addToPromptHistory,
+    currentSession,
+    updateSessionState,
   } = useStore();
 
-  const { createSession, currentSession } = useSessionManagement();
+  const { createSession, loadSession } = useSessionManagement();
   const [suggestionCount, setSuggestionCount] = useState(0);
 
   // Handle new suggestions from WebSocket
   const handleNewSuggestion = useCallback((suggestion: CardSuggestion) => {
-    setQueue((prev: CardSuggestion[]) => [...prev, suggestion]);
+    addToQueue(suggestion);
     setSuggestionCount(prev => prev + 1);
-  }, [setQueue]);
+  }, [addToQueue]);
+
+  // Handle state changes from WebSocket
+  const handleStateChange = useCallback((state: SessionStateData) => {
+    console.log('Session state changed:', state);
+    // Update both currentSessionData and sessions list
+    updateSessionState(state);
+  }, [updateSessionState]);
 
   // Handle session completion
-  const handleSessionComplete = useCallback((data: { totalSuggestions: number }) => {
+  const handleSessionComplete = useCallback(async (data: { totalSuggestions: number }) => {
     console.log(`Session complete: ${data.totalSuggestions} suggestions generated`);
     setProcessing(false);
+    // State is updated in real-time via state:change WebSocket event
   }, [setProcessing]);
 
   // Handle session errors
-  const handleSessionError = useCallback((error: { error: string }) => {
+  const handleSessionError = useCallback(async (error: { error: string }) => {
     console.error('Session error:', error.error);
     setProcessing(false);
+    // State is updated in real-time via state:change WebSocket event
   }, [setProcessing]);
 
   // Set up WebSocket listener
   useWebSocket({
     sessionId: currentSession,
     onSuggestion: handleNewSuggestion,
+    onStateChange: handleStateChange,
     onSessionComplete: handleSessionComplete,
     onError: handleSessionError
   });
