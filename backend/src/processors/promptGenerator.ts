@@ -112,6 +112,26 @@ There is a file watcher monitoring the suggestions directory in real-time. Each 
 
 **Remember**: Write each suggestion file immediately after analyzing that card, not in a batch at the end. This enables real-time progress updates!
 
+## Special Instructions for Large Decks
+
+${request.totalCards > 100 ? `**⚠️ LARGE DECK DETECTED (${request.totalCards} cards)**
+
+For decks with hundreds or thousands of cards, you should consider using the Task tool to spawn a general-purpose agent that can handle the large-scale analysis more efficiently. This helps avoid token budget issues and provides better performance.
+
+Consider delegating the card-by-card analysis to a Task agent if you're having difficulty processing all cards in one go.
+
+` : ''}## Critical Rules
+
+**DO NOT create any of the following files:**
+- Summary files (ANALYSIS_SUMMARY.md, summary.md, etc.)
+- Index files (SUGGESTIONS_INDEX.md, index.md, etc.)
+- Report files (report.md, findings.md, etc.)
+- Any other documentation files
+
+**ONLY create suggestion files** in the format: \`${suggestionsPath}/suggestion-{noteId}.json\`
+
+These are the ONLY files the application reads. Any other files are wasted effort and will be ignored.
+
 Start analyzing now!`;
   }
 
