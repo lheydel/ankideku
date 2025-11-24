@@ -36,7 +36,7 @@ export function initializeRouter(
  */
 router.post('/new', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { prompt, deckName } = req.body;
+    const { prompt, deckName, forceSync = false } = req.body;
 
     // Validate input
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
@@ -47,6 +47,18 @@ router.post('/new', async (req: Request, res: Response): Promise<void> => {
     if (!deckName || typeof deckName !== 'string') {
       res.status(400).json({ error: 'Deck name is required' });
       return;
+    }
+
+    // Perform synchronous incremental sync if forceSync is true
+    // This ensures the AI works with the most up-to-date card data
+    if (forceSync) {
+      console.log(`Force sync enabled - syncing deck cache for "${deckName}" before starting AI session...`);
+      const cacheModule = await import('../services/cache.js');
+      const cache = cacheModule.default;
+
+      await cache.syncDeckCache(deckName);
+    } else {
+      console.log(`Force sync disabled - skipping sync for "${deckName}"`);
     }
 
     // Create session

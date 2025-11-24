@@ -12,8 +12,8 @@ export function useSessionManagement() {
     return sessions;
   }, [setSessions]);
 
-  const createSession = useCallback(async (prompt: string, deckName: string): Promise<string> => {
-    const { sessionId } = await sessionApi.createSession(prompt, deckName);
+  const createSession = useCallback(async (prompt: string, deckName: string, forceSync: boolean = false): Promise<string> => {
+    const { sessionId } = await sessionApi.createSession(prompt, deckName, forceSync);
     setCurrentSession(sessionId);
 
     // Load the session data to populate currentSessionData with state

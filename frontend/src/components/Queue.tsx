@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import useStore from '../store/useStore.js';
 import { CheckIcon, ClockIcon, CloseIcon } from './ui/Icons.js';
-import { getDisplayField } from '../utils/getDisplayField.js';
 import { Button } from './ui/Button.js';
 import { TabButton } from './queue/TabButton.js';
 import { ToggleButton } from './queue/ToggleButton.js';
 import { QueueCard } from './queue/QueueCard.js';
 import { HistoryCard } from './queue/HistoryCard.js';
 import { StatCard } from './queue/StatCard.js';
+import { createComparisonCardFromSuggestion, createComparisonCardFromHistory } from '../utils/cardUtils.js';
+import { filterWithSearch } from '../utils/searchUtils.js';
 
 type TabType = 'queue' | 'history';
 
@@ -49,22 +50,19 @@ export default function Queue() {
   const reviewed = actionsHistory.length;
   const total = queue.length + actionsHistory.length;
 
-  // Filter queue items based on search
-  const filteredQueue = queue.filter((item) => {
-    if (!searchQuery) return true;
-    const displayValue = getDisplayField(item.original, fieldDisplayConfig);
-    return displayValue.toLowerCase().includes(searchQuery.toLowerCase());
-  });
-
   // Get the appropriate history based on view mode
   const displayHistory = historyViewMode === 'session' ? actionsHistory : globalHistory;
 
-  // Filter history items based on search
-  const filteredHistory = displayHistory.filter((item) => {
-    if (!searchQuery || !item.original) return true;
-    const displayValue = getDisplayField(item.original, fieldDisplayConfig);
-    return displayValue.toLowerCase().includes(searchQuery.toLowerCase());
-  }).reverse(); // Show most recent first
+  // Filter items based on search (memoized for performance)
+  const filteredQueue = useMemo(
+    () => filterWithSearch(queue, searchQuery, fieldDisplayConfig),
+    [queue, searchQuery, fieldDisplayConfig]
+  );
+
+  const filteredHistory = useMemo(
+    () => filterWithSearch(displayHistory, searchQuery, fieldDisplayConfig, true),
+    [displayHistory, searchQuery, fieldDisplayConfig]
+  );
 
   return (
     <div className="bg-white dark:bg-gray-800 border-r border-gray-200/50 dark:border-gray-700/50 w-72 flex flex-col shadow-sm transition-colors duration-200">
@@ -157,14 +155,7 @@ export default function Queue() {
                       fieldDisplayConfig={fieldDisplayConfig}
                       onClick={() => {
                         goToCard(globalIdx);
-                        setSelectedCard({
-                          noteId: item.noteId,
-                          original: item.original,
-                          changes: item.changes,
-                          reasoning: item.reasoning,
-                          readonly: false,
-                          editedChanges: item.editedChanges
-                        });
+                        setSelectedCard(createComparisonCardFromSuggestion(item));
                       }}
                     />
                   );
@@ -180,7 +171,7 @@ export default function Queue() {
             filteredHistory.length > 0 ? (
               <div className="space-y-2">
                 {filteredHistory.map((item) => {
-                  const isCurrentlyViewing = selectedCard?.readonly && selectedCard?.noteId === item.noteId && selectedCard?.timestamp === item.timestamp;
+                  const isCurrentlyViewing = !!(selectedCard?.readonly && selectedCard?.noteId === item.noteId && selectedCard?.timestamp === item.timestamp);
 
                   return (
                     <HistoryCard
@@ -190,16 +181,7 @@ export default function Queue() {
                       fieldDisplayConfig={fieldDisplayConfig}
                       showDeckName={historyViewMode === 'global'}
                       onClick={() => {
-                        setSelectedCard({
-                          noteId: item.noteId,
-                          original: item.original!,
-                          changes: item.changes,
-                          reasoning: item.reasoning,
-                          readonly: true,
-                          status: item.action as 'accept' | 'reject',
-                          timestamp: item.timestamp,
-                          editedChanges: item.editedChanges
-                        });
+                        setSelectedCard(createComparisonCardFromHistory(item));
                       }}
                     />
                   );

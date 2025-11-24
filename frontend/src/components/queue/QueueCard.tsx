@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
-import { CardSuggestion, FieldDisplayConfig } from '../../../../contract/types';
+import type { CardSuggestion } from '../../../../contract/types';
+import type { FieldDisplayConfig } from '../../types';
 import { EyeIcon, TagIcon } from '../ui/Icons';
 import { getDisplayField } from '../../utils/getDisplayField';
 import { Card } from './Card';

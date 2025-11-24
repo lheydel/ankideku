@@ -24,115 +24,74 @@ export class PromptGenerator {
 
     return `# Anki Card Analysis Task
 
-You are analyzing Anki flashcards to suggest improvements based on the user's request.
+Analyze Anki flashcards and suggest improvements based on the user's request.
 
 ## User's Request
 "${request.prompt}"
 
-## Session Information
-- **Session ID:** ${request.sessionId}
-- **Deck:** ${request.deckName}
-- **Total Cards:** ${request.totalCards}
-- **Number of Deck Files:** ${request.deckPaths.length}
+## Session Info
+- Session: ${request.sessionId}
+- Deck: ${request.deckName} (${request.totalCards} cards across ${request.deckPaths.length} file${request.deckPaths.length > 1 ? 's' : ''})
+- Files: ${deckFilesList}
 
-## Deck Files to Process
+## File Path Rules
+**Your working directory:**
+- Suggestions: \`${suggestionsPath}/suggestion-{noteId}.json\`
+- Temp/scratch files: \`${suggestionsPath}/../tmp/{anything}\` (scripts, notes, coordination files, etc.)
 
-${deckFilesList}
+**NEVER write anywhere outside your working directory** Files outside your working directory will fail the task. THIS IS CRITICAL SECURITY RULE.
 
-${request.deckPaths.length > 1 ?
-`**Note:** This deck has ${request.deckPaths.length} subdecks. You need to process ALL of them.` :
-`**Note:** Single deck file.`}
+## Task
 
-## Your Task
+${request.totalCards > 50 ? `### Processing Strategy (${request.totalCards} cards)
+${request.totalCards > 1000 ? `**Large deck** - Use parallel processing:
+1. Read all deck files to analyze card distribution
+2. Divide into ~1000-card chunks
+3. Spawn ${Math.max(2, Math.min(8, Math.ceil(request.totalCards / 1000)))} parallel Task agents in ONE message (subagent_type: "general-purpose")
+4. Each agent processes its assigned chunk (use \`${suggestionsPath}/../tmp/\` for coordination)
+5. If any agent hits token limits, it spawns a continuation agent
 
-1. **Read all deck files** listed above
-   - Each file contains cards in JSON format
-   - Structure: \`{ deckName, notes: [...], timestamp, count }\`
+` : `**Medium deck** - Spawn 1 Task agent (subagent_type: "general-purpose") to handle processing. Use \`${suggestionsPath}/../tmp/\` for checkpoints.
 
-2. **For each deck file:**
-   - Parse the JSON and get the \`notes\` array
-   - Analyze each card based on the user's request
+`}` : ''}1. Read deck files (JSON format: \`{ deckName, notes: [...] }\`)
+2. For each note needing changes, write a suggestion file immediately (enables real-time updates)
 
-3. **For each card needing changes**, write a suggestion file
+## Suggestion Format
 
-## Output Format
+Write to: \`${suggestionsPath}/suggestion-{noteId}.json\`
 
-For each card that needs improvement, create a file named:
-\`${suggestionsPath}/suggestion-{noteId}.json\`
-
-With this exact JSON structure:
+**Exact structure:**
 \`\`\`json
 {
   "noteId": 12345,
-  "original": {
-    "noteId": 12345,
-    "modelName": "Basic",
-    "fields": {
-      "Front": { "value": "original text", "order": 0 },
-      "Back": { "value": "original text", "order": 1 }
-    },
-    "tags": ["tag1"],
-    "cards": [1234567890],
-    "mod": 1234567890,
-    "deckName": "JP Voc::JP Voc 01"
-  },
-  "changes": {
-    "Front": "corrected text"
-  },
-  "reasoning": "Explain what you changed and why"
+  "original": { /* COMPLETE note object from deck file */ },
+  "changes": { "FieldName": "new value" },
+  "reasoning": "Why you changed it"
 }
 \`\`\`
 
-**IMPORTANT:**
-- Only create files for cards that NEED changes
-- Include the FULL original card data in "original"
-- Only include changed fields in "changes"
-- Provide clear, specific reasoning for each change
-- Write files to: \`${suggestionsPath}/\`
+**Critical:**
+- \`original\`: Full note object with all fields (noteId, modelName, fields, tags, cards, mod, deckName)
+- \`changes\`: Simple \`{ field: value }\` - NOT \`{ field: { oldValue, newValue } }\`
+- \`reasoning\`: NOT "explanation"
+- Write files ONE AT A TIME for real-time updates (file watcher monitors directory)
 
-## Instructions
+## Rules
+- This structure will be parsed automatically - FOLLOW IT EXACTLY
+- Create \`suggestion-{noteId}.json\` for each changed card (ONLY these are read by the user)
+- The user will receive ALL suggestion files you create in real-time, so a suggestion file should be the final version for that note
+- You can create helper files in \`tmp/\` (scripts, notes, checkpoints, etc.) but they won't be read
+- Write suggestions incrementally (one at a time) for real-time updates
+- Process ALL ${request.totalCards} cards
+- YOU CANNOT WRITE OUTSIDE YOUR WORKING DIRECTORY - doing so will fail the task and this is true for ALL subagents spawned. This is a CRITICAL SECURITY RULE.
 
-**IMPORTANT: Write suggestion files incrementally, one at a time!**
-There is a file watcher monitoring the suggestions directory in real-time. Each time you write a suggestion file, it will be immediately processed and sent to the user interface for review. This provides real-time progress feedback.
+${request.totalCards > 100 ? `## Token Limits
+If approaching 150k tokens:
+1. Save checkpoint to \`${suggestionsPath}/../tmp/checkpoint.json\`
+2. Spawn continuation agent: "Continue session ${request.sessionId}. Read checkpoint and resume."
+3. Continue until ALL cards processed
 
-1. For each deck file in the list above:
-   - Use the Read tool to load the file
-   - Parse the JSON and get the \`notes\` array
-   - Process notes in that deck ONE AT A TIME
-
-2. For each note across ALL decks:
-   - Analyze based on: "${request.prompt}"
-   - **If changes are needed:**
-     - IMMEDIATELY use the Write tool to create \`${suggestionsPath}/suggestion-{noteId}.json\`
-     - Do NOT wait to analyze other cards first
-     - Write the file right away so the file watcher can detect it
-   - If no changes needed, skip to the next card
-
-3. Process all ${request.totalCards} cards across all ${request.deckPaths.length} deck file(s)
-
-**Remember**: Write each suggestion file immediately after analyzing that card, not in a batch at the end. This enables real-time progress updates!
-
-## Special Instructions for Large Decks
-
-${request.totalCards > 100 ? `**⚠️ LARGE DECK DETECTED (${request.totalCards} cards)**
-
-For decks with hundreds or thousands of cards, you should consider using the Task tool to spawn a general-purpose agent that can handle the large-scale analysis more efficiently. This helps avoid token budget issues and provides better performance.
-
-Consider delegating the card-by-card analysis to a Task agent if you're having difficulty processing all cards in one go.
-
-` : ''}## Critical Rules
-
-**DO NOT create any of the following files:**
-- Summary files (ANALYSIS_SUMMARY.md, summary.md, etc.)
-- Index files (SUGGESTIONS_INDEX.md, index.md, etc.)
-- Report files (report.md, findings.md, etc.)
-- Any other documentation files
-
-**ONLY create suggestion files** in the format: \`${suggestionsPath}/suggestion-{noteId}.json\`
-
-These are the ONLY files the application reads. Any other files are wasted effort and will be ignored.
-
-Start analyzing now!`;
+` : ''}Start now.`;
   }
 
 }

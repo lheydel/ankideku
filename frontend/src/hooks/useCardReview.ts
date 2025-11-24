@@ -2,6 +2,9 @@ import { useCallback, useState } from 'react';
 import { ankiApi } from '../services/api';
 import useStore from '../store/useStore';
 import type { Note, ActionHistoryEntry, CardSuggestion } from '../types';
+import { mergeChanges } from '../utils/editingUtils';
+import { createComparisonCardFromSuggestion, updateCardInQueue } from '../utils/cardUtils';
+import { getErrorMessage } from '../utils/errorUtils';
 
 export function useCardReview() {
   const {
@@ -53,11 +56,6 @@ export function useCardReview() {
     }
   }, []);
 
-  // Helper to check if editedChanges differ from original changes
-  const hasActualEdits = useCallback((editedChanges: Record<string, string> | undefined, originalChanges: Record<string, string>): boolean => {
-    return editedChanges !== undefined && JSON.stringify(editedChanges) !== JSON.stringify(originalChanges);
-  }, []);
-
   // Helper to create history entry
   const createHistoryEntry = useCallback((
     action: 'accept' | 'reject',
@@ -65,18 +63,27 @@ export function useCardReview() {
     deckName: string | null,
     editedChanges?: Record<string, string>
   ): ActionHistoryEntry => {
+    // For accept: `changes` should be the merged result (what was actually applied)
+    // For reject: `changes` should be what AI suggested (for reference)
+    const appliedChanges = action === 'accept'
+      ? mergeChanges(card.changes, editedChanges)
+      : card.changes;
+
     return {
       action,
       noteId: card.noteId,
-      changes: action === 'accept' ? (editedChanges || card.changes) : card.changes,
+      changes: appliedChanges,
       original: card.original,
       reasoning: card.reasoning,
       timestamp: new Date().toISOString(),
       sessionId: currentSession || undefined,
       deckName: deckName || undefined,
-      editedChanges: hasActualEdits(editedChanges, card.changes) ? editedChanges : undefined,
+      // Store original AI suggestion separately so we can see what AI suggested vs what user changed
+      aiChanges: card.changes,
+      // Store user's edits if any (only the fields they modified)
+      editedChanges: editedChanges && Object.keys(editedChanges).length > 0 ? editedChanges : undefined,
     };
-  }, [currentSession, hasActualEdits]);
+  }, [currentSession]);
 
   // Helper to save history (local + backend)
   const saveHistory = useCallback(async (historyEntry: ActionHistoryEntry) => {
@@ -95,27 +102,11 @@ export function useCardReview() {
   // Helper to move to next card in queue
   const moveToNextCard = useCallback(() => {
     // Get the next card BEFORE removing current one from queue
-    // The next card is the one immediately after the current index (which will shift down after removal)
     const nextCard = queue.length > 1 ? queue[currentIndex + 1] || queue[currentIndex - 1] : null;
 
-    // Remove from queue
     removeFromQueue(currentIndex);
+    setSelectedCard(nextCard ? createComparisonCardFromSuggestion(nextCard) : null);
 
-    // Update selected card to the next one
-    if (nextCard) {
-      setSelectedCard({
-        noteId: nextCard.noteId,
-        original: nextCard.original,
-        changes: nextCard.changes,
-        reasoning: nextCard.reasoning,
-        readonly: false,
-        editedChanges: nextCard.editedChanges
-      });
-    } else {
-      setSelectedCard(null);
-    }
-
-    // Check if all cards reviewed
     return queue.length <= 1;
   }, [queue, currentIndex, removeFromQueue, setSelectedCard]);
 
@@ -143,7 +134,8 @@ export function useCardReview() {
     try {
       // Only apply changes to Anki for accept action
       if (type === 'accept') {
-        const changesToApply = editedChanges || card.changes;
+        // Merge AI changes with user edits (editedChanges only contains modified fields)
+        const changesToApply = mergeChanges(card.changes, editedChanges);
         await ankiApi.updateNote(card.noteId, changesToApply, deckName);
       }
 
@@ -163,8 +155,7 @@ export function useCardReview() {
         setQueue([]);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      onError(`Failed to ${type} changes: ${errorMessage}`);
+      onError(`Failed to ${type} changes: ${getErrorMessage(err)}`);
     }
   }, [getCurrentCard, selectedDeck, checkForConflict, createHistoryEntry, saveHistory, moveToNextCard, setQueue]);
 
@@ -194,29 +185,13 @@ export function useCardReview() {
     if (!card || !currentSession) return;
 
     try {
-      // Call backend to refresh the suggestion with current Anki state
       const updatedSuggestion = await ankiApi.refreshSuggestionOriginal(currentSession, card.noteId);
-
-      // Update the card in the queue
-      const updatedQueue = queue.map(item =>
-        item.noteId === card.noteId
-          ? { ...item, original: updatedSuggestion.original }
-          : item
-      );
-      setQueue(updatedQueue);
-
-      // Update the selected card with refreshed original fields
-      setSelectedCard({
-        ...card,
-        original: updatedSuggestion.original
-      });
-
-      // Close the conflict dialog
+      setQueue(updateCardInQueue(queue, card.noteId, { original: updatedSuggestion.original }));
+      setSelectedCard({ ...card, original: updatedSuggestion.original });
       setConflictDetected(false);
       setPendingAction(null);
     } catch (error) {
       console.error('Failed to refresh card with new version:', error);
-      // Close dialog on error
       setConflictDetected(false);
       setPendingAction(null);
     }

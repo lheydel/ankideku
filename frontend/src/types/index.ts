@@ -50,6 +50,10 @@ export interface StoreState {
   promptHistory: string[];
   addToPromptHistory: (prompt: string) => void;
 
+  // Force sync option
+  forceSync: boolean;
+  setForceSync: (forceSync: boolean) => void;
+
   // Processing state
   isProcessing: boolean;
   processingProgress: number;

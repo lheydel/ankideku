@@ -393,6 +393,42 @@ class CacheService {
       deckName: cache.deckName,
     };
   }
+
+  /**
+   * Sync deck cache with Anki (incremental if cache exists, full if not)
+   * @param deckName - Name of the deck to sync
+   * @returns Object with sync results { notesUpdated: number, fromCache: boolean }
+   */
+  async syncDeckCache(deckName: string): Promise<{ notesUpdated: number; fromCache: boolean }> {
+    const ankiConnectModule = await import('./ankiConnect.js');
+    const ankiConnect = ankiConnectModule.default;
+
+    // Check if cache exists
+    const cachedData = await this.getCachedNotes(deckName);
+
+    if (cachedData && cachedData.lastSyncTimestamp) {
+      // Incremental sync - only fetch modified notes
+      console.log(`  Cache exists (last sync: ${new Date(cachedData.lastSyncTimestamp * 1000).toISOString()})`);
+      const modifiedNotes = await ankiConnect.getDeckNotes(deckName, cachedData.lastSyncTimestamp);
+
+      if (modifiedNotes.length > 0) {
+        await this.cacheNotes(deckName, modifiedNotes, true);
+        console.log(`  Sync complete: ${modifiedNotes.length} notes updated`);
+      } else {
+        console.log(`  Sync complete: no modifications since last sync`);
+      }
+
+      return { notesUpdated: modifiedNotes.length, fromCache: true };
+    } else {
+      // No cache - full sync
+      console.log(`  No cache found, performing full sync...`);
+      const notes = await ankiConnect.getDeckNotes(deckName);
+      await this.cacheNotes(deckName, notes, false);
+      console.log(`  Full sync complete: ${notes.length} notes cached`);
+
+      return { notesUpdated: notes.length, fromCache: false };
+    }
+  }
 }
 
 export default new CacheService();

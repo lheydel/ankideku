@@ -116,11 +116,12 @@ export interface SessionData {
 export interface ActionHistoryEntry {
   action: 'accept' | 'reject';
   noteId: number;
-  changes: Record<string, string>;
+  changes: Record<string, string>; // For accept: merged result (AI + user edits). For reject: AI suggestion
   original?: Note;
   reasoning?: string;
   timestamp: string;
   sessionId?: string;
   deckName?: string;
-  editedChanges?: Record<string, string>; // Manual edits made by user (if any)
+  aiChanges?: Record<string, string>; // Original AI suggestion (for reference when user edited)
+  editedChanges?: Record<string, string>; // Manual edits made by user - only fields they modified
 }

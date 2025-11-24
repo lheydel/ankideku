@@ -20,6 +20,10 @@ const useStore = create<StoreState>((set, get) => ({
     promptHistory: [prompt, ...state.promptHistory.filter(p => p !== prompt)].slice(0, 10)
   })),
 
+  // Force sync option
+  forceSync: false,
+  setForceSync: (forceSync: boolean) => set({ forceSync }),
+
   // Processing state
   isProcessing: false,
   processingProgress: 0,

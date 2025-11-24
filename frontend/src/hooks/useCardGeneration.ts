@@ -3,6 +3,8 @@ import useStore from '../store/useStore';
 import { useSessionManagement } from './useSessionManagement';
 import { useWebSocket } from './useWebSocket';
 import type { CardSuggestion, SessionStateData } from '../types';
+import { createComparisonCardFromSuggestion } from '../utils/cardUtils';
+import { getErrorMessage } from '../utils/errorUtils';
 
 export function useCardGeneration() {
   const {
@@ -17,6 +19,7 @@ export function useCardGeneration() {
     updateSessionState,
     selectedCard,
     setSelectedCard,
+    forceSync,
   } = useStore();
 
   const { createSession, loadSession } = useSessionManagement();
@@ -29,13 +32,7 @@ export function useCardGeneration() {
 
     // Auto-select the first suggestion if no card is currently being viewed
     if (selectedCard == null) {
-      setSelectedCard({
-        noteId: suggestion.noteId,
-        original: suggestion.original,
-        changes: suggestion.changes,
-        reasoning: suggestion.reasoning,
-        readonly: false
-      });
+      setSelectedCard(createComparisonCardFromSuggestion(suggestion));
     }
   }, [addToQueue, selectedCard, setSelectedCard]);
 
@@ -86,7 +83,7 @@ export function useCardGeneration() {
       addToPromptHistory(prompt);
 
       // Create a new AI processing session
-      const sessionId = await createSession(prompt, selectedDeck);
+      const sessionId = await createSession(prompt, selectedDeck, forceSync);
 
       onSuccess(`Started AI processing session: ${sessionId}`);
       console.log(`Session ${sessionId} created. Waiting for suggestions...`);
@@ -95,11 +92,10 @@ export function useCardGeneration() {
       // Queue will update automatically via handleNewSuggestion callback
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create session';
-      onError(errorMessage);
+      onError(getErrorMessage(err, 'Failed to create session'));
       setProcessing(false);
     }
-  }, [selectedDeck, setQueue, setProcessing, setProgress, addToPromptHistory, createSession]);
+  }, [selectedDeck, setQueue, setProcessing, setProgress, addToPromptHistory, createSession, forceSync]);
 
   return {
     generateSuggestions,

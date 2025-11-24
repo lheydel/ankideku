@@ -21,10 +21,10 @@ class SessionApiClient {
     return response.json();
   }
 
-  async createSession(prompt: string, deckName: string): Promise<{ sessionId: string }> {
+  async createSession(prompt: string, deckName: string, forceSync: boolean = false): Promise<{ sessionId: string }> {
     return this.request('/new', {
       method: 'POST',
-      body: JSON.stringify({ prompt, deckName })
+      body: JSON.stringify({ prompt, deckName, forceSync })
     });
   }
 

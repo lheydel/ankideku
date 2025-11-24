@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ankiApi } from '../services/api.js';
 import useStore from '../store/useStore.js';
-import { DeckIcon, ChevronDownIcon, LightningIcon, CloseIcon, ChatIcon } from './ui/Icons.js';
+import { DeckIcon, ChevronDownIcon, LightningIcon, CloseIcon, ChatIcon, SyncIcon } from './ui/Icons.js';
 import { SessionStateBadge } from './ui/SessionStateBadge.js';
 import { useCardGeneration } from '../hooks/useCardGeneration.js';
 import { useSessionManagement } from '../hooks/useSessionManagement.js';
@@ -39,6 +39,8 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     processingTotal: totalCount,
     setFieldDisplayConfig,
     setPrompt,
+    forceSync,
+    setForceSync,
   } = useStore();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -52,6 +54,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const deckEntries = Object.entries(decks);
 
@@ -240,6 +243,25 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     ]);
   };
 
+  const handleSync = async () => {
+    if (!selectedDeck) {
+      addMessage('system', 'Please select a deck first');
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      addMessage('system', `Syncing "${selectedDeck}"...`);
+      const result = await ankiApi.syncDeck(selectedDeck);
+      addMessage('assistant', `✓ Synced ${result.count} card${result.count !== 1 ? 's' : ''}`);
+    } catch (error) {
+      addMessage('system', 'Sync failed');
+      console.error('Sync error:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -250,6 +272,11 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     if (!selectedDeck) {
       addMessage('system', 'Please select a deck first.');
       return;
+    }
+
+    // Show sync indicator if force sync is enabled
+    if (forceSync) {
+      addMessage('system', `⚡ Force sync enabled - will sync "${selectedDeck}" before processing`);
     }
 
     // Update the prompt in the store and generate suggestions
@@ -331,20 +358,30 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
           <DeckIcon className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
           Deck
         </label>
-        <div className="relative">
-          <select
-            value={selectedDeck || ''}
-            onChange={(e) => selectDeck(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none pr-10 cursor-pointer"
-          >
-            <option value="">Choose a deck...</option>
-            {deckEntries.map(([name, id]) => (
-              <option key={id} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <ChevronDownIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <select
+              value={selectedDeck || ''}
+              onChange={(e) => selectDeck(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none pr-10 cursor-pointer"
+            >
+              <option value="">Choose a deck...</option>
+              {deckEntries.map(([name, id]) => (
+                <option key={id} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+          <Button
+            onClick={handleSync}
+            variant="secondary"
+            size="sm"
+            icon={<SyncIcon className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />}
+            disabled={!selectedDeck || syncing}
+            className="shrink-0"
+          />
         </div>
       </div>
 
@@ -409,6 +446,23 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
       {/* Chat Input - Only show when no active session */}
       {!currentSessionData && (
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          {/* Force sync checkbox */}
+          <div className="mb-3 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="force-sync"
+              checked={forceSync}
+              onChange={(e) => setForceSync(e.target.checked)}
+              className="w-4 h-4 text-primary-600 dark:text-primary-500 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:ring-offset-0 cursor-pointer accent-primary-600 dark:accent-primary-500"
+            />
+            <label
+              htmlFor="force-sync"
+              className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none"
+            >
+              Sync deck before processing
+            </label>
+          </div>
+
           <div className="flex gap-2 items-end">
             <textarea
               ref={inputRef}

@@ -39,13 +39,7 @@ router.get('/:deckName/notes', async (req: Request, res: Response) => {
           (async () => {
             try {
               console.log(`Background incremental sync for "${deckName}"...`);
-              const modifiedNotes = await ankiConnect.getDeckNotes(deckName, cachedData.lastSyncTimestamp);
-              if (modifiedNotes.length > 0) {
-                await cache.cacheNotes(deckName, modifiedNotes, true);
-                console.log(`Background sync complete: ${modifiedNotes.length} notes updated`);
-              } else {
-                console.log(`Background sync complete: no modifications`);
-              }
+              await cache.syncDeckCache(deckName);
             } catch (error) {
               console.error(`Background sync failed:`, error);
             }
@@ -89,12 +83,11 @@ router.post('/:deckName/sync', async (req: Request, res: Response) => {
     const { deckName } = req.params;
     console.log(`Syncing deck "${deckName}" from Anki...`);
 
-    const notes = await ankiConnect.getDeckNotes(deckName);
-    await cache.cacheNotes(deckName, notes);
+    const result = await cache.syncDeckCache(deckName);
 
     const response: SyncResponse = {
       success: true,
-      count: notes.length,
+      count: result.notesUpdated,
       timestamp: new Date().toISOString(),
     };
     res.json(response);
