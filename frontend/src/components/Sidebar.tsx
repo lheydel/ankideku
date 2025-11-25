@@ -8,17 +8,14 @@ import { useAnkiConnection } from '../hooks/useAnkiConnection';
 import { Button } from './ui/Button';
 import { ChatMessage } from './sidebar/ChatMessage';
 import { LAYOUT } from '../constants/layout';
-import type { SessionData } from '../types';
-
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  currentSessionData: SessionData | null;
   onNewSession: () => void;
-  onViewLogs?: () => void;
 }
 
-export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSession, onViewLogs }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps) {
+  const currentSessionData = useStore((state) => state.currentSessionData);
   const {
     decks,
     selectedDeck,
@@ -29,7 +26,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
   } = useStore();
 
   const processing = useStore(selectIsProcessing);
-  const { processed: processedCount, total: totalCount, suggestionsCount } = useStore(selectSessionProgress);
+  const { processed: processedCount, total: totalCount, suggestionsCount, inputTokens, outputTokens } = useStore(selectSessionProgress);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState('');
@@ -116,11 +113,6 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
           <h2 className="font-bold text-gray-900 dark:text-gray-100">AI Assistant</h2>
         </div>
         <div className="flex items-center gap-2">
-          {currentSessionData && onViewLogs && (
-            <Button onClick={onViewLogs} variant="secondary" size="sm">
-              View Logs
-            </Button>
-          )}
           {currentSessionData && (
             <Button
               onClick={handleNewSession}
@@ -200,6 +192,11 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
                 className="bg-primary-600 dark:bg-primary-400 h-full rounded-full transition-all duration-300 ease-out"
                 style={{ width: `${Math.round((processedCount / totalCount) * 100)}%` }}
               />
+            </div>
+          )}
+          {(inputTokens > 0 || outputTokens > 0) && (
+            <div className="mt-2 text-xs text-primary-600 dark:text-primary-400">
+              Tokens: {inputTokens.toLocaleString()} in / {outputTokens.toLocaleString()} out
             </div>
           )}
         </div>

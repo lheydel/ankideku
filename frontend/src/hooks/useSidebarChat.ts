@@ -75,17 +75,37 @@ export function useSidebarChat({
     progressMessageIdRef.current = null;
   }, []);
 
+  // Build session info content with optional token counts
+  const buildSessionInfo = useCallback((
+    sessionId: string,
+    deckName: string,
+    totalCards: number,
+    tokens: { input: number; output: number }
+  ): string => {
+    let content = `${sessionId}\nDeck: ${deckName}\n${totalCards} cards`;
+    if (tokens.input > 0 || tokens.output > 0) {
+      content += `\nTokens estimate: ${tokens.input.toLocaleString()} in / ${tokens.output.toLocaleString()} out`;
+    }
+    return content;
+  }, []);
+
   // Restore chat history when session is loaded, or reset when cleared
   useEffect(() => {
     if (currentSessionData) {
       const { sessionId, request, suggestions, cancelled, state } = currentSessionData;
       const currentState = state?.state || (cancelled ? SessionState.CANCELLED : undefined);
+      const progress = state?.progress;
 
       const sessionMessages: ChatMessage[] = [
         {
           id: '0',
           type: 'system',
-          content: `${sessionId}\nDeck: ${request.deckName}\n${request.totalCards} cards`,
+          content: buildSessionInfo(
+            sessionId,
+            request.deckName,
+            request.totalCards,
+            { input: progress?.inputTokens ?? 0, output: progress?.outputTokens ?? 0 }
+          ),
         },
         {
           id: '1',
@@ -106,7 +126,7 @@ export function useSidebarChat({
     } else {
       resetToWelcome();
     }
-  }, [currentSessionData, onSelectDeck, resetToWelcome]);
+  }, [currentSessionData, onSelectDeck, resetToWelcome, buildSessionInfo]);
 
   // Update progress message as suggestions arrive
   useEffect(() => {

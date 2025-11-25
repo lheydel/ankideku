@@ -135,7 +135,7 @@ export const selectIsProcessing = (state: StoreState): boolean => {
 };
 
 // Default progress object - stable reference to avoid infinite re-renders
-const DEFAULT_PROGRESS = { processed: 0, total: 0, suggestionsCount: 0 };
+const DEFAULT_PROGRESS = { processed: 0, total: 0, suggestionsCount: 0, inputTokens: 0, outputTokens: 0 };
 
 // Selector for session progress - derived from session state
 // Usage: const progress = useStore(selectSessionProgress);

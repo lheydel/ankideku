@@ -35,6 +35,8 @@ export interface SessionResult {
   suggestionsGenerated: number;
   batchesProcessed: number;
   batchesFailed: number;
+  inputTokens: number;
+  outputTokens: number;
   errors: string[];
 }
 
@@ -76,6 +78,8 @@ export class SessionOrchestrator {
       suggestionsGenerated: 0,
       batchesProcessed: 0,
       batchesFailed: 0,
+      inputTokens: 0,
+      outputTokens: 0,
       errors: [],
     };
 
@@ -93,7 +97,7 @@ export class SessionOrchestrator {
       result.totalCards = cards.length;
 
       // Emit initial progress
-      await this.updateProgress(sessionId, 0, result.totalCards, 0);
+      await this.updateProgress(sessionId, 0, result.totalCards, 0, 0, 0);
 
       if (cards.length === 0) {
         console.log(`[SessionOrchestrator] No cards found for deck "${request.deckName}"`);
@@ -119,7 +123,7 @@ export class SessionOrchestrator {
         console.log(`[SessionOrchestrator] Processing batch ${i + 1}/${batches.length} (${batch.length} cards)`);
 
         try {
-          const suggestionsCount = await this.processBatch(
+          const batchResult = await this.processBatch(
             sessionId,
             batch,
             request.prompt,
@@ -128,7 +132,9 @@ export class SessionOrchestrator {
 
           result.batchesProcessed++;
           result.processedCards += batch.length;
-          result.suggestionsGenerated += suggestionsCount;
+          result.suggestionsGenerated += batchResult.suggestionsCount;
+          result.inputTokens += batchResult.inputTokens;
+          result.outputTokens += batchResult.outputTokens;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.error(`[SessionOrchestrator] Batch ${i + 1} failed: ${errorMessage}`);
@@ -143,7 +149,9 @@ export class SessionOrchestrator {
           sessionId,
           result.processedCards,
           result.totalCards,
-          result.suggestionsGenerated
+          result.suggestionsGenerated,
+          result.inputTokens,
+          result.outputTokens
         );
       }
 
@@ -174,9 +182,11 @@ export class SessionOrchestrator {
     sessionId: string,
     processed: number,
     total: number,
-    suggestionsCount: number
+    suggestionsCount: number,
+    inputTokens: number,
+    outputTokens: number
   ): Promise<void> {
-    const progress: SessionProgress = { processed, total, suggestionsCount };
+    const progress: SessionProgress = { processed, total, suggestionsCount, inputTokens, outputTokens };
     const updatedState = await sessionService.updateSessionProgress(sessionId, progress);
 
     if (updatedState) {
@@ -226,13 +236,16 @@ export class SessionOrchestrator {
     batch: Note[],
     userPrompt: string,
     noteType: NoteTypeInfo
-  ): Promise<number> {
+  ): Promise<{ suggestionsCount: number; inputTokens: number; outputTokens: number }> {
     // Call LLM service
     const response = await this.llmService.analyzeBatch(batch, userPrompt, noteType);
 
+    const inputTokens = response.usage?.inputTokens ?? 0;
+    const outputTokens = response.usage?.outputTokens ?? 0;
+
     if (response.suggestions.length === 0) {
-      console.log(`[SessionOrchestrator] Batch returned no suggestions`);
-      return 0;
+      console.log(`[SessionOrchestrator] Batch returned no suggestions (${inputTokens} in / ${outputTokens} out tokens)`);
+      return { suggestionsCount: 0, inputTokens, outputTokens };
     }
 
     // Create lookup map for original notes
@@ -253,8 +266,8 @@ export class SessionOrchestrator {
       this.eventEmitter.emitSuggestion(sessionId, suggestion);
     }
 
-    console.log(`[SessionOrchestrator] Batch generated ${writtenSuggestions.length} suggestions`);
-    return writtenSuggestions.length;
+    console.log(`[SessionOrchestrator] Batch generated ${writtenSuggestions.length} suggestions (${inputTokens} in / ${outputTokens} out tokens)`);
+    return { suggestionsCount: writtenSuggestions.length, inputTokens, outputTokens };
   }
 
   /**

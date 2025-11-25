@@ -76,6 +76,8 @@ export interface SessionProgress {
   processed: number;
   total: number;
   suggestionsCount: number;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 export interface SessionStateData {

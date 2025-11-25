@@ -11,6 +11,7 @@ import type { LLMHealthStatus, LLMResponse, LLMService, NoteTypeInfo } from './L
 import { buildSystemPrompt } from './prompts/systemPrompt.js';
 import { buildBatchPrompt } from './prompts/batchPrompt.js';
 import { ResponseParser } from './ResponseParser.js';
+import { countTokens } from '../../utils/tokenizer.js';
 
 const DEFAULT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 const MAX_RETRIES = 2;
@@ -80,12 +81,26 @@ export class ClaudeCodeService implements LLMService {
     // Combine into single prompt for Claude Code
     const fullPrompt = `${systemPrompt}\n\n---\n\n${batchPrompt}`;
 
+    // Estimate input tokens
+    const inputTokens = countTokens(fullPrompt);
+
     // Try with retries on all errors
     let lastError: Error | null = null;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         const rawResponse = await this.spawnClaudeCode(fullPrompt);
-        return this.parser.parse(rawResponse, cards);
+        const result = this.parser.parse(rawResponse, cards);
+
+        // Estimate output tokens from raw response
+        const outputTokens = countTokens(rawResponse);
+
+        return {
+          ...result,
+          usage: {
+            inputTokens,
+            outputTokens,
+          },
+        };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.log(
