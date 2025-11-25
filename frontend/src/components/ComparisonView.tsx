@@ -12,7 +12,6 @@ import {
   ActionButtons,
   FieldsList,
 } from './comparison';
-import type { SessionData } from '../types';
 import { isSessionActive } from '../utils/sessionUtils';
 import { useComparisonEditor } from '../hooks/useComparisonEditor';
 import { useMultipleLoadingActions } from '../hooks/useLoadingAction';
@@ -21,7 +20,6 @@ import { getSuggestionCardStyles } from '../utils/styleUtils';
 import { getSuggestedCardTitle } from '../utils/textUtils';
 
 interface ComparisonViewProps {
-  currentSessionData: SessionData | null;
   onBackToSessions: () => void;
   onAccept: (editedChanges?: Record<string, string>) => void;
   onReject: (editedChanges?: Record<string, string>) => void;
@@ -29,13 +27,12 @@ interface ComparisonViewProps {
 }
 
 export default function ComparisonView({
-  currentSessionData,
   onBackToSessions,
   onAccept,
   onReject,
   onSkip,
 }: ComparisonViewProps) {
-  const { selectedCard, queue, currentIndex } = useStore();
+  const { selectedCard, queue, currentIndex, currentSessionData } = useStore();
   const { processed: processingProgress, total: processingTotal } = useStore(selectSessionProgress);
   const isProcessing = isSessionActive(currentSessionData);
   const card = selectedCard;

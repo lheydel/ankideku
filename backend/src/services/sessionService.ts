@@ -400,7 +400,11 @@ export class SessionService {
     const sessionDir = path.join(this.sessionsDir, sessionId);
     const statePath = path.join(sessionDir, 'state.json');
 
+    // Load existing state and merge with new fields
+    const currentState = await this.getSessionState(sessionId);
+
     const stateData: SessionStateData = {
+      ...currentState,
       state,
       timestamp: new Date().toISOString(),
       ...(message && { message }),

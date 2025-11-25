@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import useStore from '../store/useStore';
 import { useSessionManagement } from './useSessionManagement';
 import { useWebSocket } from './useWebSocket';
@@ -20,14 +20,12 @@ export function useCardGeneration() {
   } = useStore();
 
   const { createSession } = useSessionManagement();
-  const [suggestionCount, setSuggestionCount] = useState(0);
 
   // Handle new suggestions from WebSocket
   // Note: We use a ref to avoid re-creating this callback when selectedCard changes,
   // which would cause useWebSocket to reconnect and miss subsequent suggestions
   const handleNewSuggestion = useCallback((suggestion: CardSuggestion) => {
     addToQueue(suggestion);
-    setSuggestionCount(prev => prev + 1);
 
     // Auto-select the first suggestion if no card is currently being viewed
     // Use store.getState() to avoid dependency on selectedCard
@@ -75,7 +73,6 @@ export function useCardGeneration() {
 
     try {
       setQueue([]); // Clear existing queue
-      setSuggestionCount(0);
 
       addToPromptHistory(prompt);
 
@@ -98,6 +95,5 @@ export function useCardGeneration() {
   return {
     generateSuggestions,
     currentSession,
-    suggestionCount
   };
 }

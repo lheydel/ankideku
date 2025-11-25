@@ -5,7 +5,6 @@ import Sidebar from './components/Sidebar.js';
 import Settings from './components/Settings.js';
 import Notification from './components/ui/Notification.js';
 import ConfirmDialog from './components/ui/ConfirmDialog.js';
-import OutputViewer from './components/ui/OutputViewer.js';
 import { ConflictDialog } from './components/ui/ConflictDialog.js';
 import { Button } from './components/ui/Button.js';
 import { LightningIcon, ChatIcon, SettingsIcon, MoonIcon, SunIcon, Logo } from './components/ui/Icons.js';
@@ -19,11 +18,10 @@ import { useSessionManagement } from './hooks/useSessionManagement.js';
 import { LAYOUT } from './constants/layout.js';
 
 function App() {
-  const { setQueue, currentSession, currentSessionData, setSelectedCard } = useStore();
+  const { setQueue, currentSession, setSelectedCard } = useStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  const [outputViewerSession, setOutputViewerSession] = useState<string | null>(null);
 
   const { notification, showNotification } = useNotification();
   const {
@@ -164,7 +162,6 @@ function App() {
                         session={session}
                         onLoad={() => handleLoadSession(session.sessionId)}
                         onDelete={() => setSessionToDelete(session.sessionId)}
-                        onViewOutput={() => setOutputViewerSession(session.sessionId)}
                       />
                     ))}
                   </div>
@@ -176,7 +173,6 @@ function App() {
             <div className="p-8">
               <div className="max-w-6xl mx-auto space-y-6">
                 <ComparisonView
-                  currentSessionData={currentSessionData}
                   onBackToSessions={handleClearSession}
                   onAccept={(editedChanges) => handleAccept(
                     (msg) => showNotification(msg, 'success'),
@@ -195,9 +191,7 @@ function App() {
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          currentSessionData={currentSessionData}
           onNewSession={handleClearSession}
-          onViewLogs={currentSession ? () => setOutputViewerSession(currentSession) : undefined}
         />
       </div>
 
@@ -215,15 +209,6 @@ function App() {
         onConfirm={handleDeleteSession}
         onCancel={() => setSessionToDelete(null)}
       />
-
-      {/* Output Viewer */}
-      {outputViewerSession && (
-        <OutputViewer
-          isOpen={!!outputViewerSession}
-          sessionId={outputViewerSession}
-          onClose={() => setOutputViewerSession(null)}
-        />
-      )}
 
       {/* Conflict Detection Dialog */}
       <ConflictDialog

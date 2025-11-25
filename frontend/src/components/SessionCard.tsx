@@ -7,10 +7,9 @@ interface SessionCardProps {
   session: SessionMetadata;
   onLoad: () => void;
   onDelete: () => void;
-  onViewOutput: () => void;
 }
 
-export function SessionCard({ session, onLoad, onDelete, onViewOutput }: SessionCardProps) {
+export function SessionCard({ session, onLoad, onDelete }: SessionCardProps) {
   const date = new Date(session.timestamp);
 
   return (
@@ -48,20 +47,9 @@ export function SessionCard({ session, onLoad, onDelete, onViewOutput }: Session
           {formatDateTime(date)}
         </p>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 font-medium">
-            <span>Load Session</span>
-            <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </div>
-          <span
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewOutput();
-            }}
-            className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 underline cursor-pointer"
-          >
-            View Logs
-          </span>
+        <div className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 font-medium">
+          <span>Load Session</span>
+          <span className="group-hover:translate-x-1 transition-transform">→</span>
         </div>
       </button>
     </div>
