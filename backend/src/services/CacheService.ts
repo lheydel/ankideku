@@ -3,6 +3,7 @@ import path from 'path';
 import type { Note, CachedDeckData, CacheInfo } from '../types/index.js';
 import { DECKS_DIR as CACHE_DIR } from '../constants.js';
 import { ensureDir } from '../utils/fs.js';
+import { estimateDeckTokens } from '../utils/tokenizer.js';
 
 export class CacheService {
   /**
@@ -133,6 +134,7 @@ export class CacheService {
       const allNotes: Note[] = [];
       let oldestTimestamp: string | null = null;
       let oldestSyncTimestamp: number | undefined = undefined;
+      let totalEstimatedTokens = 0;
 
       for (const subDeck of subDeckCaches) {
         const subCache = await this.getCachedNotes(subDeck);
@@ -146,6 +148,10 @@ export class CacheService {
             if (oldestSyncTimestamp === undefined || subCache.lastSyncTimestamp < oldestSyncTimestamp) {
               oldestSyncTimestamp = subCache.lastSyncTimestamp;
             }
+          }
+          // Sum up token estimates
+          if (subCache.estimatedTokens) {
+            totalEstimatedTokens += subCache.estimatedTokens;
           }
         }
       }
@@ -161,6 +167,7 @@ export class CacheService {
         timestamp: oldestTimestamp || new Date().toISOString(),
         count: allNotes.length,
         lastSyncTimestamp: oldestSyncTimestamp,
+        estimatedTokens: totalEstimatedTokens > 0 ? totalEstimatedTokens : undefined,
       };
     } catch (error) {
       console.log(`Error loading cache for deck "${deckName}":`, error);
@@ -231,31 +238,35 @@ export class CacheService {
         }
 
         const mergedNotes = Array.from(existingNotesMap.values());
+        const estimatedTokens = estimateDeckTokens(mergedNotes);
         const cacheData: CachedDeckData = {
           deckName,
           notes: mergedNotes,
           timestamp,
           count: mergedNotes.length,
           lastSyncTimestamp,
+          estimatedTokens,
         };
 
         await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2), 'utf-8');
-        console.log(`  - Updated cache for "${deckName}": ${notes.length} modified, ${mergedNotes.length} total`);
+        console.log(`  - Updated cache for "${deckName}": ${notes.length} modified, ${mergedNotes.length} total (~${estimatedTokens} tokens)`);
         return;
       }
     }
 
     // Full cache save
+    const estimatedTokens = estimateDeckTokens(notes);
     const cacheData: CachedDeckData = {
       deckName,
       notes,
       timestamp,
       count: notes.length,
       lastSyncTimestamp,
+      estimatedTokens,
     };
 
     await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2), 'utf-8');
-    console.log(`  - Cached ${notes.length} notes for sub-deck "${deckName}"`);
+    console.log(`  - Cached ${notes.length} notes for sub-deck "${deckName}" (~${estimatedTokens} tokens)`);
   }
 
   /**
@@ -388,6 +399,7 @@ export class CacheService {
       timestamp: cache.timestamp,
       count: cache.count,
       deckName: cache.deckName,
+      estimatedTokens: cache.estimatedTokens,
     };
   }
 

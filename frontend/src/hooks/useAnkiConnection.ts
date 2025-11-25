@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ankiApi } from '../services/api';
 import useStore from '../store/useStore';
+import type { CacheInfo } from '../types';
 
 /**
  * Hook for managing Anki connection, deck loading, and syncing
@@ -8,6 +9,7 @@ import useStore from '../store/useStore';
 export function useAnkiConnection(onMessage?: (type: 'system' | 'assistant', content: string) => void) {
   const { setDecks, setAnkiConnected, setFieldDisplayConfig, selectedDeck } = useStore();
   const [syncing, setSyncing] = useState(false);
+  const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -39,6 +41,16 @@ export function useAnkiConnection(onMessage?: (type: 'system' | 'assistant', con
     }
   }, [setDecks, setAnkiConnected, onMessage]);
 
+  const loadCacheInfo = useCallback(async (deckName: string) => {
+    try {
+      const info = await ankiApi.getCacheInfo(deckName);
+      setCacheInfo(info);
+    } catch (error) {
+      console.error('Failed to load cache info:', error);
+      setCacheInfo(null);
+    }
+  }, []);
+
   const syncDeck = useCallback(async () => {
     if (!selectedDeck) {
       onMessage?.('system', 'Please select a deck first');
@@ -50,13 +62,15 @@ export function useAnkiConnection(onMessage?: (type: 'system' | 'assistant', con
       onMessage?.('system', `Syncing "${selectedDeck}"...`);
       const result = await ankiApi.syncDeck(selectedDeck);
       onMessage?.('assistant', `✓ Synced ${result.count} card${result.count !== 1 ? 's' : ''}`);
+      // Refresh cache info after sync
+      await loadCacheInfo(selectedDeck);
     } catch (error) {
       onMessage?.('system', 'Sync failed');
       console.error('Sync error:', error);
     } finally {
       setSyncing(false);
     }
-  }, [selectedDeck, onMessage]);
+  }, [selectedDeck, onMessage, loadCacheInfo]);
 
   // Load decks and settings on mount
   useEffect(() => {
@@ -64,9 +78,19 @@ export function useAnkiConnection(onMessage?: (type: 'system' | 'assistant', con
     loadSettings();
   }, [loadDecks, loadSettings]);
 
+  // Load cache info when deck changes
+  useEffect(() => {
+    if (selectedDeck) {
+      loadCacheInfo(selectedDeck);
+    } else {
+      setCacheInfo(null);
+    }
+  }, [selectedDeck, loadCacheInfo]);
+
   return {
     syncing,
     syncDeck,
     loadDecks,
+    cacheInfo,
   };
 }

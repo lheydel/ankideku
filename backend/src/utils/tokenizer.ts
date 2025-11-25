@@ -142,3 +142,21 @@ export function estimateFullBatchTokens(
   const fullPrompt = buildSystemPrompt() + '\n\n---\n\n' + buildBatchPrompt(cards, userPrompt, noteType);
   return countTokens(fullPrompt);
 }
+
+/**
+ * Estimate total tokens for all cards in a deck using actual prompt formatting
+ * Used to give users an estimation before running a session
+ */
+export function estimateDeckTokens(cards: Note[]): number {
+  if (cards.length === 0) return 0;
+
+  // Extract note type from first card
+  const noteType: NoteTypeInfo = {
+    modelName: cards[0].modelName,
+    fieldNames: Object.keys(cards[0].fields),
+  };
+
+  // Use actual buildBatchPrompt with placeholder prompt
+  const batchPrompt = buildBatchPrompt(cards, '', noteType);
+  return countTokens(batchPrompt);
+}

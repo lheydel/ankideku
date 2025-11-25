@@ -32,6 +32,7 @@ export interface CachedDeckData {
   timestamp: string;
   count: number;
   lastSyncTimestamp?: number; // Unix timestamp of last sync for incremental updates
+  estimatedTokens?: number; // Estimated input tokens for all cards
 }
 
 export interface NoteUpdate {

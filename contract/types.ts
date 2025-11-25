@@ -47,6 +47,7 @@ export interface CacheInfo {
   timestamp?: string;
   count?: number;
   deckName?: string;
+  estimatedTokens?: number;
 }
 
 export interface ErrorResponse {

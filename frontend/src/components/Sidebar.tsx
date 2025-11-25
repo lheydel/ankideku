@@ -49,7 +49,7 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
     onSelectDeck: selectDeck,
   });
 
-  const { syncing, syncDeck } = useAnkiConnection(addMessage);
+  const { syncing, syncDeck, cacheInfo } = useAnkiConnection(addMessage);
 
   const handleCancelSession = async () => {
     if (!currentSession) return;
@@ -163,6 +163,14 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
             className="shrink-0"
           />
         </div>
+        {cacheInfo?.exists && (
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {cacheInfo.count?.toLocaleString()} cards
+            {cacheInfo.estimatedTokens && (
+              <span> · ~{cacheInfo.estimatedTokens.toLocaleString()} tokens</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Processing Indicator */}
