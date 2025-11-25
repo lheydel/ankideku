@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import useStore from '../store/useStore.js';
-import { ankiApi } from '../services/api.js';
-import { CloseIcon, CheckIcon } from './ui/Icons.js';
+import { ankiApi, llmApi, LLMHealthStatus } from '../services/api.js';
+import { CloseIcon, CheckIcon, LightningIcon } from './ui/Icons.js';
 import { Button } from './ui/Button.js';
-import type { Note } from '../types/index.js';
+import type { Note } from '../types';
 
 interface SettingsProps {
   isOpen: boolean;
@@ -15,7 +15,11 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
 
   const [localConfig, setLocalConfig] = useState(fieldDisplayConfig);
   const [saving, setSaving] = useState(false);
-  const [modelFieldsCache, setModelFieldsCache] = useState<Record<string, string[]>>({});
+
+  // LLM health state
+  const [llmHealth, setLlmHealth] = useState<LLMHealthStatus | null>(null);
+  const [llmChecking, setLlmChecking] = useState(false);
+  const [llmProvider, setLlmProvider] = useState<string>('');
 
   // Get all unique model types from queue, history, AND saved config
   const modelTypes = useMemo(() => {
@@ -50,8 +54,26 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
   useEffect(() => {
     if (isOpen) {
       setLocalConfig(fieldDisplayConfig);
+      checkLlmHealth();
     }
   }, [isOpen, fieldDisplayConfig]);
+
+  // Check LLM health
+  const checkLlmHealth = async () => {
+    setLlmChecking(true);
+    try {
+      const [health, config] = await Promise.all([
+        llmApi.checkHealth(),
+        llmApi.getConfig()
+      ]);
+      setLlmHealth(health);
+      setLlmProvider(config.provider);
+    } catch (error) {
+      setLlmHealth({ available: false, error: 'Failed to connect to backend' });
+    } finally {
+      setLlmChecking(false);
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -79,8 +101,8 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         {/* Header */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Display Settings</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Configure which field to display in the sidebar for each note type</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Configure application settings</p>
           </div>
           <Button
             onClick={onClose}
@@ -91,59 +113,128 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {modelTypes.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">No note types found in queue, history, or settings.</p>
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          {/* LLM Provider Section */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <LightningIcon className="w-5 h-5 text-primary-500" />
+              AI Provider
+            </h3>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {llmProvider || 'Claude Code'}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {llmChecking ? (
+                      'Checking connection...'
+                    ) : llmHealth?.available ? (
+                      <span className="text-green-600 dark:text-green-400">
+                        {llmHealth.info || 'Connected'}
+                      </span>
+                    ) : (
+                      <span className="text-red-600 dark:text-red-400">
+                        {llmHealth?.error || 'Not connected'}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* Status indicator */}
+                  <div className={`w-3 h-3 rounded-full ${
+                    llmChecking
+                      ? 'bg-yellow-400 animate-pulse'
+                      : llmHealth?.available
+                        ? 'bg-green-500'
+                        : 'bg-red-500'
+                  }`} />
+                  {/* Test button */}
+                  <Button
+                    onClick={checkLlmHealth}
+                    variant="secondary"
+                    size="sm"
+                    disabled={llmChecking}
+                    loading={llmChecking}
+                  >
+                    Test Connection
+                  </Button>
+                </div>
+              </div>
+              {llmHealth?.error && !llmHealth.available && (
+                <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-md border border-red-200 dark:border-red-800">
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    <strong>Error:</strong> {llmHealth.error}
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    Make sure Claude Code CLI is installed and accessible in your PATH.
+                  </p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="space-y-4">
-              {modelTypes.map(([modelName, sampleNote]) => {
-                // If we have a sample note, show dropdown with fields
-                if (sampleNote) {
-                  const fields = Object.keys(sampleNote.fields).sort(
-                    (a, b) => sampleNote.fields[a].order - sampleNote.fields[b].order
-                  );
-                  const currentField = localConfig[modelName] || fields[0];
+          </div>
 
-                  return (
-                    <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{modelName}</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{fields.length} field{fields.length !== 1 ? 's' : ''} available</p>
-                      </div>
-                      <select
-                        value={currentField}
-                        onChange={(e) => handleFieldChange(modelName, e.target.value)}
-                        className="px-3 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
-                      >
-                        {fields.map(fieldName => (
-                          <option key={fieldName} value={fieldName}>
-                            {fieldName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                } else {
-                  // No sample note available, show configured value as text
-                  const currentField = localConfig[modelName] || 'Not configured';
+          {/* Field Display Section */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Field Display
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Configure which field to display in the sidebar for each note type
+            </p>
+            {modelTypes.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="text-gray-500 dark:text-gray-400">No note types found in queue, history, or settings.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {modelTypes.map(([modelName, sampleNote]) => {
+                  // If we have a sample note, show dropdown with fields
+                  if (sampleNote) {
+                    const fields = Object.keys(sampleNote.fields).sort(
+                      (a, b) => sampleNote.fields[a].order - sampleNote.fields[b].order
+                    );
+                    const currentField = localConfig[modelName] || fields[0];
 
-                  return (
-                    <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{modelName}</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Configured value (no sample notes available)</p>
+                    return (
+                      <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate">{modelName}</h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{fields.length} field{fields.length !== 1 ? 's' : ''} available</p>
+                        </div>
+                        <select
+                          value={currentField}
+                          onChange={(e) => handleFieldChange(modelName, e.target.value)}
+                          className="px-3 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
+                        >
+                          {fields.map(fieldName => (
+                            <option key={fieldName} value={fieldName}>
+                              {fieldName}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <div className="px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm min-w-[200px]">
-                        {currentField}
+                    );
+                  } else {
+                    // No sample note available, show configured value as text
+                    const currentField = localConfig[modelName] || 'Not configured';
+
+                    return (
+                      <div key={modelName} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate">{modelName}</h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Configured value (no sample notes available)</p>
+                        </div>
+                        <div className="px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm min-w-[200px]">
+                          {currentField}
+                        </div>
                       </div>
-                    </div>
-                  );
-                }
-              })}
-            </div>
-          )}
+                    );
+                  }
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}

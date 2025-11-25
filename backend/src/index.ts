@@ -4,8 +4,10 @@ import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { CONFIG, validateConfig } from './config.js';
 import { sessionService } from './services/sessionService.js';
-import { FileWatcherService } from './services/fileWatcher.js';
-import { ClaudeSpawnerService } from './services/claudeSpawner.js';
+import { suggestionWriter } from './services/SuggestionWriter.js';
+import { sessionEventEmitter } from './services/SessionEventEmitter.js';
+import { SessionOrchestrator } from './services/SessionOrchestrator.js';
+import { SocketEvent } from '../../contract/types.js';
 
 // Route imports
 import sessionsRouter, { initializeRouter } from './routes/sessions.js';
@@ -15,6 +17,7 @@ import ankiRouter from './routes/anki.js';
 import decksRouter from './routes/decks.js';
 import notesRouter from './routes/notes.js';
 import settingsRouter from './routes/settings.js';
+import llmRouter from './routes/llm.js';
 
 // Validate configuration on startup
 validateConfig();
@@ -32,12 +35,14 @@ const io = new SocketIOServer(httpServer, {
   }
 });
 
-// Initialize AI workflow services (sessionService is already a singleton)
-const fileWatcher = new FileWatcherService();
-const claudeSpawner = new ClaudeSpawnerService();
+// Wire up SessionEventEmitter with Socket.IO
+sessionEventEmitter.setSocketIO(io);
+
+// Create SessionOrchestrator with dependencies
+const sessionOrchestrator = new SessionOrchestrator(suggestionWriter, sessionEventEmitter);
 
 // Initialize sessions router with service dependencies
-initializeRouter({ sessionService, fileWatcher, claudeSpawner });
+initializeRouter({ sessionService, sessionOrchestrator });
 
 // Middleware
 app.use(cors());
@@ -47,14 +52,12 @@ app.use(express.json());
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  // Subscribe to session updates
-  socket.on('subscribe:session', (sessionId: string) => {
+  socket.on(SocketEvent.SUBSCRIBE_SESSION, (sessionId: string) => {
     socket.join(sessionId);
     console.log(`Client ${socket.id} subscribed to session: ${sessionId}`);
   });
 
-  // Unsubscribe from session
-  socket.on('unsubscribe:session', (sessionId: string) => {
+  socket.on(SocketEvent.UNSUBSCRIBE_SESSION, (sessionId: string) => {
     socket.leave(sessionId);
     console.log(`Client ${socket.id} unsubscribed from session: ${sessionId}`);
   });
@@ -62,28 +65,6 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
-});
-
-// Listen to file watcher events and emit via WebSocket
-fileWatcher.on('suggestion:new', ({ sessionId, suggestion }) => {
-  io.to(sessionId).emit('suggestion:new', suggestion);
-  console.log(`Sent suggestion to session ${sessionId}: note ${suggestion.noteId}`);
-});
-
-fileWatcher.on('state:change', ({ sessionId, state }) => {
-  console.log(`[WebSocket] Emitting state:change to session ${sessionId}:`, state);
-  io.to(sessionId).emit('state:change', state);
-  console.log(`State changed for session ${sessionId}:`, state.state);
-});
-
-fileWatcher.on('session:complete', ({ sessionId, totalSuggestions }) => {
-  io.to(sessionId).emit('session:complete', { totalSuggestions });
-  console.log(`Session ${sessionId} complete: ${totalSuggestions} suggestions`);
-});
-
-fileWatcher.on('error', ({ sessionId, error }) => {
-  io.to(sessionId).emit('session:error', { error });
-  console.error(`Session ${sessionId} error:`, error);
 });
 
 // Mount routes
@@ -94,12 +75,11 @@ app.use('/api/anki', ankiRouter);
 app.use('/api/decks', decksRouter);
 app.use('/api/notes', notesRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/llm', llmRouter);
 
 // Graceful shutdown handling
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
-  await fileWatcher.unwatchAll();
-  claudeSpawner.killAll();
   httpServer.close(() => {
     console.log('Server closed');
     process.exit(0);
@@ -108,8 +88,6 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
-  await fileWatcher.unwatchAll();
-  claudeSpawner.killAll();
   httpServer.close(() => {
     console.log('Server closed');
     process.exit(0);

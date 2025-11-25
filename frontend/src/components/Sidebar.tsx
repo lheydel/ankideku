@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ankiApi } from '../services/api.js';
-import useStore from '../store/useStore.js';
+import useStore, { selectIsProcessing, selectSessionProgress } from '../store/useStore.js';
 import { DeckIcon, ChevronDownIcon, LightningIcon, CloseIcon, ChatIcon, SyncIcon } from './ui/Icons.js';
 import { SessionStateBadge } from './ui/SessionStateBadge.js';
 import { useCardGeneration } from '../hooks/useCardGeneration.js';
@@ -15,7 +15,6 @@ interface Message {
   id: string;
   type: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp: Date;
   state?: SessionState; // Optional session state for status messages
 }
 
@@ -34,14 +33,15 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     selectDeck,
     setDecks,
     setAnkiConnected,
-    isProcessing: processing,
-    processingProgress: processedCount,
-    processingTotal: totalCount,
     setFieldDisplayConfig,
     setPrompt,
     forceSync,
     setForceSync,
   } = useStore();
+
+  // Derived from session state
+  const processing = useStore(selectIsProcessing);
+  const { processed: processedCount, total: totalCount, suggestionsCount } = useStore(selectSessionProgress);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [messages, setMessages] = useState<Message[]>([
@@ -49,17 +49,15 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
       id: '0',
       type: 'system',
       content: 'Welcome! Select a deck and describe what you want to improve.',
-      timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const deckEntries = Object.entries(decks);
 
   // Initialize hooks
-  const { generateSuggestions, suggestionCount, currentSession } = useCardGeneration();
+  const { generateSuggestions, currentSession } = useCardGeneration();
   const { cancelSession } = useSessionManagement();
   const progressMessageIdRef = useRef<string | null>(null);
 
@@ -81,56 +79,53 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     loadSettings();
   }, []);
 
+  // Helper to get contextual tip based on session state
+  const getContextualTip = (state: SessionState | undefined, suggestionsCount: number): string => {
+    if (!state || state === SessionState.PENDING || state === SessionState.RUNNING) {
+      return suggestionsCount > 0
+        ? '← Tip: You can review suggestions as they arrive'
+        : 'Processing your request...';
+    }
+    if (state === SessionState.COMPLETED) {
+      return suggestionsCount > 0
+        ? '← Review suggestions in the card view'
+        : 'No suggestions found for this deck.';
+    }
+    if (state === SessionState.FAILED) {
+      return 'Try again with a different prompt or check the logs.';
+    }
+    if (state === SessionState.CANCELLED) {
+      return suggestionsCount > 0
+        ? '← Review the suggestions found before cancellation'
+        : 'Session was cancelled before finding suggestions.';
+    }
+    return '';
+  };
+
   // Restore chat history when session is loaded, or reset when cleared
   useEffect(() => {
     if (currentSessionData) {
-      const { request, suggestions, cancelled, state } = currentSessionData;
+      const { sessionId, request, suggestions, cancelled, state } = currentSessionData;
       const sessionDate = new Date(request.timestamp);
-
-      // Build status message based on state or cancelled flag
-      let statusContent: string;
-      let statusType: 'assistant' | 'system' = 'assistant';
-
-      if (state) {
-        // Use new state system
-        const stateMessages = {
-          [SessionState.PENDING]: `Session pending... (${suggestions.length} suggestions so far)`,
-          [SessionState.RUNNING]: `Session running... Found ${suggestions.length} suggestions for "${request.deckName}"`,
-          [SessionState.COMPLETED]: `Session complete! Found ${suggestions.length} suggestions for "${request.deckName}" (${request.totalCards} total cards)`,
-          [SessionState.FAILED]: `Session failed: ${state.message || 'Unknown error'}. Found ${suggestions.length} suggestions before failure.`,
-          [SessionState.CANCELLED]: `Session cancelled. Found ${suggestions.length} suggestions before cancellation for "${request.deckName}"`
-        };
-        statusContent = stateMessages[state.state];
-        statusType = state.state === SessionState.FAILED || state.state === SessionState.CANCELLED ? 'system' : 'assistant';
-      } else if (cancelled) {
-        // Fallback to old cancelled format
-        statusContent = `Session cancelled. Found ${suggestions.length} suggestions before cancellation for "${request.deckName}"`;
-        statusType = 'system';
-      } else {
-        // No state info - assume completed
-        statusContent = `Session complete! Found ${suggestions.length} suggestions for "${request.deckName}" (${request.totalCards} total cards)`;
-      }
+      const currentState = state?.state || (cancelled ? SessionState.CANCELLED : undefined);
 
       // Reconstruct chat history for this session
       const sessionMessages: Message[] = [
         {
           id: '0',
           type: 'system',
-          content: `Session loaded from ${sessionDate.toLocaleDateString()} at ${formatTime(sessionDate)}`,
-          timestamp: sessionDate
+          content: `${sessionId}\nDeck: ${request.deckName}\n${request.totalCards} cards`,
         },
         {
           id: '1',
           type: 'user',
           content: request.prompt,
-          timestamp: sessionDate
         },
         {
           id: '2',
-          type: statusType,
-          content: statusContent,
-          timestamp: state ? new Date(state.timestamp) : (cancelled ? new Date(cancelled.timestamp) : sessionDate),
-          state: state?.state // Include state for badge display
+          type: 'assistant',
+          content: getContextualTip(currentState, suggestions.length),
+          state: currentState
         }
       ];
 
@@ -146,7 +141,6 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
           id: '0',
           type: 'system',
           content: 'Welcome! Select a deck and describe what you want to improve.',
-          timestamp: new Date(),
         },
       ]);
       progressMessageIdRef.current = null;
@@ -155,17 +149,18 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
 
   // Update progress message as suggestions arrive
   useEffect(() => {
-    if (processing && suggestionCount > 0) {
+    if (processing && suggestionsCount > 0) {
       setMessages(prev => {
         // Find or create progress message
         if (progressMessageIdRef.current) {
-          // Update existing progress message
+          // Update existing progress message with contextual tip
           return prev.map(msg =>
             msg.id === progressMessageIdRef.current
               ? {
                   ...msg,
-                  content: `Processing... Found ${suggestionCount} suggestion${suggestionCount !== 1 ? 's' : ''}`,
-                  timestamp: new Date()
+                  content: '← Tip: You can review suggestions as they arrive',
+                  timestamp: new Date(),
+                  state: SessionState.RUNNING
                 }
               : msg
           );
@@ -174,29 +169,31 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
           const newMsg: Message = {
             id: `progress-${Date.now()}`,
             type: 'assistant',
-            content: `Processing... Found ${suggestionCount} suggestion${suggestionCount !== 1 ? 's' : ''}`,
-            timestamp: new Date()
+            content: '← Tip: You can review suggestions as they arrive',
+            state: SessionState.RUNNING
           };
           progressMessageIdRef.current = newMsg.id;
           return [...prev, newMsg];
         }
       });
-    } else if (!processing && progressMessageIdRef.current && suggestionCount > 0) {
+    } else if (!processing && progressMessageIdRef.current) {
       // Processing complete - update final message
+      const finalState = currentSessionData?.state?.state || SessionState.COMPLETED;
       setMessages(prev =>
         prev.map(msg =>
           msg.id === progressMessageIdRef.current
             ? {
                 ...msg,
-                content: `✓ Complete! ${suggestionCount} suggestion${suggestionCount !== 1 ? 's' : ''} ready for review`,
-                timestamp: new Date()
+                content: getContextualTip(finalState, suggestionsCount),
+                timestamp: new Date(),
+                state: finalState
               }
             : msg
         )
       );
       progressMessageIdRef.current = null;
     }
-  }, [suggestionCount, processing]);
+  }, [suggestionsCount, processing, currentSessionData?.state?.state]);
 
   const loadSettings = async () => {
     try {
@@ -211,7 +208,6 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
 
   const loadDecks = async () => {
     try {
-      setLoading(true);
       const { connected } = await ankiApi.ping();
       setAnkiConnected(connected);
 
@@ -226,8 +222,6 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect to AnkiConnect';
       addMessage('system', errorMessage);
       setAnkiConnected(false);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -238,7 +232,6 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
         id: prev.length.toString(),
         type,
         content,
-        timestamp: new Date(),
       } as Message
     ]);
   };
@@ -329,7 +322,6 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
                     id: '0',
                     type: 'system',
                     content: 'Welcome! Select a deck and describe what you want to improve.',
-                    timestamp: new Date(),
                   },
                 ]);
                 setInput('');
@@ -388,10 +380,15 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
       {/* Processing Indicator */}
       {processing && (
         <div className="p-4 bg-primary-50 dark:bg-primary-900/30 border-b border-primary-100 dark:border-primary-800">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-primary-600 dark:bg-primary-400 rounded-full animate-pulse"></div>
-              <span className="text-sm text-primary-700 dark:text-primary-300 font-medium">AI Processing...</span>
+              <span className="text-sm text-primary-700 dark:text-primary-300 font-medium">
+                {totalCount > 0
+                  ? `Processing ${processedCount} / ${totalCount} cards`
+                  : 'AI Processing...'
+                }
+              </span>
             </div>
             <Button
               onClick={handleCancelSession}
@@ -402,6 +399,15 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
               Cancel
             </Button>
           </div>
+          {/* Progress Bar */}
+          {totalCount > 0 && (
+            <div className="w-full bg-primary-200 dark:bg-primary-800 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-primary-600 dark:bg-primary-400 h-full rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${Math.round((processedCount / totalCount) * 100)}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -426,18 +432,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
                   <SessionStateBadge state={message.state} />
                 </div>
               )}
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-              <p
-                className={`text-xs mt-1 ${
-                  message.type === 'user'
-                    ? 'text-primary-200 dark:text-primary-300'
-                    : message.type === 'system'
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-gray-500 dark:text-gray-400'
-                }`}
-              >
-                {formatTime(message.timestamp)}
-              </p>
+              <p className="text-sm mb-1 whitespace-pre-wrap">{message.content}</p>
             </div>
           </div>
         ))}
@@ -453,11 +448,12 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
               id="force-sync"
               checked={forceSync}
               onChange={(e) => setForceSync(e.target.checked)}
-              className="w-4 h-4 text-primary-600 dark:text-primary-500 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:ring-offset-0 cursor-pointer accent-primary-600 dark:accent-primary-500"
+              disabled={syncing}
+              className="w-4 h-4 text-primary-600 dark:text-primary-500 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:ring-offset-0 cursor-pointer accent-primary-600 dark:accent-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <label
               htmlFor="force-sync"
-              className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none"
+              className={`text-sm text-gray-700 dark:text-gray-300 select-none ${syncing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               Sync deck before processing
             </label>
@@ -469,13 +465,14 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (e.key === 'Enter' && !e.shiftKey && !syncing) {
                   e.preventDefault();
                   handleSend();
                 }
               }}
-              placeholder="Describe what you want to improve... (Shift+Enter for new line)"
-              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
+              placeholder={syncing ? "Syncing deck..." : "Describe what you want to improve... (Shift+Enter for new line)"}
+              disabled={syncing}
+              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none placeholder:text-gray-500 dark:placeholder:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               rows={3}
             />
           </div>

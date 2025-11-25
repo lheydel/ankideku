@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { CardSuggestion, SessionStateData, SessionState } from '../types';
-import { SessionState as SessionStateEnum } from '../types';
+import type { CardSuggestion, SessionStateData } from '../types';
+import { SessionState as SessionStateEnum, SocketEvent } from '../types';
 
 interface UseWebSocketParams {
   sessionId: string | null;
-  sessionState?: SessionStateData; // Current session state
+  initialSessionState?: SessionStateData;
   onSuggestion: (suggestion: CardSuggestion) => void;
   onStateChange?: (state: SessionStateData) => void;
   onSessionComplete?: (data: { totalSuggestions: number }) => void;
@@ -14,35 +14,50 @@ interface UseWebSocketParams {
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
+/**
+ * Check if we should skip WebSocket connection for an old completed session
+ */
+function shouldSkipConnection(sessionState?: SessionStateData): boolean {
+  if (!sessionState) return false;
+
+  const isFinished =
+    sessionState.state === SessionStateEnum.COMPLETED ||
+    sessionState.state === SessionStateEnum.FAILED ||
+    sessionState.state === SessionStateEnum.CANCELLED;
+
+  if (isFinished) {
+    const completionTime = new Date(sessionState.timestamp).getTime();
+    const timeSinceCompletion = Date.now() - completionTime;
+    return timeSinceCompletion > TEN_MINUTES_MS;
+  }
+
+  return false;
+}
+
 export function useWebSocket({
   sessionId,
-  sessionState,
+  initialSessionState,
   onSuggestion,
   onStateChange,
   onSessionComplete,
   onError
 }: UseWebSocketParams) {
   const socketRef = useRef<Socket | null>(null);
+  // Store initial state in ref to avoid re-running effect when state updates
+  const initialStateRef = useRef(initialSessionState);
+
+  // Update ref when sessionId changes (new session)
+  useEffect(() => {
+    initialStateRef.current = initialSessionState;
+  }, [sessionId]); // Only update when sessionId changes, not on every state update
 
   useEffect(() => {
     if (!sessionId) return;
 
     // Skip WebSocket connection if session completed more than 10 minutes ago
-    if (sessionState) {
-      const isFinished =
-        sessionState.state === SessionStateEnum.COMPLETED ||
-        sessionState.state === SessionStateEnum.FAILED ||
-        sessionState.state === SessionStateEnum.CANCELLED;
-
-      if (isFinished) {
-        const completionTime = new Date(sessionState.timestamp).getTime();
-        const timeSinceCompletion = Date.now() - completionTime;
-
-        if (timeSinceCompletion > TEN_MINUTES_MS) {
-          console.log(`[WebSocket] Skipping connection for session ${sessionId} (completed ${Math.round(timeSinceCompletion / 60000)} minutes ago)`);
-          return;
-        }
-      }
+    if (shouldSkipConnection(initialStateRef.current)) {
+      console.log(`[WebSocket] Skipping connection for session ${sessionId} (completed > 10 min ago)`);
+      return;
     }
 
     console.log(`[WebSocket] Connecting to session ${sessionId}`);
@@ -51,37 +66,38 @@ export function useWebSocket({
     socketRef.current = io('http://localhost:3001');
 
     // Subscribe to session
-    socketRef.current.emit('subscribe:session', sessionId);
+    socketRef.current.emit(SocketEvent.SUBSCRIBE_SESSION, sessionId);
     console.log(`[WebSocket] Subscribed to session ${sessionId}`);
 
     // Listen for suggestions
-    socketRef.current.on('suggestion:new', (suggestion) => {
-      console.log(`[WebSocket] Received suggestion:new for session ${sessionId}`, suggestion);
+    socketRef.current.on(SocketEvent.SUGGESTION_NEW, (suggestion) => {
+      console.log(`[WebSocket] Received ${SocketEvent.SUGGESTION_NEW} for session ${sessionId}`, suggestion);
       onSuggestion(suggestion);
     });
 
-    // Listen for state changes
+    // Listen for state changes (includes progress updates)
     if (onStateChange) {
-      socketRef.current.on('state:change', (state) => {
-        console.log(`[WebSocket] Received state:change for session ${sessionId}`, state);
+      socketRef.current.on(SocketEvent.STATE_CHANGE, (state) => {
+        console.log(`[WebSocket] Received ${SocketEvent.STATE_CHANGE} for session ${sessionId}`, state);
         onStateChange(state);
       });
     }
 
     // Listen for session completion
     if (onSessionComplete) {
-      socketRef.current.on('session:complete', onSessionComplete);
+      socketRef.current.on(SocketEvent.SESSION_COMPLETE, onSessionComplete);
     }
 
     // Listen for errors
     if (onError) {
-      socketRef.current.on('session:error', onError);
+      socketRef.current.on(SocketEvent.SESSION_ERROR, onError);
     }
 
     return () => {
+      console.log(`[WebSocket] Disconnecting from session ${sessionId}`);
       socketRef.current?.disconnect();
     };
-  }, [sessionId, sessionState, onSuggestion, onStateChange, onSessionComplete, onError]);
+  }, [sessionId, onSuggestion, onStateChange, onSessionComplete, onError]);
 
   return socketRef.current;
 }

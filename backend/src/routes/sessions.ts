@@ -1,16 +1,13 @@
 import express, { Request, Response } from 'express';
-import * as path from 'path';
 import { SessionService } from '../services/sessionService.js';
-import { FileWatcherService } from '../services/fileWatcher.js';
-import { ClaudeSpawnerService } from '../services/claudeSpawner.js';
+import { SessionOrchestrator } from '../services/SessionOrchestrator.js';
 import { historyService } from '../services/historyService.js';
 
 const router = express.Router();
 
 // Services will be injected via router setup
 let sessionService: SessionService;
-let fileWatcher: FileWatcherService;
-let claudeSpawner: ClaudeSpawnerService;
+let sessionOrchestrator: SessionOrchestrator;
 
 /**
  * Initialize router with service dependencies
@@ -18,20 +15,18 @@ let claudeSpawner: ClaudeSpawnerService;
 export function initializeRouter(
   services: {
     sessionService: SessionService;
-    fileWatcher: FileWatcherService;
-    claudeSpawner: ClaudeSpawnerService;
+    sessionOrchestrator: SessionOrchestrator;
   }
 ) {
   sessionService = services.sessionService;
-  fileWatcher = services.fileWatcher;
-  claudeSpawner = services.claudeSpawner;
+  sessionOrchestrator = services.sessionOrchestrator;
 }
 
 /**
  * POST /api/sessions/new
  * Create a new AI processing session
  *
- * Body: { prompt: string, deckName: string }
+ * Body: { prompt: string, deckName: string, forceSync?: boolean }
  * Returns: { sessionId: string }
  */
 router.post('/new', async (req: Request, res: Response): Promise<void> => {
@@ -50,57 +45,29 @@ router.post('/new', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Perform synchronous incremental sync if forceSync is true
-    // This ensures the AI works with the most up-to-date card data
     if (forceSync) {
       console.log(`Force sync enabled - syncing deck cache for "${deckName}" before starting AI session...`);
       const cacheModule = await import('../services/cache.js');
       const cache = cacheModule.default;
-
       await cache.syncDeckCache(deckName);
-    } else {
-      console.log(`Force sync disabled - skipping sync for "${deckName}"`);
     }
 
     // Create session
     console.log(`Creating new session for deck "${deckName}" with prompt: "${prompt}"`);
     const sessionId = await sessionService.createSession(prompt, deckName);
 
-    // Get session directory
-    const sessionDir = sessionService.getSessionDir(sessionId);
-
-    // Start file watcher for this session
-    await fileWatcher.watchSession(sessionId, sessionDir);
-
-    // Spawn Claude Code CLI in background (non-blocking)
-    // Mark as RUNNING when spawning starts
-    sessionService.markSessionRunning(sessionId);
-
-    claudeSpawner.spawnClaude({ sessionId, sessionDir })
+    // Execute session in background (non-blocking)
+    sessionOrchestrator.executeSession(sessionId)
       .then((result) => {
-        console.log(`Claude processing completed for session: ${sessionId}`);
-        // Mark as COMPLETED with exit code
-        sessionService.markSessionCompleted(sessionId, result.exitCode);
+        console.log(`[Sessions] Session ${sessionId} completed:`, {
+          suggestions: result.suggestionsGenerated,
+          processed: result.processedCards,
+          total: result.totalCards,
+          failed: result.batchesFailed,
+        });
       })
-      .catch(async (error) => {
-        console.error(`Claude processing failed for session ${sessionId}:`, error);
-
-        // Check if session was already marked as cancelled (don't overwrite!)
-        const currentState = await sessionService.getSessionState(sessionId);
-        if (currentState?.state === 'cancelled') {
-          console.log(`Session ${sessionId} was cancelled, keeping CANCELLED state`);
-          return;
-        }
-
-        // Mark as FAILED with error message
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        sessionService.markSessionFailed(sessionId, errorMessage);
-      })
-      .finally(() => {
-        // Stop watching after a delay to ensure all files are caught
-        // This runs whether Claude succeeded or failed, catching any partial results
-        setTimeout(() => {
-          fileWatcher.unwatchSession(sessionId);
-        }, 2000);
+      .catch((error) => {
+        console.error(`[Sessions] Session ${sessionId} failed:`, error);
       });
 
     res.json({ sessionId });
@@ -114,13 +81,13 @@ router.post('/new', async (req: Request, res: Response): Promise<void> => {
 
 /**
  * GET /api/sessions/active
- * List all sessions with active Claude processes
+ * List all active sessions
  *
- * Returns: { activeSessions: string[] }
+ * Returns: { activeSessions: string[], count: number }
  */
 router.get('/active', (req: Request, res: Response): void => {
   try {
-    const activeSessions = claudeSpawner.getActiveSessions();
+    const activeSessions = sessionOrchestrator.getActiveSessions();
     res.json({ activeSessions, count: activeSessions.length });
   } catch (error) {
     console.error('Error listing active sessions:', error);
@@ -134,12 +101,11 @@ router.get('/active', (req: Request, res: Response): void => {
  * GET /api/sessions
  * List all available sessions with metadata
  *
- * Returns: { sessions: Array<{ sessionId: string, timestamp: string, deckName: string, totalCards: number }> }
+ * Returns: { sessions: Array<{ sessionId, timestamp, deckName, totalCards, state? }> }
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const sessions = await sessionService.listSessionsWithMetadata();
-
     res.json({ sessions });
   } catch (error) {
     console.error('Error listing sessions:', error);
@@ -153,35 +119,17 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  * GET /api/sessions/:sessionId
  * Load an existing session with all suggestions and history
  *
- * Returns: { sessionId: string, request: SessionRequest, suggestions: CardSuggestion[], history: ActionHistoryEntry[], state?: SessionStateData, cancelled?: { cancelled: true, timestamp: string } }
+ * Returns: { sessionId, request, suggestions, history, state?, cancelled? }
  */
 router.get('/:sessionId', async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId } = req.params;
 
-    // Load session request
     const request = await sessionService.getSessionRequest(sessionId);
-
-    // Load all suggestions
     const suggestions = await sessionService.loadSession(sessionId);
-
-    // Load history
     const history = await historyService.getSessionHistory(sessionId);
-
-    // Get session state
     const state = await sessionService.getSessionState(sessionId);
-
-    // Check if session was cancelled (backwards compatibility)
     const cancelled = await sessionService.getSessionCancellation(sessionId);
-
-    // If session is still running, start watching it for real-time updates
-    if (state && (state.state === 'pending' || state.state === 'running')) {
-      const sessionDir = sessionService.getSessionDir(sessionId);
-      if (!fileWatcher.isWatching(sessionId)) {
-        await fileWatcher.watchSession(sessionId, sessionDir);
-        console.log(`Started watching session ${sessionId} (state: ${state.state})`);
-      }
-    }
 
     res.json({
       sessionId,
@@ -209,14 +157,9 @@ router.delete('/:sessionId', async (req: Request, res: Response): Promise<void> 
   try {
     const { sessionId } = req.params;
 
-    // Stop watching if active
-    if (fileWatcher.isWatching(sessionId)) {
-      await fileWatcher.unwatchSession(sessionId);
-    }
-
-    // Kill Claude process if running
-    if (claudeSpawner.isRunning(sessionId)) {
-      claudeSpawner.killProcess(sessionId);
+    // Cancel if running
+    if (sessionOrchestrator.isRunning(sessionId)) {
+      sessionOrchestrator.cancelSession(sessionId);
     }
 
     // Delete session files
@@ -233,18 +176,16 @@ router.delete('/:sessionId', async (req: Request, res: Response): Promise<void> 
 
 /**
  * POST /api/sessions/:sessionId/cancel
- * Cancel an ongoing session (kill Claude process)
+ * Cancel an ongoing session
  *
- * Returns: { success: boolean }
+ * Returns: { success: boolean, message?: string }
  */
 router.post('/:sessionId/cancel', async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId } = req.params;
 
-    const killed = claudeSpawner.killProcess(sessionId);
-
-    if (killed) {
-      // Mark session as cancelled in the filesystem
+    if (sessionOrchestrator.isRunning(sessionId)) {
+      sessionOrchestrator.cancelSession(sessionId);
       await sessionService.markSessionCancelled(sessionId);
       res.json({ success: true, message: 'Session cancelled' });
     } else {
@@ -259,6 +200,31 @@ router.post('/:sessionId/cancel', async (req: Request, res: Response): Promise<v
 });
 
 /**
+ * GET /api/sessions/:sessionId/status
+ * Get status of a session
+ *
+ * Returns: { sessionId, isRunning, suggestionCount, state? }
+ */
+router.get('/:sessionId/status', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sessionId } = req.params;
+
+    const state = await sessionService.getSessionState(sessionId);
+
+    res.json({
+      sessionId,
+      isRunning: sessionOrchestrator.isRunning(sessionId),
+      ...(state && { state })
+    });
+  } catch (error) {
+    console.error('Error getting session status:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to get session status'
+    });
+  }
+});
+
+/**
  * PUT /api/sessions/:sessionId/suggestions/:noteId/refresh-original
  * Refresh a suggestion's original fields with current state from Anki
  *
@@ -267,45 +233,12 @@ router.post('/:sessionId/cancel', async (req: Request, res: Response): Promise<v
 router.put('/:sessionId/suggestions/:noteId/refresh-original', async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId, noteId } = req.params;
-    const noteIdNum = parseInt(noteId);
-
-    const updatedSuggestion = await sessionService.refreshSuggestionOriginal(sessionId, noteIdNum);
-
+    const updatedSuggestion = await sessionService.refreshSuggestionOriginal(sessionId, parseInt(noteId));
     res.json(updatedSuggestion);
   } catch (error) {
     console.error('Error refreshing suggestion original:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to refresh suggestion original'
-    });
-  }
-});
-
-/**
- * GET /api/sessions/:sessionId/status
- * Get status of a session
- *
- * Returns: { sessionId: string, isRunning: boolean, isWatching: boolean, suggestionCount: number, state?: SessionStateData }
- */
-router.get('/:sessionId/status', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { sessionId } = req.params;
-
-    // Get session state
-    const state = await sessionService.getSessionState(sessionId);
-
-    const status = {
-      sessionId,
-      isRunning: claudeSpawner.isRunning(sessionId),
-      isWatching: fileWatcher.isWatching(sessionId),
-      suggestionCount: fileWatcher.getSuggestionCount(sessionId),
-      ...(state && { state })
-    };
-
-    res.json(status);
-  } catch (error) {
-    console.error('Error getting session status:', error);
-    res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to get session status'
     });
   }
 });
@@ -328,7 +261,6 @@ router.put('/:sessionId/suggestions/:noteId/edited-changes', async (req: Request
     }
 
     await sessionService.saveEditedChanges(sessionId, parseInt(noteId), editedChanges);
-
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving edited changes:', error);
@@ -347,67 +279,12 @@ router.put('/:sessionId/suggestions/:noteId/edited-changes', async (req: Request
 router.delete('/:sessionId/suggestions/:noteId/edited-changes', async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId, noteId } = req.params;
-
     await sessionService.revertEditedChanges(sessionId, parseInt(noteId));
-
     res.json({ success: true });
   } catch (error) {
     console.error('Error reverting edited changes:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to revert edited changes'
-    });
-  }
-});
-
-/**
- * GET /api/sessions/:sessionId/output
- * Get Claude output logs for a session
- *
- * Query params:
- * - type: 'combined' (default), 'stdout', or 'stderr'
- *
- * Returns: Raw log file content
- */
-router.get('/:sessionId/output', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { sessionId } = req.params;
-    const type = (req.query.type as string) || 'combined';
-
-    const sessionDir = sessionService.getSessionDir(sessionId);
-    const logsDir = path.join(sessionDir, 'logs');
-    let logFile: string;
-
-    switch (type) {
-      case 'stdout':
-        logFile = 'claude-stdout.log';
-        break;
-      case 'stderr':
-        logFile = 'claude-stderr.log';
-        break;
-      case 'combined':
-      default:
-        logFile = 'claude-output.log';
-        break;
-    }
-
-    const logPath = path.join(logsDir, logFile);
-
-    // Check if file exists
-    const fs = await import('fs/promises');
-    try {
-      await fs.access(logPath);
-    } catch {
-      res.status(404).json({ error: 'Output log not found' });
-      return;
-    }
-
-    // Read and return log content
-    const content = await fs.readFile(logPath, 'utf-8');
-    res.type('text/plain').send(content);
-  } catch (error) {
-    console.error('Error reading output log:', error);
-    res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to read output log'
     });
   }
 });

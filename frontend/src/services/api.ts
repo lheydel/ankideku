@@ -131,4 +131,36 @@ export const ankiApi = {
   },
 };
 
+// LLM API
+export interface LLMHealthStatus {
+  available: boolean;
+  error?: string;
+  info?: string;
+}
+
+export interface LLMConfig {
+  provider: string;
+  availableProviders: string[];
+}
+
+export const llmApi = {
+  // Check LLM provider health
+  checkHealth: async (): Promise<LLMHealthStatus> => {
+    const response = await api.get<LLMHealthStatus>('/llm/health');
+    return response.data;
+  },
+
+  // Get LLM configuration
+  getConfig: async (): Promise<LLMConfig> => {
+    const response = await api.get<LLMConfig>('/llm/config');
+    return response.data;
+  },
+
+  // Get available providers
+  getProviders: async (): Promise<{ providers: string[] }> => {
+    const response = await api.get<{ providers: string[] }>('/llm/providers');
+    return response.data;
+  },
+};
+
 export default api;

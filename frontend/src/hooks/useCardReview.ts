@@ -187,7 +187,7 @@ export function useCardReview() {
     try {
       const updatedSuggestion = await ankiApi.refreshSuggestionOriginal(currentSession, card.noteId);
       setQueue(updateCardInQueue(queue, card.noteId, { original: updatedSuggestion.original }));
-      setSelectedCard({ ...card, original: updatedSuggestion.original });
+      setSelectedCard(createComparisonCardFromSuggestion({ ...card, original: updatedSuggestion.original }));
       setConflictDetected(false);
       setPendingAction(null);
     } catch (error) {

@@ -1,5 +1,7 @@
 import fs from 'fs/promises';
 import { DATABASE_DIR, SETTINGS_FILE } from '../constants.js';
+import type { LLMConfig } from './llm/LLMService.js';
+import { DEFAULT_LLM_CONFIG } from './llm/LLMService.js';
 
 export interface FieldDisplayConfig {
   [modelName: string]: string; // Maps model name to field name to display
@@ -7,10 +9,12 @@ export interface FieldDisplayConfig {
 
 export interface UserSettings {
   fieldDisplayConfig: FieldDisplayConfig;
+  llm: LLMConfig;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
   fieldDisplayConfig: {},
+  llm: DEFAULT_LLM_CONFIG,
 };
 
 class SettingsService {
@@ -27,12 +31,19 @@ class SettingsService {
 
   /**
    * Load settings from file
+   * Merges with defaults to handle missing keys from older settings files
    */
   async loadSettings(): Promise<UserSettings> {
     try {
       await this.ensureDatabaseDir();
       const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      // Merge with defaults to ensure all keys exist (handles migration)
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        llm: { ...DEFAULT_LLM_CONFIG, ...parsed.llm },
+      };
     } catch (error) {
       // Only return defaults if file doesn't exist
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -81,6 +92,24 @@ class SettingsService {
   async updateModelDisplayField(modelName: string, fieldName: string): Promise<void> {
     const settings = await this.loadSettings();
     settings.fieldDisplayConfig[modelName] = fieldName;
+    await this.saveSettings(settings);
+  }
+
+  /**
+   * Get LLM configuration
+   */
+  async getLLMConfig(): Promise<LLMConfig> {
+    const settings = await this.loadSettings();
+    // Merge with defaults to ensure all fields exist
+    return { ...DEFAULT_LLM_CONFIG, ...settings.llm };
+  }
+
+  /**
+   * Update LLM configuration
+   */
+  async updateLLMConfig(config: Partial<LLMConfig>): Promise<void> {
+    const settings = await this.loadSettings();
+    settings.llm = { ...settings.llm, ...config };
     await this.saveSettings(settings);
   }
 }

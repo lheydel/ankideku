@@ -1,23 +1,42 @@
-// Re-export shared types from contract
-export type {
-  NoteField,
-  Note,
-  DeckInfo,
-  GetNotesResponse,
-  SyncResponse,
-  CacheInfo,
-  ErrorResponse,
-  PingResponse,
-  SessionRequest,
-  CardSuggestion,
-  SessionData,
-  SessionStateData,
-  SessionState,
-  ActionHistoryEntry
+// Import shared types from contract for use in this file
+import type {
+  NoteField as NoteFieldType,
+  Note as NoteType,
+  DeckInfo as DeckInfoType,
+  GetNotesResponse as GetNotesResponseType,
+  SyncResponse as SyncResponseType,
+  CacheInfo as CacheInfoType,
+  ErrorResponse as ErrorResponseType,
+  PingResponse as PingResponseType,
+  SessionRequest as SessionRequestType,
+  CardSuggestion as CardSuggestionType,
+  SessionData as SessionDataType,
+  SessionStateData as SessionStateDataType,
+  SessionState as SessionStateType,
+  SessionProgress as SessionProgressType,
+  ActionHistoryEntry as ActionHistoryEntryType
 } from '../../../contract/types';
 
-// Re-export SessionState const object for value access
-export { SessionState } from '../../../contract/types';
+// Re-export types for use by other files
+export type NoteField = NoteFieldType;
+export type Note = NoteType;
+export type DeckInfo = DeckInfoType;
+export type GetNotesResponse = GetNotesResponseType;
+export type SyncResponse = SyncResponseType;
+export type CacheInfo = CacheInfoType;
+export type ErrorResponse = ErrorResponseType;
+export type PingResponse = PingResponseType;
+export type SessionRequest = SessionRequestType;
+export type CardSuggestion = CardSuggestionType;
+export type SessionData = SessionDataType;
+export type SessionStateData = SessionStateDataType;
+export type SessionProgress = SessionProgressType;
+export type ActionHistoryEntry = ActionHistoryEntryType;
+
+// SessionState is both a type and a const object
+// The const is for value comparisons (e.g., SessionState.COMPLETED)
+// The type is inferred from the const
+export { SessionState, SocketEvent } from '../../../contract/types';
 
 // Frontend-specific types
 
@@ -26,7 +45,7 @@ export interface SessionMetadata {
   timestamp: string;
   deckName: string;
   totalCards: number;
-  state?: SessionStateData;
+  state?: SessionStateDataType;
 }
 
 export interface FieldDisplayConfig {
@@ -39,9 +58,9 @@ export interface StoreState {
   setAnkiConnected: (connected: boolean) => void;
 
   // Decks
-  decks: DeckInfo;
+  decks: DeckInfoType;
   selectedDeck: string | null;
-  setDecks: (decks: DeckInfo) => void;
+  setDecks: (decks: DeckInfoType) => void;
   selectDeck: (deckName: string) => void;
 
   // Prompt
@@ -54,40 +73,33 @@ export interface StoreState {
   forceSync: boolean;
   setForceSync: (forceSync: boolean) => void;
 
-  // Processing state
-  isProcessing: boolean;
-  processingProgress: number;
-  processingTotal: number;
-  setProcessing: (isProcessing: boolean) => void;
-  setProgress: (progress: number, total: number) => void;
-
   // Session management
   currentSession: string | null;
-  currentSessionData: SessionData | null;
+  currentSessionData: SessionDataType | null;
   sessions: SessionMetadata[];
   setCurrentSession: (sessionId: string | null) => void;
-  setCurrentSessionData: (data: SessionData | null) => void;
-  updateSessionState: (state: SessionStateData) => void;
+  setCurrentSessionData: (data: SessionDataType | null) => void;
+  updateSessionState: (state: SessionStateDataType) => void;
   setSessions: (sessions: SessionMetadata[]) => void;
 
   // Queue
-  queue: CardSuggestion[];
+  queue: CardSuggestionType[];
   currentIndex: number;
-  setQueue: (queue: CardSuggestion[]) => void;
-  addToQueue: (suggestion: CardSuggestion) => void;
+  setQueue: (queue: CardSuggestionType[]) => void;
+  addToQueue: (suggestion: CardSuggestionType) => void;
   goToCard: (index: number) => void;
   skipCard: () => void;
   removeFromQueue: (index: number) => void;
-  getCurrentCard: () => CardSuggestion | undefined;
+  getCurrentCard: () => CardSuggestionType | undefined;
 
   // Actions history
-  actionsHistory: ActionHistoryEntry[];
-  globalHistory: ActionHistoryEntry[];
+  actionsHistory: ActionHistoryEntryType[];
+  globalHistory: ActionHistoryEntryType[];
   historyViewMode: 'session' | 'global';
-  addToHistory: (action: Omit<ActionHistoryEntry, 'timestamp'>) => void;
+  addToHistory: (action: Omit<ActionHistoryEntryType, 'timestamp'>) => void;
   loadGlobalHistory: () => Promise<void>;
   toggleHistoryView: () => void;
-  setSessionHistory: (history: ActionHistoryEntry[]) => void;
+  setSessionHistory: (history: ActionHistoryEntryType[]) => void;
 
   // Comparison view
   selectedCard: ComparisonCard | null;
@@ -109,7 +121,7 @@ export interface NotificationState {
 
 export interface ComparisonCard {
   noteId: number;
-  original: Note;
+  original: NoteType;
   changes: Record<string, string>;
   reasoning?: string;
   readonly: boolean;

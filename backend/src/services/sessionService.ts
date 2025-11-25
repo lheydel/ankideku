@@ -1,8 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Note, SessionRequest, CardSuggestion, SessionState, SessionStateData } from '../types/index.js';
-import { PromptGenerator } from '../processors/promptGenerator.js';
-import { DATABASE_DIR, DECKS_DIR, AI_SESSIONS_DIR } from '../constants.js';
+import { SessionRequest, CardSuggestion, SessionState, SessionStateData, SessionProgress } from '../types/index.js';
+import { DECKS_DIR, AI_SESSIONS_DIR } from '../constants.js';
 
 export class SessionService {
   private sessionsDir = AI_SESSIONS_DIR;
@@ -34,7 +33,6 @@ export class SessionService {
 
     // Create session directory structure
     await fs.mkdir(sessionDir, { recursive: true });
-    await fs.mkdir(path.join(sessionDir, 'logs'), { recursive: true });
     await fs.mkdir(path.join(sessionDir, 'suggestions'), { recursive: true });
 
     // Find all deck files (parent + subdecks)
@@ -60,19 +58,10 @@ export class SessionService {
       'utf-8'
     );
 
-    // Generate and write the Claude task file
-    const taskPrompt = PromptGenerator.generatePrompt(request);
-    await fs.writeFile(
-      path.join(sessionDir, 'claude-task.md'),
-      taskPrompt,
-      'utf-8'
-    );
-
     // Set initial session state to PENDING
     await this.setSessionState(sessionId, SessionState.PENDING);
 
     console.log(`Created session: ${sessionId} (${deckPaths.length} decks, ${totalCards} total cards)`);
-    console.log(`Task file: ${path.join(sessionDir, 'claude-task.md')}`);
     return sessionId;
   }
 
@@ -402,12 +391,14 @@ export class SessionService {
    * @param state - New session state
    * @param message - Optional message for context
    * @param exitCode - Optional exit code for completed/failed states
+   * @param progress - Optional progress data
    */
   async setSessionState(
     sessionId: string,
     state: SessionState,
     message?: string,
-    exitCode?: number | null
+    exitCode?: number | null,
+    progress?: SessionProgress
   ): Promise<void> {
     const sessionDir = path.join(this.sessionsDir, sessionId);
     const statePath = path.join(sessionDir, 'state.json');
@@ -416,7 +407,8 @@ export class SessionService {
       state,
       timestamp: new Date().toISOString(),
       ...(message && { message }),
-      ...(exitCode !== undefined && { exitCode })
+      ...(exitCode !== undefined && { exitCode }),
+      ...(progress && { progress })
     };
 
     try {
@@ -428,6 +420,37 @@ export class SessionService {
       console.log(`Session ${sessionId} state updated to: ${state}`);
     } catch (error) {
       console.error(`Failed to update session ${sessionId} state to ${state}:`, error);
+    }
+  }
+
+  /**
+   * Update session progress without changing state
+   * @param sessionId - Session ID
+   * @param progress - Progress data
+   */
+  async updateSessionProgress(sessionId: string, progress: SessionProgress): Promise<SessionStateData | null> {
+    const currentState = await this.getSessionState(sessionId);
+    if (!currentState) return null;
+
+    const updatedState: SessionStateData = {
+      ...currentState,
+      timestamp: new Date().toISOString(),
+      progress
+    };
+
+    const sessionDir = path.join(this.sessionsDir, sessionId);
+    const statePath = path.join(sessionDir, 'state.json');
+
+    try {
+      await fs.writeFile(
+        statePath,
+        JSON.stringify(updatedState, null, 2),
+        'utf-8'
+      );
+      return updatedState;
+    } catch (error) {
+      console.error(`Failed to update session ${sessionId} progress:`, error);
+      return null;
     }
   }
 

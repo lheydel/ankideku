@@ -69,8 +69,6 @@ function App() {
           changes: firstSuggestion.changes,
           reasoning: firstSuggestion.reasoning,
           readonly: false,
-          status: firstSuggestion.action as 'accept' | 'reject' | undefined,
-          timestamp: firstSuggestion.timestamp,
           editedChanges: firstSuggestion.editedChanges
         });
       }

@@ -11,56 +11,55 @@ export function useCardGeneration() {
     selectedDeck,
     setQueue,
     addToQueue,
-    setProcessing,
-    setProgress,
     addToPromptHistory,
     currentSession,
     currentSessionData,
     updateSessionState,
-    selectedCard,
     setSelectedCard,
     forceSync,
   } = useStore();
 
-  const { createSession, loadSession } = useSessionManagement();
+  const { createSession } = useSessionManagement();
   const [suggestionCount, setSuggestionCount] = useState(0);
 
   // Handle new suggestions from WebSocket
+  // Note: We use a ref to avoid re-creating this callback when selectedCard changes,
+  // which would cause useWebSocket to reconnect and miss subsequent suggestions
   const handleNewSuggestion = useCallback((suggestion: CardSuggestion) => {
     addToQueue(suggestion);
     setSuggestionCount(prev => prev + 1);
 
     // Auto-select the first suggestion if no card is currently being viewed
-    if (selectedCard == null) {
+    // Use store.getState() to avoid dependency on selectedCard
+    const currentSelectedCard = useStore.getState().selectedCard;
+    if (currentSelectedCard == null) {
       setSelectedCard(createComparisonCardFromSuggestion(suggestion));
     }
-  }, [addToQueue, selectedCard, setSelectedCard]);
+  }, [addToQueue, setSelectedCard]);
 
   // Handle state changes from WebSocket
+  // This updates currentSessionData.state which drives isProcessing and progress
   const handleStateChange = useCallback((state: SessionStateData) => {
     console.log('Session state changed:', state);
-    // Update both currentSessionData and sessions list
     updateSessionState(state);
   }, [updateSessionState]);
 
   // Handle session completion
-  const handleSessionComplete = useCallback(async (data: { totalSuggestions: number }) => {
+  const handleSessionComplete = useCallback((data: { totalSuggestions: number }) => {
     console.log(`Session complete: ${data.totalSuggestions} suggestions generated`);
-    setProcessing(false);
-    // State is updated in real-time via state:change WebSocket event
-  }, [setProcessing]);
+    // isProcessing is derived from session state, updated via state:change event
+  }, []);
 
   // Handle session errors
-  const handleSessionError = useCallback(async (error: { error: string }) => {
+  const handleSessionError = useCallback((error: { error: string }) => {
     console.error('Session error:', error.error);
-    setProcessing(false);
-    // State is updated in real-time via state:change WebSocket event
-  }, [setProcessing]);
+    // isProcessing is derived from session state, updated via state:change event
+  }, []);
 
   // Set up WebSocket listener
   useWebSocket({
     sessionId: currentSession,
-    sessionState: currentSessionData?.state,
+    initialSessionState: currentSessionData?.state,
     onSuggestion: handleNewSuggestion,
     onStateChange: handleStateChange,
     onSessionComplete: handleSessionComplete,
@@ -75,14 +74,13 @@ export function useCardGeneration() {
     if (!selectedDeck || !prompt.trim()) return;
 
     try {
-      setProcessing(true);
-      setProgress(0, 0);
       setQueue([]); // Clear existing queue
       setSuggestionCount(0);
 
       addToPromptHistory(prompt);
 
       // Create a new AI processing session
+      // This will set currentSessionData with state=PENDING, making isProcessing=true
       const sessionId = await createSession(prompt, selectedDeck, forceSync);
 
       onSuccess(`Started AI processing session: ${sessionId}`);
@@ -93,9 +91,9 @@ export function useCardGeneration() {
 
     } catch (err) {
       onError(getErrorMessage(err, 'Failed to create session'));
-      setProcessing(false);
+      // No session was created, so isProcessing stays false (no currentSessionData)
     }
-  }, [selectedDeck, setQueue, setProcessing, setProgress, addToPromptHistory, createSession, forceSync]);
+  }, [selectedDeck, setQueue, addToPromptHistory, createSession, forceSync]);
 
   return {
     generateSuggestions,

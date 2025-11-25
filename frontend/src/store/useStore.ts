@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { StoreState, DeckInfo, CardSuggestion, ActionHistoryEntry, SessionData, SessionMetadata, ComparisonCard } from '../types/index.js';
+import type { StoreState, DeckInfo, CardSuggestion, ActionHistoryEntry, SessionData, SessionMetadata, ComparisonCard, SessionStateData } from '../types/index.js';
 
 const useStore = create<StoreState>((set, get) => ({
   // Connection state
@@ -23,13 +23,6 @@ const useStore = create<StoreState>((set, get) => ({
   // Force sync option
   forceSync: false,
   setForceSync: (forceSync: boolean) => set({ forceSync }),
-
-  // Processing state
-  isProcessing: false,
-  processingProgress: 0,
-  processingTotal: 0,
-  setProcessing: (isProcessing: boolean) => set({ isProcessing }),
-  setProgress: (progress: number, total: number) => set({ processingProgress: progress, processingTotal: total }),
 
   // Session management
   currentSession: null,
@@ -125,9 +118,6 @@ const useStore = create<StoreState>((set, get) => ({
   reset: () => set({
     selectedDeck: null,
     prompt: '',
-    isProcessing: false,
-    processingProgress: 0,
-    processingTotal: 0,
     currentSession: null,
     currentSessionData: null,
     queue: [],
@@ -136,3 +126,19 @@ const useStore = create<StoreState>((set, get) => ({
 }));
 
 export default useStore;
+
+// Selector for isProcessing - derived from session state
+// Usage: const isProcessing = useStore(selectIsProcessing);
+export const selectIsProcessing = (state: StoreState): boolean => {
+  const sessionState = state.currentSessionData?.state?.state;
+  return sessionState === 'pending' || sessionState === 'running';
+};
+
+// Default progress object - stable reference to avoid infinite re-renders
+const DEFAULT_PROGRESS = { processed: 0, total: 0, suggestionsCount: 0 };
+
+// Selector for session progress - derived from session state
+// Usage: const progress = useStore(selectSessionProgress);
+export const selectSessionProgress = (state: StoreState) => {
+  return state.currentSessionData?.state?.progress ?? DEFAULT_PROGRESS;
+};

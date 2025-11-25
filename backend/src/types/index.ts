@@ -45,4 +45,4 @@ export interface BatchUpdateRequest {
 
 // Session state management (re-export from contract for consistency)
 export { SessionState } from '../../../contract/types.js';
-export type { SessionStateData } from '../../../contract/types.js';
+export type { SessionStateData, SessionProgress } from '../../../contract/types.js';

@@ -72,11 +72,18 @@ export const SessionState = {
 
 export type SessionState = typeof SessionState[keyof typeof SessionState];
 
+export interface SessionProgress {
+  processed: number;
+  total: number;
+  suggestionsCount: number;
+}
+
 export interface SessionStateData {
   state: SessionState;
   timestamp: string;
   message?: string; // Optional message for errors or additional context
   exitCode?: number | null; // For completed/failed states
+  progress?: SessionProgress; // Processing progress
 }
 
 export interface SessionRequest {
@@ -124,4 +131,36 @@ export interface ActionHistoryEntry {
   deckName?: string;
   aiChanges?: Record<string, string>; // Original AI suggestion (for reference when user edited)
   editedChanges?: Record<string, string>; // Manual edits made by user - only fields they modified
+}
+
+// ============================================================================
+// WebSocket Event Types
+// ============================================================================
+
+/** Event names for WebSocket communication */
+export const SocketEvent = {
+  SUGGESTION_NEW: 'suggestion:new',
+  STATE_CHANGE: 'state:change',
+  SESSION_COMPLETE: 'session:complete',
+  SESSION_ERROR: 'session:error',
+  SUBSCRIBE_SESSION: 'subscribe:session',
+  UNSUBSCRIBE_SESSION: 'unsubscribe:session',
+} as const;
+
+export type SocketEvent = typeof SocketEvent[keyof typeof SocketEvent];
+
+/** Payload for 'suggestion:new' event */
+export type SuggestionNewPayload = CardSuggestion;
+
+/** Payload for 'state:change' event */
+export type StateChangePayload = SessionStateData;
+
+/** Payload for 'session:complete' event */
+export interface SessionCompletePayload {
+  totalSuggestions: number;
+}
+
+/** Payload for 'session:error' event */
+export interface SessionErrorPayload {
+  error: string;
 }

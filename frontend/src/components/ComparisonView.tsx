@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import useStore from '../store/useStore';
+import useStore, { selectSessionProgress } from '../store/useStore';
 import { CheckIcon, ClockIcon } from './ui/Icons';
 import { Breadcrumb } from './ui/Breadcrumb';
 import ConfirmDialog from './ui/ConfirmDialog';
@@ -36,6 +36,7 @@ export default function ComparisonView({
   onSkip,
 }: ComparisonViewProps) {
   const { selectedCard, queue, currentIndex } = useStore();
+  const { processed: processingProgress, total: processingTotal } = useStore(selectSessionProgress);
   const isProcessing = isSessionActive(currentSessionData);
   const card = selectedCard;
 
@@ -105,8 +106,12 @@ export default function ComparisonView({
   if (!card) {
     return (
       <div className="space-y-6">
-        {(isProcessing || queue.length > 0) && <Breadcrumb onClick={onBackToSessions} />}
-        <EmptyState isProcessing={isProcessing} />
+        <Breadcrumb onClick={onBackToSessions} />
+        <EmptyState
+          isProcessing={isProcessing}
+          progress={processingProgress}
+          total={processingTotal}
+        />
       </div>
     );
   }

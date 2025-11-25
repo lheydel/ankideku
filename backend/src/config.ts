@@ -24,14 +24,6 @@ export const CONFIG = {
   },
 
   /**
-   * File watcher configuration
-   */
-  fileWatcher: {
-    stabilityThreshold: 100, // ms to wait for file stability
-    pollInterval: 50, // ms between polls
-  },
-
-  /**
    * Logging configuration
    */
   logging: {
