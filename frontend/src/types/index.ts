@@ -13,7 +13,8 @@ import type {
   SessionData as SessionDataType,
   SessionStateData as SessionStateDataType,
   SessionProgress as SessionProgressType,
-  ActionHistoryEntry as ActionHistoryEntryType
+  ActionHistoryEntry as ActionHistoryEntryType,
+  SyncProgressPayload as SyncProgressPayloadType
 } from '../../../contract/types';
 
 // Re-export types for use by other files
@@ -31,6 +32,7 @@ export type SessionData = SessionDataType;
 export type SessionStateData = SessionStateDataType;
 export type SessionProgress = SessionProgressType;
 export type ActionHistoryEntry = ActionHistoryEntryType;
+export type SyncProgressPayload = SyncProgressPayloadType;
 
 // SessionState is both a type and a const object
 // The const is for value comparisons (e.g., SessionState.COMPLETED)

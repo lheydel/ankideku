@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ankiConnectService } from '../services/AnkiConnectService.js';
 import { cacheService } from '../services/CacheService.js';
+import { getAnkiSyncService } from '../services/AnkiSyncService.js';
 import { sendErrorResponse } from '../utils/errorHandler.js';
 import type { GetNotesResponse, SyncResponse, CacheInfo } from '../types/index.js';
 
@@ -39,7 +40,8 @@ router.get('/:deckName/notes', async (req: Request, res: Response) => {
           (async () => {
             try {
               console.log(`Background incremental sync for "${deckName}"...`);
-              await cacheService.syncDeckCache(deckName);
+              const ankiSyncService = await getAnkiSyncService();
+              await ankiSyncService.syncDeck(deckName);
             } catch (error) {
               console.error(`Background sync failed:`, error);
             }
@@ -55,13 +57,15 @@ router.get('/:deckName/notes', async (req: Request, res: Response) => {
       }
     }
 
-    // No cache or force refresh - fetch from Anki
+    // No cache or force refresh - sync from Anki
     console.log(`Fetching notes from Anki for deck: "${deckName}"${forceRefresh ? ' (force refresh)' : ''}`);
-    const notes = await ankiConnectService.getDeckNotes(deckName);
-    console.log(`Found ${notes.length} notes in deck "${deckName}"`);
+    const ankiSyncService = await getAnkiSyncService();
+    await ankiSyncService.syncDeck(deckName);
 
-    // Cache the results
-    await cacheService.cacheNotes(deckName, notes, false);
+    // Read from freshly synced cache
+    const cachedData = await cacheService.getCachedNotes(deckName);
+    const notes = cachedData?.notes || [];
+    console.log(`Found ${notes.length} notes in deck "${deckName}"`);
 
     const response: GetNotesResponse = {
       notes,
@@ -83,7 +87,8 @@ router.post('/:deckName/sync', async (req: Request, res: Response) => {
     const { deckName } = req.params;
     console.log(`Syncing deck "${deckName}" from Anki...`);
 
-    const result = await cacheService.syncDeckCache(deckName);
+    const ankiSyncService = await getAnkiSyncService();
+    const result = await ankiSyncService.syncDeck(deckName);
 
     const response: SyncResponse = {
       success: true,

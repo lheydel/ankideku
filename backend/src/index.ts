@@ -6,6 +6,7 @@ import { CONFIG, validateConfig } from './config.js';
 import { sessionService } from './services/SessionService.js';
 import { suggestionWriter } from './services/SuggestionWriter.js';
 import { sessionEventEmitter } from './services/SessionEventEmitter.js';
+import { syncProgressEmitter } from './services/SyncProgressEmitter.js';
 import { SessionOrchestrator } from './services/SessionOrchestrator.js';
 import { SocketEvent } from '../../contract/types.js';
 
@@ -38,6 +39,9 @@ const io = new SocketIOServer(httpServer, {
 // Wire up SessionEventEmitter with Socket.IO
 sessionEventEmitter.setSocketIO(io);
 
+// Wire up SyncProgressEmitter with Socket.IO
+syncProgressEmitter.setSocketIO(io);
+
 // Create SessionOrchestrator with dependencies
 const sessionOrchestrator = new SessionOrchestrator(suggestionWriter, sessionEventEmitter);
 
@@ -60,6 +64,19 @@ io.on('connection', (socket) => {
   socket.on(SocketEvent.UNSUBSCRIBE_SESSION, (sessionId: string) => {
     socket.leave(sessionId);
     console.log(`Client ${socket.id} unsubscribed from session: ${sessionId}`);
+  });
+
+  // Sync progress subscriptions
+  socket.on(SocketEvent.SUBSCRIBE_SYNC, (deckName: string) => {
+    const room = `sync:${deckName}`;
+    socket.join(room);
+    console.log(`Client ${socket.id} subscribed to sync: ${deckName}`);
+  });
+
+  socket.on(SocketEvent.UNSUBSCRIBE_SYNC, (deckName: string) => {
+    const room = `sync:${deckName}`;
+    socket.leave(room);
+    console.log(`Client ${socket.id} unsubscribed from sync: ${deckName}`);
   });
 
   socket.on('disconnect', () => {

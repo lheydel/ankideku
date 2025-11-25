@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ankiApi } from '../services/api';
 import useStore from '../store/useStore';
+import { useSyncProgress } from './useSyncProgress';
 import type { CacheInfo } from '../types';
 
 /**
@@ -10,6 +11,9 @@ export function useAnkiConnection(onMessage?: (type: 'system' | 'assistant', con
   const { setDecks, setAnkiConnected, setFieldDisplayConfig, selectedDeck } = useStore();
   const [syncing, setSyncing] = useState(false);
   const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null);
+
+  // Subscribe to sync progress for the selected deck
+  const { progress: syncProgress, clearProgress } = useSyncProgress(syncing ? selectedDeck : null);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -69,8 +73,9 @@ export function useAnkiConnection(onMessage?: (type: 'system' | 'assistant', con
       console.error('Sync error:', error);
     } finally {
       setSyncing(false);
+      clearProgress();
     }
-  }, [selectedDeck, onMessage, loadCacheInfo]);
+  }, [selectedDeck, onMessage, loadCacheInfo, clearProgress]);
 
   // Load decks and settings on mount
   useEffect(() => {
@@ -92,5 +97,6 @@ export function useAnkiConnection(onMessage?: (type: 'system' | 'assistant', con
     syncDeck,
     loadDecks,
     cacheInfo,
+    syncProgress,
   };
 }

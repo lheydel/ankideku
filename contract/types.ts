@@ -148,6 +148,10 @@ export const SocketEvent = {
   SESSION_ERROR: 'session:error',
   SUBSCRIBE_SESSION: 'subscribe:session',
   UNSUBSCRIBE_SESSION: 'unsubscribe:session',
+  // Sync progress events
+  SYNC_PROGRESS: 'sync:progress',
+  SUBSCRIBE_SYNC: 'subscribe:sync',
+  UNSUBSCRIBE_SYNC: 'unsubscribe:sync',
 } as const;
 
 export type SocketEvent = typeof SocketEvent[keyof typeof SocketEvent];
@@ -166,4 +170,14 @@ export interface SessionCompletePayload {
 /** Payload for 'session:error' event */
 export interface SessionErrorPayload {
   error: string;
+}
+
+/** Payload for 'sync:progress' event */
+export interface SyncProgressPayload {
+  deckName: string;
+  step: number;
+  totalSteps: number;
+  stepName: string;
+  processed: number;
+  total: number;
 }

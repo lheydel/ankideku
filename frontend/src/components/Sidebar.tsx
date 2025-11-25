@@ -49,7 +49,7 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
     onSelectDeck: selectDeck,
   });
 
-  const { syncing, syncDeck, cacheInfo } = useAnkiConnection(addMessage);
+  const { syncing, syncDeck, cacheInfo, syncProgress } = useAnkiConnection(addMessage);
 
   const handleCancelSession = async () => {
     if (!currentSession) return;
@@ -163,7 +163,22 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
             className="shrink-0"
           />
         </div>
-        {cacheInfo?.exists && (
+        {/* Sync Progress Bar */}
+        {syncing && syncProgress && (
+          <div className="mt-2">
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <span>Step {syncProgress.step}/{syncProgress.totalSteps}: {syncProgress.stepName}</span>
+              <span>{Math.round((syncProgress.processed / syncProgress.total) * 100)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-primary-500 dark:bg-primary-400 h-full rounded-full transition-all duration-200 ease-out"
+                style={{ width: syncProgress.total > 0 ? `${Math.round((syncProgress.processed / syncProgress.total) * 100)}%` : '0%' }}
+              />
+            </div>
+          </div>
+        )}
+        {!syncing && cacheInfo?.exists && (
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {cacheInfo.count?.toLocaleString()} cards
             {cacheInfo.estimatedTokens && (

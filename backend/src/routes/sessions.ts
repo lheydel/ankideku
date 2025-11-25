@@ -47,8 +47,9 @@ router.post('/new', async (req: Request, res: Response): Promise<void> => {
     // Perform synchronous incremental sync if forceSync is true
     if (forceSync) {
       console.log(`Force sync enabled - syncing deck cache for "${deckName}" before starting AI session...`);
-      const { cacheService } = await import('../services/CacheService.js');
-      await cacheService.syncDeckCache(deckName);
+      const { getAnkiSyncService } = await import('../services/AnkiSyncService.js');
+      const ankiSyncService = await getAnkiSyncService();
+      await ankiSyncService.syncDeck(deckName);
     }
 
     // Create session
