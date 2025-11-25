@@ -5,9 +5,9 @@
  * Optimization: Queries each sub-deck separately to avoid slow cardsInfo enrichment
  */
 
-import type { Note } from '../types/index.js';
-import type { SyncProgressPayload } from '../../../contract/types.js';
-import { CONFIG } from '../config.js';
+import type { Note } from '../../types/index.js';
+import type { SyncProgressPayload } from '../../../../contract/types.js';
+import { CONFIG } from '../../config.js';
 import { AnkiConnectService } from './AnkiConnectService.js';
 import { cacheService } from './CacheService.js';
 import { syncProgressEmitter } from './SyncProgressEmitter.js';

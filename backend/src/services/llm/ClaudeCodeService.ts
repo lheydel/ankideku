@@ -128,8 +128,8 @@ export class ClaudeCodeService implements LLMService {
         'claude',
         [
           '--print',
-          '--output-format',
-          'text', // We want clean text output, not streaming JSON
+          '--model', 'sonnet',
+          '--output-format', 'text', // We want clean text output, not streaming JSON
         ],
         {
           cwd: process.cwd(),

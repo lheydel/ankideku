@@ -1,8 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { ActionHistoryEntry } from '../../../contract';
-import { AI_SESSIONS_DIR } from '../constants.js';
-import { ensureDir } from '../utils/fs.js';
+import { ActionHistoryEntry } from '../../../../contract';
+import { AI_SESSIONS_DIR } from '../../constants.js';
+import { ensureDir } from '../../utils/fs.js';
 
 export class HistoryService {
   /**

@@ -4,7 +4,7 @@
  */
 
 import type { Server as SocketIOServer } from 'socket.io';
-import { SocketEvent, type SyncProgressPayload } from '../../../contract/types.js';
+import { SocketEvent, type SyncProgressPayload } from '../../../../contract/types.js';
 
 /**
  * Handles WebSocket event emission for sync progress

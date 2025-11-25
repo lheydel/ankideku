@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { ankiConnectService } from '../services/AnkiConnectService.js';
+import { ankiConnectService } from '../services/anki/AnkiConnectService.js';
 import { sendErrorResponse } from '../utils/errorHandler.js';
 import type { PingResponse } from '../types/index.js';
 

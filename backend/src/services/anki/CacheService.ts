@@ -1,9 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
-import type { Note, CachedDeckData, CacheInfo } from '../types/index.js';
-import { DECKS_DIR as CACHE_DIR } from '../constants.js';
-import { ensureDir } from '../utils/fs.js';
-import { estimateDeckTokens } from '../utils/tokenizer.js';
+import type { Note, CachedDeckData, CacheInfo } from '../../types/index.js';
+import { DECKS_DIR as CACHE_DIR } from '../../constants.js';
+import { ensureDir } from '../../utils/fs.js';
+import { estimateDeckTokens } from '../../utils/tokenizer.js';
 
 export class CacheService {
   /**

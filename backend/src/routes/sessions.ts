@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
-import { SessionService } from '../services/SessionService.js';
-import { SessionOrchestrator } from '../services/SessionOrchestrator.js';
-import { historyService } from '../services/HistoryService.js';
+import { SessionService } from '../services/session/SessionService.js';
+import { SessionOrchestrator } from '../services/session/SessionOrchestrator.js';
+import { historyService } from '../services/storage/HistoryService.js';
 
 const router = express.Router();
 
@@ -47,7 +47,7 @@ router.post('/new', async (req: Request, res: Response): Promise<void> => {
     // Perform synchronous incremental sync if forceSync is true
     if (forceSync) {
       console.log(`Force sync enabled - syncing deck cache for "${deckName}" before starting AI session...`);
-      const { getAnkiSyncService } = await import('../services/AnkiSyncService.js');
+      const { getAnkiSyncService } = await import('../services/anki/AnkiSyncService.js');
       const ankiSyncService = await getAnkiSyncService();
       await ankiSyncService.syncDeck(deckName);
     }

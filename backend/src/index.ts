@@ -3,11 +3,11 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { CONFIG, validateConfig } from './config.js';
-import { sessionService } from './services/SessionService.js';
-import { suggestionWriter } from './services/SuggestionWriter.js';
-import { sessionEventEmitter } from './services/SessionEventEmitter.js';
-import { syncProgressEmitter } from './services/SyncProgressEmitter.js';
-import { SessionOrchestrator } from './services/SessionOrchestrator.js';
+import { sessionService } from './services/session/SessionService.js';
+import { suggestionWriter } from './services/storage/SuggestionWriter.js';
+import { sessionEventEmitter } from './services/session/SessionEventEmitter.js';
+import { syncProgressEmitter } from './services/anki/SyncProgressEmitter.js';
+import { SessionOrchestrator } from './services/session/SessionOrchestrator.js';
 import { SocketEvent } from '../../contract/types.js';
 
 // Route imports

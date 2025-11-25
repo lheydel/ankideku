@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { SessionRequest, CardSuggestion, SessionState, SessionStateData, SessionProgress } from '../types/index.js';
-import { DECKS_DIR, AI_SESSIONS_DIR } from '../constants.js';
-import { ensureDir } from '../utils/fs.js';
+import { SessionRequest, CardSuggestion, SessionState, SessionStateData, SessionProgress } from '../../types/index.js';
+import { DECKS_DIR, AI_SESSIONS_DIR } from '../../constants.js';
+import { ensureDir } from '../../utils/fs.js';
 
 export class SessionService {
   private sessionsDir = AI_SESSIONS_DIR;
@@ -109,7 +109,7 @@ export class SessionService {
       const suggestion: CardSuggestion = JSON.parse(content);
 
       // Import ankiConnectService here to avoid circular dependency
-      const { ankiConnectService } = await import('./AnkiConnectService.js');
+      const { ankiConnectService } = await import('../anki/AnkiConnectService.js');
 
       // Fetch current note state from Anki
       const currentNotes = await ankiConnectService.notesInfo([noteId]);

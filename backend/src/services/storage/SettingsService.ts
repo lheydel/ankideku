@@ -1,8 +1,8 @@
 import fs from 'fs/promises';
-import { DATABASE_DIR, SETTINGS_FILE } from '../constants.js';
-import type { LLMConfig } from './llm/LLMService.js';
-import { DEFAULT_LLM_CONFIG } from './llm/LLMService.js';
-import { ensureDir } from '../utils/fs.js';
+import { DATABASE_DIR, SETTINGS_FILE } from '../../constants.js';
+import type { LLMConfig } from '../llm/LLMService.js';
+import { DEFAULT_LLM_CONFIG } from '../llm/LLMService.js';
+import { ensureDir } from '../../utils/fs.js';
 
 export interface FieldDisplayConfig {
   [modelName: string]: string; // Maps model name to field name to display

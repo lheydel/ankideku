@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { historyService } from '../services/HistoryService.js';
-import { sessionService } from '../services/SessionService.js';
+import { historyService } from '../services/storage/HistoryService.js';
+import { sessionService } from '../services/session/SessionService.js';
 import { ActionHistoryEntry } from '../../../contract';
 
 const router = Router();

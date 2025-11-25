@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { ankiConnectService } from '../services/AnkiConnectService.js';
-import { cacheService } from '../services/CacheService.js';
+import { ankiConnectService } from '../services/anki/AnkiConnectService.js';
+import { cacheService } from '../services/anki/CacheService.js';
 import { sendErrorResponse } from '../utils/errorHandler.js';
 
 const router = Router();

@@ -5,9 +5,9 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { Note, CardSuggestion } from '../types/index.js';
-import type { LLMSuggestion } from './llm/LLMService.js';
-import { AI_SESSIONS_DIR } from '../constants.js';
+import type { Note, CardSuggestion } from '../../types/index.js';
+import type { LLMSuggestion } from '../llm/LLMService.js';
+import { AI_SESSIONS_DIR } from '../../constants.js';
 
 /**
  * Handles writing LLM suggestions to the filesystem

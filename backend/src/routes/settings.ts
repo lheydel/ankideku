@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { settingsService, type FieldDisplayConfig } from '../services/SettingsService.js';
+import { settingsService, type FieldDisplayConfig } from '../services/storage/SettingsService.js';
 import { sendErrorResponse } from '../utils/errorHandler.js';
 
 const router = Router();

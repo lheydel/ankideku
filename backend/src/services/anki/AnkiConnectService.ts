@@ -4,8 +4,8 @@
  */
 
 import axios, { AxiosError } from 'axios';
-import type { Note, DeckInfo, NoteUpdate, AnkiConnectResponse } from '../types/index.js';
-import { CONFIG } from '../config.js';
+import type { Note, DeckInfo, NoteUpdate, AnkiConnectResponse } from '../../types/index.js';
+import { CONFIG } from '../../config.js';
 
 export class AnkiConnectService {
   /**

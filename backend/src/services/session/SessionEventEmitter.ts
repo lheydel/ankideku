@@ -10,7 +10,7 @@ import {
   type StateChangePayload,
   type SessionCompletePayload,
   type SessionErrorPayload,
-} from '../../../contract/types.js';
+} from '../../../../contract/types.js';
 
 /**
  * Handles all WebSocket event emission for sessions

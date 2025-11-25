@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { ankiConnectService } from '../services/AnkiConnectService.js';
-import { cacheService } from '../services/CacheService.js';
-import { getAnkiSyncService } from '../services/AnkiSyncService.js';
+import { ankiConnectService } from '../services/anki/AnkiConnectService.js';
+import { cacheService } from '../services/anki/CacheService.js';
+import { getAnkiSyncService } from '../services/anki/AnkiSyncService.js';
 import { sendErrorResponse } from '../utils/errorHandler.js';
 import type { GetNotesResponse, SyncResponse, CacheInfo } from '../types/index.js';
 
