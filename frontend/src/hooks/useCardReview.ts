@@ -21,7 +21,9 @@ export function useCardReview() {
   } = useStore();
 
   const [conflictDetected, setConflictDetected] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{
+  // Note: pendingAction stores the action that was pending when conflict was detected.
+  // Currently only used for storing state, but could enable "retry with new version" feature.
+  const [_pendingAction, setPendingAction] = useState<{
     type: 'accept' | 'reject';
     editedChanges?: Record<string, string>;
     onSuccess: (message: string) => void;

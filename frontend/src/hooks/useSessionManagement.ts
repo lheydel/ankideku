@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { CardSuggestion, SessionRequest, SessionData, SessionMetadata } from '../types';
+import type { SessionData, SessionMetadata } from '../types';
 import { sessionApi } from '../services/sessionApi';
 import useStore from '../store/useStore';
 

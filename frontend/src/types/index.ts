@@ -12,7 +12,6 @@ import type {
   CardSuggestion as CardSuggestionType,
   SessionData as SessionDataType,
   SessionStateData as SessionStateDataType,
-  SessionState as SessionStateType,
   SessionProgress as SessionProgressType,
   ActionHistoryEntry as ActionHistoryEntryType
 } from '../../../contract/types';

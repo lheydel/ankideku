@@ -10,8 +10,8 @@ import type { LLMService, NoteTypeInfo } from './llm/LLMService.js';
 import { LLMServiceFactory } from './llm/LLMServiceFactory.js';
 import { SuggestionWriter } from './SuggestionWriter.js';
 import { SessionEventEmitter } from './SessionEventEmitter.js';
-import { sessionService } from './sessionService.js';
-import cacheService from './cache.js';
+import { sessionService } from './SessionService.js';
+import { cacheService } from './CacheService.js';
 import { createTokenBasedBatches } from '../utils/tokenizer.js';
 
 /**

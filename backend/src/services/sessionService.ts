@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { SessionRequest, CardSuggestion, SessionState, SessionStateData, SessionProgress } from '../types/index.js';
 import { DECKS_DIR, AI_SESSIONS_DIR } from '../constants.js';
+import { ensureDir } from '../utils/fs.js';
 
 export class SessionService {
   private sessionsDir = AI_SESSIONS_DIR;
@@ -14,11 +15,7 @@ export class SessionService {
    * Ensure the sessions directory exists
    */
   private async ensureSessionsDir(): Promise<void> {
-    try {
-      await fs.mkdir(this.sessionsDir, { recursive: true });
-    } catch (error) {
-      console.error('Failed to create sessions directory:', error);
-    }
+    await ensureDir(this.sessionsDir);
   }
 
   /**
@@ -111,11 +108,11 @@ export class SessionService {
       const content = await fs.readFile(suggestionPath, 'utf-8');
       const suggestion: CardSuggestion = JSON.parse(content);
 
-      // Import ankiConnect here to avoid circular dependency
-      const { default: ankiConnect } = await import('./ankiConnect.js');
+      // Import ankiConnectService here to avoid circular dependency
+      const { ankiConnectService } = await import('./AnkiConnectService.js');
 
       // Fetch current note state from Anki
-      const currentNotes = await ankiConnect.notesInfo([noteId]);
+      const currentNotes = await ankiConnectService.notesInfo([noteId]);
       if (currentNotes.length === 0) {
         throw new Error(`Note ${noteId} not found in Anki`);
       }

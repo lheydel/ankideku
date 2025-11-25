@@ -164,5 +164,3 @@ export function FieldsList({
     </div>
   );
 }
-
-export { CardField, DiffDisplay };

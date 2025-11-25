@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import ankiConnect from '../services/ankiConnect.js';
-import cache from '../services/cache.js';
+import { ankiConnectService } from '../services/AnkiConnectService.js';
+import { cacheService } from '../services/CacheService.js';
 import { sendErrorResponse } from '../utils/errorHandler.js';
 
 const router = Router();
@@ -11,7 +11,7 @@ const router = Router();
 router.post('/batch-update', async (req: Request, res: Response) => {
   try {
     const { updates } = req.body as { updates: Array<{ noteId: number; fields: Record<string, string> }> };
-    const results = await ankiConnect.batchUpdateNotes(updates);
+    const results = await ankiConnectService.batchUpdateNotes(updates);
     res.json({ success: true, results });
   } catch (error) {
     sendErrorResponse(res, error, 500);
@@ -24,7 +24,7 @@ router.post('/batch-update', async (req: Request, res: Response) => {
 router.get('/:noteId', async (req: Request, res: Response) => {
   try {
     const noteId = parseInt(req.params.noteId);
-    const notes = await ankiConnect.notesInfo([noteId]);
+    const notes = await ankiConnectService.notesInfo([noteId]);
 
     if (notes.length === 0) {
       return res.status(404).json({ error: 'Note not found' });
@@ -45,11 +45,11 @@ router.put('/:noteId', async (req: Request, res: Response) => {
     const { fields, deckName } = req.body as { fields: Record<string, string>; deckName?: string };
 
     // Update in Anki
-    await ankiConnect.updateNoteFields(noteId, fields);
+    await ankiConnectService.updateNoteFields(noteId, fields);
 
     // Update in cache if deckName provided
     if (deckName) {
-      await cache.updateNoteInCache(deckName, noteId, fields);
+      await cacheService.updateNoteInCache(deckName, noteId, fields);
     }
 
     res.json({ success: true });

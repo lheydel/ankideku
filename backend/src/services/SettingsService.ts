@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { DATABASE_DIR, SETTINGS_FILE } from '../constants.js';
 import type { LLMConfig } from './llm/LLMService.js';
 import { DEFAULT_LLM_CONFIG } from './llm/LLMService.js';
+import { ensureDir } from '../utils/fs.js';
 
 export interface FieldDisplayConfig {
   [modelName: string]: string; // Maps model name to field name to display
@@ -17,16 +18,12 @@ const DEFAULT_SETTINGS: UserSettings = {
   llm: DEFAULT_LLM_CONFIG,
 };
 
-class SettingsService {
+export class SettingsService {
   /**
    * Ensure database directory exists
    */
   async ensureDatabaseDir(): Promise<void> {
-    try {
-      await fs.mkdir(DATABASE_DIR, { recursive: true });
-    } catch (error) {
-      console.error('Error creating database directory:', error);
-    }
+    await ensureDir(DATABASE_DIR);
   }
 
   /**
@@ -114,4 +111,5 @@ class SettingsService {
   }
 }
 
-export default new SettingsService();
+// Singleton instance
+export const settingsService = new SettingsService();

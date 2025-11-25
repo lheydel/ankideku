@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
-import { SessionService } from '../services/sessionService.js';
+import { SessionService } from '../services/SessionService.js';
 import { SessionOrchestrator } from '../services/SessionOrchestrator.js';
-import { historyService } from '../services/historyService.js';
+import { historyService } from '../services/HistoryService.js';
 
 const router = express.Router();
 
@@ -47,9 +47,8 @@ router.post('/new', async (req: Request, res: Response): Promise<void> => {
     // Perform synchronous incremental sync if forceSync is true
     if (forceSync) {
       console.log(`Force sync enabled - syncing deck cache for "${deckName}" before starting AI session...`);
-      const cacheModule = await import('../services/cache.js');
-      const cache = cacheModule.default;
-      await cache.syncDeckCache(deckName);
+      const { cacheService } = await import('../services/CacheService.js');
+      await cacheService.syncDeckCache(deckName);
     }
 
     // Create session

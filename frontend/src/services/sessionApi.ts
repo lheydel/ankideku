@@ -1,3 +1,5 @@
+import type { SessionData } from '../types';
+
 const BASE_URL = 'http://localhost:3001/api/sessions';
 
 class SessionApiClient {
@@ -28,7 +30,7 @@ class SessionApiClient {
     });
   }
 
-  async loadSession(sessionId: string): Promise<any> {
+  async loadSession(sessionId: string): Promise<SessionData> {
     return this.request(`/${sessionId}`);
   }
 
@@ -46,10 +48,6 @@ class SessionApiClient {
     return this.request(`/${sessionId}/cancel`, {
       method: 'POST'
     });
-  }
-
-  async getSessionStatus(sessionId: string): Promise<any> {
-    return this.request(`/${sessionId}/status`);
   }
 
   async getActiveSessions(): Promise<{ activeSessions: string[]; count: number }> {

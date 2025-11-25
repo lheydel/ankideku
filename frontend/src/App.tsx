@@ -19,7 +19,7 @@ import { useSessionManagement } from './hooks/useSessionManagement.js';
 import { LAYOUT } from './constants/layout.js';
 
 function App() {
-  const { queue, setQueue, currentSession, currentSessionData, setSelectedCard } = useStore();
+  const { setQueue, currentSession, currentSessionData, setSelectedCard } = useStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);

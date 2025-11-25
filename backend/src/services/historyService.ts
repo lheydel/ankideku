@@ -1,7 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { ActionHistoryEntry } from '../../../contract/types';
+import { ActionHistoryEntry } from '../../../contract';
 import { AI_SESSIONS_DIR } from '../constants.js';
+import { ensureDir } from '../utils/fs.js';
 
 export class HistoryService {
   /**
@@ -19,7 +20,7 @@ export class HistoryService {
 
     // Ensure the session directory exists
     const sessionDir = path.dirname(historyPath);
-    await fs.mkdir(sessionDir, { recursive: true });
+    await ensureDir(sessionDir);
 
     // Load existing history or start with empty array
     let history: ActionHistoryEntry[] = [];

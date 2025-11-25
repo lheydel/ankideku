@@ -23,7 +23,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
 
   // Get all unique model types from queue, history, AND saved config
   const modelTypes = useMemo(() => {
-    const models = new Map<string, Note>();
+    const models = new Map<string, Note | null>();
 
     // Add from queue
     queue.forEach(item => {
@@ -42,8 +42,8 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
     // Add from saved config (even if not in queue/history)
     Object.keys(fieldDisplayConfig).forEach(modelName => {
       if (!models.has(modelName)) {
-        // We'll need to fetch fields for this model from Anki
-        models.set(modelName, null as any);
+        // No sample note available for this model
+        models.set(modelName, null);
       }
     });
 

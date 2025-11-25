@@ -1,22 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { ankiApi } from '../services/api.js';
-import useStore, { selectIsProcessing, selectSessionProgress } from '../store/useStore.js';
-import { DeckIcon, ChevronDownIcon, LightningIcon, CloseIcon, ChatIcon, SyncIcon } from './ui/Icons.js';
-import { SessionStateBadge } from './ui/SessionStateBadge.js';
-import { useCardGeneration } from '../hooks/useCardGeneration.js';
-import { useSessionManagement } from '../hooks/useSessionManagement.js';
-import { Button } from './ui/Button.js';
-import { formatTime } from '../utils/formatUtils.js';
-import { LAYOUT } from '../constants/layout.js';
+import { useState, useRef } from 'react';
+import useStore, { selectIsProcessing, selectSessionProgress } from '../store/useStore';
+import { DeckIcon, ChevronDownIcon, LightningIcon, CloseIcon, ChatIcon, SyncIcon } from './ui/Icons';
+import { useCardGeneration } from '../hooks/useCardGeneration';
+import { useSessionManagement } from '../hooks/useSessionManagement';
+import { useSidebarChat } from '../hooks/useSidebarChat';
+import { useAnkiConnection } from '../hooks/useAnkiConnection';
+import { Button } from './ui/Button';
+import { ChatMessage } from './sidebar/ChatMessage';
+import { LAYOUT } from '../constants/layout';
 import type { SessionData } from '../types';
-import { SessionState } from '../types';
-
-interface Message {
-  id: string;
-  type: 'user' | 'assistant' | 'system';
-  content: string;
-  state?: SessionState; // Optional session state for status messages
-}
 
 interface SidebarProps {
   isOpen: boolean;
@@ -31,35 +23,36 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     decks,
     selectedDeck,
     selectDeck,
-    setDecks,
-    setAnkiConnected,
-    setFieldDisplayConfig,
     setPrompt,
     forceSync,
     setForceSync,
   } = useStore();
 
-  // Derived from session state
   const processing = useStore(selectIsProcessing);
   const { processed: processedCount, total: totalCount, suggestionsCount } = useStore(selectSessionProgress);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      type: 'system',
-      content: 'Welcome! Select a deck and describe what you want to improve.',
-    },
-  ]);
   const [input, setInput] = useState('');
-  const [syncing, setSyncing] = useState(false);
 
   const deckEntries = Object.entries(decks);
 
-  // Initialize hooks
+  // Hooks
   const { generateSuggestions, currentSession } = useCardGeneration();
   const { cancelSession } = useSessionManagement();
-  const progressMessageIdRef = useRef<string | null>(null);
+
+  const {
+    messages,
+    addMessage,
+    resetToWelcome,
+    resetProgressTracking,
+  } = useSidebarChat({
+    currentSessionData,
+    processing,
+    suggestionsCount,
+    onSelectDeck: selectDeck,
+  });
+
+  const { syncing, syncDeck } = useAnkiConnection(addMessage);
 
   const handleCancelSession = async () => {
     if (!currentSession) return;
@@ -67,192 +60,17 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
     try {
       await cancelSession(currentSession);
       addMessage('system', 'Session cancelled');
-      progressMessageIdRef.current = null;
-    } catch (error) {
+      resetProgressTracking();
+    } catch {
       addMessage('system', 'Failed to cancel session');
     }
   };
 
-  // Load decks and settings on mount
-  useEffect(() => {
-    loadDecks();
-    loadSettings();
-  }, []);
-
-  // Helper to get contextual tip based on session state
-  const getContextualTip = (state: SessionState | undefined, suggestionsCount: number): string => {
-    if (!state || state === SessionState.PENDING || state === SessionState.RUNNING) {
-      return suggestionsCount > 0
-        ? '← Tip: You can review suggestions as they arrive'
-        : 'Processing your request...';
-    }
-    if (state === SessionState.COMPLETED) {
-      return suggestionsCount > 0
-        ? '← Review suggestions in the card view'
-        : 'No suggestions found for this deck.';
-    }
-    if (state === SessionState.FAILED) {
-      return 'Try again with a different prompt or check the logs.';
-    }
-    if (state === SessionState.CANCELLED) {
-      return suggestionsCount > 0
-        ? '← Review the suggestions found before cancellation'
-        : 'Session was cancelled before finding suggestions.';
-    }
-    return '';
-  };
-
-  // Restore chat history when session is loaded, or reset when cleared
-  useEffect(() => {
-    if (currentSessionData) {
-      const { sessionId, request, suggestions, cancelled, state } = currentSessionData;
-      const sessionDate = new Date(request.timestamp);
-      const currentState = state?.state || (cancelled ? SessionState.CANCELLED : undefined);
-
-      // Reconstruct chat history for this session
-      const sessionMessages: Message[] = [
-        {
-          id: '0',
-          type: 'system',
-          content: `${sessionId}\nDeck: ${request.deckName}\n${request.totalCards} cards`,
-        },
-        {
-          id: '1',
-          type: 'user',
-          content: request.prompt,
-        },
-        {
-          id: '2',
-          type: 'assistant',
-          content: getContextualTip(currentState, suggestions.length),
-          state: currentState
-        }
-      ];
-
-      setMessages(sessionMessages);
-
-      // Update selected deck to match session
-      selectDeck(request.deckName);
-      progressMessageIdRef.current = null;
-    } else {
-      // No session loaded - reset to welcome message
-      setMessages([
-        {
-          id: '0',
-          type: 'system',
-          content: 'Welcome! Select a deck and describe what you want to improve.',
-        },
-      ]);
-      progressMessageIdRef.current = null;
-    }
-  }, [currentSessionData]);
-
-  // Update progress message as suggestions arrive
-  useEffect(() => {
-    if (processing && suggestionsCount > 0) {
-      setMessages(prev => {
-        // Find or create progress message
-        if (progressMessageIdRef.current) {
-          // Update existing progress message with contextual tip
-          return prev.map(msg =>
-            msg.id === progressMessageIdRef.current
-              ? {
-                  ...msg,
-                  content: '← Tip: You can review suggestions as they arrive',
-                  timestamp: new Date(),
-                  state: SessionState.RUNNING
-                }
-              : msg
-          );
-        } else {
-          // Create new progress message
-          const newMsg: Message = {
-            id: `progress-${Date.now()}`,
-            type: 'assistant',
-            content: '← Tip: You can review suggestions as they arrive',
-            state: SessionState.RUNNING
-          };
-          progressMessageIdRef.current = newMsg.id;
-          return [...prev, newMsg];
-        }
-      });
-    } else if (!processing && progressMessageIdRef.current) {
-      // Processing complete - update final message
-      const finalState = currentSessionData?.state?.state || SessionState.COMPLETED;
-      setMessages(prev =>
-        prev.map(msg =>
-          msg.id === progressMessageIdRef.current
-            ? {
-                ...msg,
-                content: getContextualTip(finalState, suggestionsCount),
-                timestamp: new Date(),
-                state: finalState
-              }
-            : msg
-        )
-      );
-      progressMessageIdRef.current = null;
-    }
-  }, [suggestionsCount, processing, currentSessionData?.state?.state]);
-
-  const loadSettings = async () => {
-    try {
-      const settings = await ankiApi.getSettings();
-      if (settings.fieldDisplayConfig) {
-        setFieldDisplayConfig(settings.fieldDisplayConfig);
-      }
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-    }
-  };
-
-  const loadDecks = async () => {
-    try {
-      const { connected } = await ankiApi.ping();
-      setAnkiConnected(connected);
-
-      if (!connected) {
-        addMessage('system', 'AnkiConnect is not running. Please start Anki.');
-        return;
-      }
-
-      const deckData = await ankiApi.getDecks();
-      setDecks(deckData);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to connect to AnkiConnect';
-      addMessage('system', errorMessage);
-      setAnkiConnected(false);
-    }
-  };
-
-  const addMessage = (type: 'user' | 'assistant' | 'system', content: string) => {
-    setMessages((prev) => [
-        ...prev,
-      {
-        id: prev.length.toString(),
-        type,
-        content,
-      } as Message
-    ]);
-  };
-
-  const handleSync = async () => {
-    if (!selectedDeck) {
-      addMessage('system', 'Please select a deck first');
-      return;
-    }
-
-    try {
-      setSyncing(true);
-      addMessage('system', `Syncing "${selectedDeck}"...`);
-      const result = await ankiApi.syncDeck(selectedDeck);
-      addMessage('assistant', `✓ Synced ${result.count} card${result.count !== 1 ? 's' : ''}`);
-    } catch (error) {
-      addMessage('system', 'Sync failed');
-      console.error('Sync error:', error);
-    } finally {
-      setSyncing(false);
-    }
+  const handleNewSession = () => {
+    onNewSession();
+    resetToWelcome();
+    setInput('');
+    setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   const handleSend = async () => {
@@ -267,25 +85,19 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
       return;
     }
 
-    // Show sync indicator if force sync is enabled
     if (forceSync) {
       addMessage('system', `⚡ Force sync enabled - will sync "${selectedDeck}" before processing`);
     }
 
-    // Update the prompt in the store and generate suggestions
     setPrompt(userMessage);
-    progressMessageIdRef.current = null; // Reset progress tracking
+    resetProgressTracking();
 
     await generateSuggestions(
       userMessage,
+      (message) => addMessage('assistant', message),
       (message) => {
-        // Success - session started
-        addMessage('assistant', message);
-      },
-      (message) => {
-        // Error
         addMessage('system', `Error: ${message}`);
-        progressMessageIdRef.current = null;
+        resetProgressTracking();
       }
     );
   };
@@ -305,29 +117,13 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
         </div>
         <div className="flex items-center gap-2">
           {currentSessionData && onViewLogs && (
-            <Button
-              onClick={onViewLogs}
-              variant="secondary"
-              size="sm"
-            >
+            <Button onClick={onViewLogs} variant="secondary" size="sm">
               View Logs
             </Button>
           )}
           {currentSessionData && (
             <Button
-              onClick={() => {
-                onNewSession();
-                setMessages([
-                  {
-                    id: '0',
-                    type: 'system',
-                    content: 'Welcome! Select a deck and describe what you want to improve.',
-                  },
-                ]);
-                setInput('');
-                // Focus the input field after state updates
-                setTimeout(() => inputRef.current?.focus(), 0);
-              }}
+              onClick={handleNewSession}
               variant="secondary"
               size="sm"
               icon={<LightningIcon className="w-4 h-4" />}
@@ -367,7 +163,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
             <ChevronDownIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
           <Button
-            onClick={handleSync}
+            onClick={syncDeck}
             variant="secondary"
             size="sm"
             icon={<SyncIcon className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />}
@@ -382,12 +178,11 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
         <div className="p-4 bg-primary-50 dark:bg-primary-900/30 border-b border-primary-100 dark:border-primary-800">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-primary-600 dark:bg-primary-400 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-primary-600 dark:bg-primary-400 rounded-full animate-pulse" />
               <span className="text-sm text-primary-700 dark:text-primary-300 font-medium">
                 {totalCount > 0
                   ? `Processing ${processedCount} / ${totalCount} cards`
-                  : 'AI Processing...'
-                }
+                  : 'AI Processing...'}
               </span>
             </div>
             <Button
@@ -399,7 +194,6 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
               Cancel
             </Button>
           </div>
-          {/* Progress Bar */}
           {totalCount > 0 && (
             <div className="w-full bg-primary-200 dark:bg-primary-800 rounded-full h-2 overflow-hidden">
               <div
@@ -414,34 +208,13 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-900">
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                message.type === 'user'
-                  ? 'bg-primary-600 dark:bg-primary-500 text-white'
-                  : message.type === 'system'
-                  ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-700'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-              }`}
-            >
-              {message.state && (
-                <div className="mb-2">
-                  <SessionStateBadge state={message.state} />
-                </div>
-              )}
-              <p className="text-sm mb-1 whitespace-pre-wrap">{message.content}</p>
-            </div>
-          </div>
+          <ChatMessage key={message.id} message={message} />
         ))}
       </div>
 
       {/* Chat Input - Only show when no active session */}
       {!currentSessionData && (
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          {/* Force sync checkbox */}
           <div className="mb-3 flex items-center gap-2">
             <input
               type="checkbox"
@@ -470,7 +243,7 @@ export default function Sidebar({ isOpen, onClose, currentSessionData, onNewSess
                   handleSend();
                 }
               }}
-              placeholder={syncing ? "Syncing deck..." : "Describe what you want to improve... (Shift+Enter for new line)"}
+              placeholder={syncing ? 'Syncing deck...' : 'Describe what you want to improve... (Shift+Enter for new line)'}
               disabled={syncing}
               className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none placeholder:text-gray-500 dark:placeholder:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               rows={3}

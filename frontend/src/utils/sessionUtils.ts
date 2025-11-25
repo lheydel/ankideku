@@ -1,4 +1,4 @@
-import { SessionState, type SessionStateData, type SessionData } from '../types';
+import { SessionState, type SessionData } from '../types';
 
 /**
  * Check if a session is currently active (pending or running)

@@ -3,7 +3,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { CONFIG, validateConfig } from './config.js';
-import { sessionService } from './services/sessionService.js';
+import { sessionService } from './services/SessionService.js';
 import { suggestionWriter } from './services/SuggestionWriter.js';
 import { sessionEventEmitter } from './services/SessionEventEmitter.js';
 import { SessionOrchestrator } from './services/SessionOrchestrator.js';

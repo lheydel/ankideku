@@ -7,6 +7,8 @@ import type {
   CacheInfo,
   FieldDisplayConfig,
   ActionHistoryEntry,
+  Note,
+  CardSuggestion,
 } from '../types/index.js';
 
 interface UserSettings {
@@ -64,12 +66,6 @@ export const ankiApi = {
     return response.data;
   },
 
-  // Batch update notes
-  batchUpdateNotes: async (updates: Array<{ noteId: number; fields: Record<string, string> }>): Promise<{ success: boolean; results: any[] }> => {
-    const response = await api.post<{ success: boolean; results: any[] }>('/notes/batch-update', { updates });
-    return response.data;
-  },
-
   // Get user settings
   getSettings: async (): Promise<UserSettings> => {
     const response = await api.get<UserSettings>('/settings');
@@ -119,14 +115,14 @@ export const ankiApi = {
   },
 
   // Get a single note by ID
-  getNote: async (noteId: number): Promise<any> => {
-    const response = await api.get(`/notes/${noteId}`);
+  getNote: async (noteId: number): Promise<Note> => {
+    const response = await api.get<Note>(`/notes/${noteId}`);
     return response.data;
   },
 
   // Refresh a suggestion's original fields with current Anki state
-  refreshSuggestionOriginal: async (sessionId: string, noteId: number): Promise<any> => {
-    const response = await api.put(`/sessions/${sessionId}/suggestions/${noteId}/refresh-original`);
+  refreshSuggestionOriginal: async (sessionId: string, noteId: number): Promise<CardSuggestion> => {
+    const response = await api.put<CardSuggestion>(`/sessions/${sessionId}/suggestions/${noteId}/refresh-original`);
     return response.data;
   },
 };

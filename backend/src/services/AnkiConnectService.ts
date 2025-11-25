@@ -1,13 +1,8 @@
 import axios, { AxiosError } from 'axios';
 import type { Note, DeckInfo, NoteUpdate, AnkiConnectResponse } from '../types/index.js';
+import { CONFIG } from '../config.js';
 
-const ANKI_CONNECT_URL = 'http://localhost:8765';
-const ANKI_CONNECT_VERSION = 6;
-const REQUEST_TIMEOUT = 60000; // 60 seconds for large requests
-const BATCH_SIZE = 50; // Batch size for notes
-const BATCH_DELAY = 50; // 50ms delay between batches
-
-class AnkiConnectService {
+export class AnkiConnectService {
   /**
    * Generic batch fetching with retry logic
    */
@@ -20,7 +15,7 @@ class AnkiConnectService {
       delay?: number;
     }
   ): Promise<TResult[]> {
-    const { batchSize, itemName, delay = BATCH_DELAY } = options;
+    const { batchSize, itemName, delay = CONFIG.anki.batchDelay } = options;
     const results: TResult[] = [];
     const totalBatches = Math.ceil(items.length / batchSize);
 
@@ -86,11 +81,11 @@ class AnkiConnectService {
   /**
    * Make a request to AnkiConnect
    */
-  async request<T = any>(action: string, params: Record<string, any> = {}, timeout: number = REQUEST_TIMEOUT): Promise<T> {
+  async request<T = any>(action: string, params: Record<string, any> = {}, timeout: number = CONFIG.anki.requestTimeout): Promise<T> {
     try {
-      const response = await axios.post<AnkiConnectResponse<T>>(ANKI_CONNECT_URL, {
+      const response = await axios.post<AnkiConnectResponse<T>>(CONFIG.anki.url, {
         action,
-        version: ANKI_CONNECT_VERSION,
+        version: CONFIG.anki.version,
         params
       }, {
         timeout
@@ -129,7 +124,7 @@ class AnkiConnectService {
   async ping(): Promise<boolean> {
     try {
       const version = await this.request<number>('version');
-      return version === ANKI_CONNECT_VERSION;
+      return version === CONFIG.anki.version;
     } catch (error) {
       return false;
     }
@@ -210,7 +205,7 @@ class AnkiConnectService {
       noteIds,
       (batch) => this.notesInfo(batch),
       {
-        batchSize: BATCH_SIZE,
+        batchSize: CONFIG.anki.batchSize,
         itemName: 'notes'
       }
     );
@@ -289,4 +284,5 @@ class AnkiConnectService {
   }
 }
 
-export default new AnkiConnectService();
+// Singleton instance
+export const ankiConnectService = new AnkiConnectService();

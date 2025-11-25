@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import ankiConnect from '../services/ankiConnect.js';
-import cache from '../services/cache.js';
+import { ankiConnectService } from '../services/AnkiConnectService.js';
+import { cacheService } from '../services/CacheService.js';
 import { sendErrorResponse } from '../utils/errorHandler.js';
 import type { GetNotesResponse, SyncResponse, CacheInfo } from '../types/index.js';
 
@@ -11,7 +11,7 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const decks = await ankiConnect.getDeckNamesAndIds();
+    const decks = await ankiConnectService.getDeckNamesAndIds();
     res.json(decks);
   } catch (error) {
     console.error('Error fetching decks:', error);
@@ -29,7 +29,7 @@ router.get('/:deckName/notes', async (req: Request, res: Response) => {
 
     // Check if we should use cache
     if (!forceRefresh) {
-      const cachedData = await cache.getCachedNotes(deckName);
+      const cachedData = await cacheService.getCachedNotes(deckName);
       if (cachedData) {
         console.log(`Serving ${cachedData.notes.length} notes from cache for deck "${deckName}" (cached at ${cachedData.timestamp})`);
 
@@ -39,7 +39,7 @@ router.get('/:deckName/notes', async (req: Request, res: Response) => {
           (async () => {
             try {
               console.log(`Background incremental sync for "${deckName}"...`);
-              await cache.syncDeckCache(deckName);
+              await cacheService.syncDeckCache(deckName);
             } catch (error) {
               console.error(`Background sync failed:`, error);
             }
@@ -57,11 +57,11 @@ router.get('/:deckName/notes', async (req: Request, res: Response) => {
 
     // No cache or force refresh - fetch from Anki
     console.log(`Fetching notes from Anki for deck: "${deckName}"${forceRefresh ? ' (force refresh)' : ''}`);
-    const notes = await ankiConnect.getDeckNotes(deckName);
+    const notes = await ankiConnectService.getDeckNotes(deckName);
     console.log(`Found ${notes.length} notes in deck "${deckName}"`);
 
     // Cache the results
-    await cache.cacheNotes(deckName, notes, false);
+    await cacheService.cacheNotes(deckName, notes, false);
 
     const response: GetNotesResponse = {
       notes,
@@ -83,7 +83,7 @@ router.post('/:deckName/sync', async (req: Request, res: Response) => {
     const { deckName } = req.params;
     console.log(`Syncing deck "${deckName}" from Anki...`);
 
-    const result = await cache.syncDeckCache(deckName);
+    const result = await cacheService.syncDeckCache(deckName);
 
     const response: SyncResponse = {
       success: true,
@@ -103,7 +103,7 @@ router.post('/:deckName/sync', async (req: Request, res: Response) => {
 router.get('/:deckName/cache-info', async (req: Request, res: Response) => {
   try {
     const { deckName } = req.params;
-    const info: CacheInfo = await cache.getCacheInfo(deckName);
+    const info: CacheInfo = await cacheService.getCacheInfo(deckName);
     res.json(info);
   } catch (error) {
     sendErrorResponse(res, error, 500);
