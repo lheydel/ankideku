@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { SessionService } from '../services/session/SessionService.js';
 import { SessionOrchestrator } from '../services/session/SessionOrchestrator.js';
 import { historyService } from '../services/storage/HistoryService.js';
+import {sessionEventEmitter} from "../services/session/SessionEventEmitter";
 
 const router = express.Router();
 
@@ -187,6 +188,7 @@ router.post('/:sessionId/cancel', async (req: Request, res: Response): Promise<v
     if (sessionOrchestrator.isRunning(sessionId)) {
       sessionOrchestrator.cancelSession(sessionId);
       await sessionService.markSessionCancelled(sessionId);
+      sessionEventEmitter.emitStateChange(sessionId, { state: "cancelled", timestamp: new Date().toISOString() });
       res.json({ success: true, message: 'Session cancelled' });
     } else {
       res.status(404).json({ error: 'Session not found or not running' });

@@ -14,21 +14,22 @@ export function useSessionManagement() {
 
   const createSession = useCallback(async (prompt: string, deckName: string, forceSync: boolean = false): Promise<string> => {
     const { sessionId } = await sessionApi.createSession(prompt, deckName, forceSync);
-    setCurrentSession(sessionId);
 
-    // Load the session data to populate currentSessionData with state
-    const data = await sessionApi.loadSession(sessionId);
-    setCurrentSessionData(data);
+    // Set session ID - useWebSocket will subscribe and receive data via acknowledgement
+    setCurrentSession(sessionId);
 
     // Refresh the sessions list to include the new session
     await listSessions();
 
     return sessionId;
-  }, [setCurrentSession, setCurrentSessionData, listSessions]);
+  }, [setCurrentSession, listSessions]);
 
   const loadSession = useCallback(async (sessionId: string): Promise<SessionData> => {
-    const data: SessionData = await sessionApi.loadSession(sessionId);
+    // Set session ID - useWebSocket will subscribe and receive data via acknowledgement
     setCurrentSession(sessionId);
+
+    // Load session data via API (primary source for historical sessions)
+    const data: SessionData = await sessionApi.loadSession(sessionId);
     setCurrentSessionData(data);
 
     // Load history if it exists

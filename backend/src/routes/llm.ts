@@ -18,7 +18,7 @@ const router = express.Router();
 router.get('/health', async (req: Request, res: Response): Promise<void> => {
   try {
     const llmService = LLMServiceFactory.getInstance();
-    const health = await llmService.checkHealth();
+    const health = await llmService.getHealth();
 
     res.json(health);
   } catch (error) {

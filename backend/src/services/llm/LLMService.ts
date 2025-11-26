@@ -53,17 +53,19 @@ export interface LLMService {
    * @param cards Array of notes to analyze
    * @param userPrompt User's instruction for improvements
    * @param noteType Information about the note type (available fields)
+   * @param signal Optional AbortSignal for cancellation
    */
   analyzeBatch(
     cards: Note[],
     userPrompt: string,
-    noteType: NoteTypeInfo
+    noteType: NoteTypeInfo,
+    signal?: AbortSignal
   ): Promise<LLMResponse>;
 
   /**
    * Check if the LLM provider is available and configured
    */
-  checkHealth(): Promise<LLMHealthStatus>;
+  getHealth(): Promise<LLMHealthStatus>;
 }
 
 /**

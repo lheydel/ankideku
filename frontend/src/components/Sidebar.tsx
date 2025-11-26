@@ -30,6 +30,7 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   const deckEntries = Object.entries(decks);
 
@@ -52,14 +53,17 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
   const { syncing, syncDeck, cacheInfo, syncProgress } = useAnkiConnection(addMessage);
 
   const handleCancelSession = async () => {
-    if (!currentSession) return;
+    if (!currentSession || cancelling) return;
 
+    setCancelling(true);
     try {
       await cancelSession(currentSession);
       addMessage('system', 'Session cancelled');
       resetProgressTracking();
     } catch {
       addMessage('system', 'Failed to cancel session');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -204,9 +208,17 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
               onClick={handleCancelSession}
               variant="ghost"
               size="sm"
-              className="text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              disabled={cancelling}
+              className={`text-xs ${cancelling ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
             >
-              Cancel
+              {cancelling ? (
+                <span className="flex items-center gap-1.5">
+                  <SyncIcon className="w-3 h-3 animate-spin" />
+                  Cancelling...
+                </span>
+              ) : (
+                'Cancel'
+              )}
             </Button>
           </div>
           {totalCount > 0 && (

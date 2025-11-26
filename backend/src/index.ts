@@ -56,9 +56,29 @@ app.use(express.json());
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  socket.on(SocketEvent.SUBSCRIBE_SESSION, (sessionId: string) => {
+  socket.on(SocketEvent.SUBSCRIBE_SESSION, async (sessionId: string, callback?: (response: { success: boolean; data?: unknown; error?: string }) => void) => {
     socket.join(sessionId);
     console.log(`Client ${socket.id} subscribed to session: ${sessionId}`);
+
+    try {
+      const request = await sessionService.getSessionRequest(sessionId);
+      const suggestions = await sessionService.loadSession(sessionId);
+      const state = await sessionService.getSessionState(sessionId);
+
+      const data = { sessionId, request, suggestions, state };
+
+      if (callback) {
+        callback({ success: true, data });
+      }
+      console.log(`Sent session data to client ${socket.id} for session: ${sessionId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to load session data for ${sessionId}:`, errorMessage);
+
+      if (callback) {
+        callback({ success: false, error: errorMessage });
+      }
+    }
   });
 
   socket.on(SocketEvent.UNSUBSCRIBE_SESSION, (sessionId: string) => {

@@ -514,6 +514,11 @@ export class SessionService {
    * @param exitCode - Exit code from Claude process
    */
   async markSessionCompleted(sessionId: string, exitCode?: number | null): Promise<void> {
+    // Don't overwrite cancelled or failed states
+    const currentState = await this.getSessionState(sessionId);
+    if (currentState?.state === SessionState.CANCELLED || currentState?.state === SessionState.FAILED) {
+      return;
+    }
     await this.setSessionState(sessionId, SessionState.COMPLETED, undefined, exitCode);
   }
 

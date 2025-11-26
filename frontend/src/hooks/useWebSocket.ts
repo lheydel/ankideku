@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { CardSuggestion, SessionStateData } from '../types';
+import type { CardSuggestion, SessionStateData, SessionData } from '../types';
 import { SessionState as SessionStateEnum, SocketEvent } from '../types';
 
 interface UseWebSocketParams {
@@ -8,6 +8,7 @@ interface UseWebSocketParams {
   initialSessionState?: SessionStateData;
   onSuggestion: (suggestion: CardSuggestion) => void;
   onStateChange?: (state: SessionStateData) => void;
+  onSessionData?: (data: SessionData) => void;
   onSessionComplete?: (data: { totalSuggestions: number }) => void;
   onError?: (error: { error: string }) => void;
 }
@@ -39,6 +40,7 @@ export function useWebSocket({
   initialSessionState,
   onSuggestion,
   onStateChange,
+  onSessionData,
   onSessionComplete,
   onError
 }: UseWebSocketParams) {
@@ -65,8 +67,16 @@ export function useWebSocket({
     // Connect to WebSocket
     socketRef.current = io('http://localhost:3001');
 
-    // Subscribe to session
-    socketRef.current.emit(SocketEvent.SUBSCRIBE_SESSION, sessionId);
+    // Subscribe to session with acknowledgement callback for initial data
+    socketRef.current.emit(SocketEvent.SUBSCRIBE_SESSION, sessionId, (response: { success: boolean; data?: SessionData; error?: string }) => {
+      if (response.success && response.data) {
+        console.log(`[WebSocket] Received session data for ${sessionId}`, response.data);
+        onSessionData?.(response.data);
+      } else if (!response.success) {
+        console.error(`[WebSocket] Failed to load session ${sessionId}:`, response.error);
+        onError?.({ error: response.error || 'Failed to load session' });
+      }
+    });
     console.log(`[WebSocket] Subscribed to session ${sessionId}`);
 
     // Listen for suggestions
@@ -97,7 +107,7 @@ export function useWebSocket({
       console.log(`[WebSocket] Disconnecting from session ${sessionId}`);
       socketRef.current?.disconnect();
     };
-  }, [sessionId, onSuggestion, onStateChange, onSessionComplete, onError]);
+  }, [sessionId, onSuggestion, onStateChange, onSessionData, onSessionComplete, onError]);
 
   return socketRef.current;
 }

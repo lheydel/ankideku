@@ -4,7 +4,8 @@
  * Sends clean prompts (no file I/O instructions) and parses JSON responses
  */
 
-import { ChildProcess, execSync } from 'child_process';
+import { ChildProcess, exec } from 'child_process';
+import { promisify } from 'util';
 import spawn from 'cross-spawn';
 import type { Note } from '../../types/index.js';
 import type { LLMHealthStatus, LLMResponse, LLMService, NoteTypeInfo } from './LLMService.js';
@@ -12,17 +13,17 @@ import { buildSystemPrompt } from './prompts/systemPrompt.js';
 import { buildBatchPrompt } from './prompts/batchPrompt.js';
 import { ResponseParser } from './ResponseParser.js';
 import { countTokens } from '../../utils/tokenizer.js';
+import { CONFIG } from '../../config.js';
 
-const DEFAULT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-const MAX_RETRIES = 2;
+const execAsync = promisify(exec);
 
 /**
- * Check if Claude CLI is installed
+ * Check if Claude CLI is installed (async - doesn't block event loop)
  */
-function isClaudeInstalled(): boolean {
+async function isClaudeInstalled(): Promise<boolean> {
   try {
     const command = process.platform === 'win32' ? 'where claude' : 'which claude';
-    execSync(command, { stdio: 'ignore' });
+    await execAsync(command);
     return true;
   } catch {
     return false;
@@ -30,12 +31,12 @@ function isClaudeInstalled(): boolean {
 }
 
 /**
- * Get Claude CLI version
+ * Get Claude CLI version (async - doesn't block event loop)
  */
-function getClaudeVersion(): string | null {
+async function getClaudeVersion(): Promise<string | null> {
   try {
-    const result = execSync('claude --version', { encoding: 'utf-8' });
-    return result.trim();
+    const { stdout } = await execAsync('claude --version');
+    return stdout.trim();
   } catch {
     return null;
   }
@@ -49,15 +50,26 @@ export class ClaudeCodeService implements LLMService {
     this.parser = new ResponseParser();
   }
 
-  async checkHealth(): Promise<LLMHealthStatus> {
-    if (!isClaudeInstalled()) {
+  /**
+   * Throw AbortError if signal is aborted
+   */
+  private throwIfAborted(signal?: AbortSignal): void {
+    if (signal?.aborted) {
+      const error = new Error('Session cancelled');
+      error.name = 'AbortError';
+      throw error;
+    }
+  }
+
+  async getHealth(): Promise<LLMHealthStatus> {
+    if (!(await isClaudeInstalled())) {
       return {
         available: false,
         error: 'Claude Code CLI is not installed or not in PATH',
       };
     }
 
-    const version = getClaudeVersion();
+    const version = await getClaudeVersion();
     return {
       available: true,
       info: version ? `Claude Code ${version} installed` : 'Claude Code installed',
@@ -67,12 +79,11 @@ export class ClaudeCodeService implements LLMService {
   async analyzeBatch(
     cards: Note[],
     userPrompt: string,
-    noteType: NoteTypeInfo
+    noteType: NoteTypeInfo,
+    signal?: AbortSignal
   ): Promise<LLMResponse> {
-    const health = await this.checkHealth();
-    if (!health.available) {
-      throw new Error(health.error || 'Claude Code not available');
-    }
+    // Check if already aborted
+    this.throwIfAborted(signal);
 
     // Build prompts
     const systemPrompt = buildSystemPrompt();
@@ -86,9 +97,12 @@ export class ClaudeCodeService implements LLMService {
 
     // Try with retries on all errors
     let lastError: Error | null = null;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= CONFIG.llm.maxRetries; attempt++) {
+      // Check abort before each attempt
+      this.throwIfAborted(signal);
+
       try {
-        const rawResponse = await this.spawnClaudeCode(fullPrompt);
+        const rawResponse = await this.spawnClaudeCode(fullPrompt, signal);
         const result = this.parser.parse(rawResponse, cards);
 
         // Estimate output tokens from raw response
@@ -102,12 +116,17 @@ export class ClaudeCodeService implements LLMService {
           },
         };
       } catch (error) {
+        // Re-throw AbortError immediately (don't retry on cancellation)
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw error;
+        }
+
         lastError = error instanceof Error ? error : new Error(String(error));
         console.log(
-          `[ClaudeCodeService] Error on attempt ${attempt + 1}/${MAX_RETRIES + 1}: ${lastError.message}`
+          `[ClaudeCodeService] Error on attempt ${attempt + 1}/${CONFIG.llm.maxRetries + 1}: ${lastError.message}`
         );
 
-        if (attempt < MAX_RETRIES) {
+        if (attempt < CONFIG.llm.maxRetries) {
           console.log('[ClaudeCodeService] Retrying...');
         }
       }
@@ -116,7 +135,7 @@ export class ClaudeCodeService implements LLMService {
     throw lastError || new Error('Failed to analyze batch after max retries');
   }
 
-  private async spawnClaudeCode(prompt: string): Promise<string> {
+  private async spawnClaudeCode(prompt: string, signal?: AbortSignal): Promise<string> {
     // Generate unique ID for this process
     const processId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -142,6 +161,24 @@ export class ClaudeCodeService implements LLMService {
 
       let stdoutData = '';
       let stderrData = '';
+      let aborted = false;
+
+      // Handle abort signal
+      const abortHandler = () => {
+        if (!aborted) {
+          aborted = true;
+          this.killProcess(processId);
+          const error = new Error('Session cancelled');
+          error.name = 'AbortError';
+          reject(error);
+        }
+      };
+      signal?.addEventListener('abort', abortHandler, { once: true });
+
+      // Cleanup function to remove abort listener
+      const cleanup = () => {
+        signal?.removeEventListener('abort', abortHandler);
+      };
 
       // Pipe the prompt to stdin
       if (claude.stdin) {
@@ -161,7 +198,12 @@ export class ClaudeCodeService implements LLMService {
 
       // Handle process completion
       claude.on('close', (code: number | null) => {
+        cleanup();
         this.activeProcesses.delete(processId);
+
+        if (aborted) {
+          return; // Already rejected via abort handler
+        }
 
         if (code === 0) {
           resolve(stdoutData);
@@ -176,17 +218,21 @@ export class ClaudeCodeService implements LLMService {
 
       // Handle process errors
       claude.on('error', (error: Error) => {
+        cleanup();
         this.activeProcesses.delete(processId);
-        reject(error);
+        if (!aborted) {
+          reject(error);
+        }
       });
 
       // Timeout
       setTimeout(() => {
-        if (this.activeProcesses.has(processId)) {
+        if (this.activeProcesses.has(processId) && !aborted) {
           this.killProcess(processId);
-          reject(new Error(`Claude Code timed out after ${DEFAULT_TIMEOUT}ms`));
+          cleanup();
+          reject(new Error(`Claude Code timed out after ${CONFIG.llm.timeout}ms`));
         }
-      }, DEFAULT_TIMEOUT);
+      }, CONFIG.llm.timeout);
     });
   }
 

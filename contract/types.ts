@@ -146,7 +146,7 @@ export const SocketEvent = {
   STATE_CHANGE: 'state:change',
   SESSION_COMPLETE: 'session:complete',
   SESSION_ERROR: 'session:error',
-  SUBSCRIBE_SESSION: 'subscribe:session',
+  SUBSCRIBE_SESSION: 'subscribe:session', // Returns SessionData via acknowledgement
   UNSUBSCRIBE_SESSION: 'unsubscribe:session',
   // Sync progress events
   SYNC_PROGRESS: 'sync:progress',

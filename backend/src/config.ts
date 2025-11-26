@@ -29,6 +29,22 @@ export const CONFIG = {
   logging: {
     level: process.env.LOG_LEVEL || 'info',
   },
+
+  /**
+   * Session processing configuration
+   */
+  session: {
+    maxConcurrentBatches: 8,
+    maxInputTokens: 8000,
+  },
+
+  /**
+   * LLM provider configuration
+   */
+  llm: {
+    timeout: 5 * 60 * 1000, // 5 minutes per batch
+    maxRetries: 2,
+  },
 } as const;
 
 /**
