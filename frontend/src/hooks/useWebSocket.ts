@@ -6,7 +6,7 @@ import { SessionState as SessionStateEnum, SocketEvent } from '../types';
 interface UseWebSocketParams {
   sessionId: string | null;
   initialSessionState?: SessionStateData;
-  onSuggestion: (suggestion: CardSuggestion) => void;
+  onSuggestionBatch: (suggestions: CardSuggestion[]) => void;
   onStateChange?: (state: SessionStateData) => void;
   onSessionData?: (data: SessionData) => void;
   onSessionComplete?: (data: { totalSuggestions: number }) => void;
@@ -38,7 +38,7 @@ function shouldSkipConnection(sessionState?: SessionStateData): boolean {
 export function useWebSocket({
   sessionId,
   initialSessionState,
-  onSuggestion,
+  onSuggestionBatch,
   onStateChange,
   onSessionData,
   onSessionComplete,
@@ -79,10 +79,10 @@ export function useWebSocket({
     });
     console.log(`[WebSocket] Subscribed to session ${sessionId}`);
 
-    // Listen for suggestions
-    socketRef.current.on(SocketEvent.SUGGESTION_NEW, (suggestion) => {
-      console.log(`[WebSocket] Received ${SocketEvent.SUGGESTION_NEW} for session ${sessionId}`, suggestion);
-      onSuggestion(suggestion);
+    // Listen for suggestion batches
+    socketRef.current.on(SocketEvent.SUGGESTION_BATCH, (suggestions) => {
+      console.log(`[WebSocket] Received ${SocketEvent.SUGGESTION_BATCH} for session ${sessionId}: ${suggestions.length} suggestions`);
+      onSuggestionBatch(suggestions);
     });
 
     // Listen for state changes (includes progress updates)
@@ -107,7 +107,7 @@ export function useWebSocket({
       console.log(`[WebSocket] Disconnecting from session ${sessionId}`);
       socketRef.current?.disconnect();
     };
-  }, [sessionId, onSuggestion, onStateChange, onSessionData, onSessionComplete, onError]);
+  }, [sessionId, onSuggestionBatch, onStateChange, onSessionData, onSessionComplete, onError]);
 
   return socketRef.current;
 }

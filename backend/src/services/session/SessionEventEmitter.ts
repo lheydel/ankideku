@@ -6,7 +6,7 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import {
   SocketEvent,
-  type SuggestionNewPayload,
+  type SuggestionBatchPayload,
   type StateChangePayload,
   type SessionCompletePayload,
   type SessionErrorPayload,
@@ -26,10 +26,10 @@ export class SessionEventEmitter {
   }
 
   /**
-   * Emit a new suggestion to subscribers
+   * Emit a batch of suggestions to subscribers
    */
-  emitSuggestion(sessionId: string, suggestion: SuggestionNewPayload): void {
-    this.emit(sessionId, SocketEvent.SUGGESTION_NEW, suggestion, `noteId: ${suggestion.noteId}`);
+  emitSuggestionBatch(sessionId: string, suggestions: SuggestionBatchPayload): void {
+    this.emit(sessionId, SocketEvent.SUGGESTION_BATCH, suggestions, `${suggestions.length} suggestions`);
   }
 
   /**

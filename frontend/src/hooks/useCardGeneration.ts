@@ -10,7 +10,7 @@ export function useCardGeneration() {
   const {
     selectedDeck,
     setQueue,
-    addToQueue,
+    addBatchToQueue,
     addToPromptHistory,
     currentSession,
     currentSessionData,
@@ -22,19 +22,21 @@ export function useCardGeneration() {
 
   const { createSession } = useSessionManagement();
 
-  // Handle new suggestions from WebSocket
+  // Handle new suggestion batch from WebSocket
   // Note: We use a ref to avoid re-creating this callback when selectedCard changes,
   // which would cause useWebSocket to reconnect and miss subsequent suggestions
-  const handleNewSuggestion = useCallback((suggestion: CardSuggestion) => {
-    addToQueue(suggestion);
+  const handleSuggestionBatch = useCallback((suggestions: CardSuggestion[]) => {
+    if (suggestions.length === 0) return;
+
+    addBatchToQueue(suggestions);
 
     // Auto-select the first suggestion if no card is currently being viewed
     // Use store.getState() to avoid dependency on selectedCard
     const currentSelectedCard = useStore.getState().selectedCard;
     if (currentSelectedCard == null) {
-      setSelectedCard(createComparisonCardFromSuggestion(suggestion));
+      setSelectedCard(createComparisonCardFromSuggestion(suggestions[0]));
     }
-  }, [addToQueue, setSelectedCard]);
+  }, [addBatchToQueue, setSelectedCard]);
 
   // Handle state changes from WebSocket
   // This updates currentSessionData.state which drives isProcessing and progress
@@ -57,7 +59,7 @@ export function useCardGeneration() {
   useWebSocket({
     sessionId: currentSession,
     initialSessionState: currentSessionData?.state,
-    onSuggestion: handleNewSuggestion,
+    onSuggestionBatch: handleSuggestionBatch,
     onStateChange: handleStateChange,
     onSessionData: handleSessionData,
     onSessionComplete: handleSessionComplete,

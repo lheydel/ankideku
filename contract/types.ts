@@ -142,7 +142,7 @@ export interface ActionHistoryEntry {
 
 /** Event names for WebSocket communication */
 export const SocketEvent = {
-  SUGGESTION_NEW: 'suggestion:new',
+  SUGGESTION_BATCH: 'suggestion:batch',
   STATE_CHANGE: 'state:change',
   SESSION_COMPLETE: 'session:complete',
   SESSION_ERROR: 'session:error',
@@ -156,8 +156,8 @@ export const SocketEvent = {
 
 export type SocketEvent = typeof SocketEvent[keyof typeof SocketEvent];
 
-/** Payload for 'suggestion:new' event */
-export type SuggestionNewPayload = CardSuggestion;
+/** Payload for 'suggestion:batch' event */
+export type SuggestionBatchPayload = CardSuggestion[];
 
 /** Payload for 'state:change' event */
 export type StateChangePayload = SessionStateData;

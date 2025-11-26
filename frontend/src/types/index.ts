@@ -88,6 +88,7 @@ export interface StoreState {
   currentIndex: number;
   setQueue: (queue: CardSuggestionType[]) => void;
   addToQueue: (suggestion: CardSuggestionType) => void;
+  addBatchToQueue: (suggestions: CardSuggestionType[]) => void;
   goToCard: (index: number) => void;
   skipCard: () => void;
   removeFromQueue: (index: number) => void;

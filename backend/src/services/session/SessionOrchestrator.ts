@@ -222,10 +222,8 @@ export class SessionOrchestrator {
           notesMap
         );
 
-        // Emit each suggestion via WebSocket
-        for (const suggestion of writtenSuggestions) {
-          this.eventEmitter.emitSuggestion(sessionId, suggestion);
-        }
+        // Emit batch of suggestions via WebSocket
+        this.eventEmitter.emitSuggestionBatch(sessionId, writtenSuggestions);
 
         suggestionsCount = writtenSuggestions.length;
       }
