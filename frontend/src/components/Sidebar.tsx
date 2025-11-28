@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import useStore, { selectIsProcessing, selectSessionProgress } from '../store/useStore';
-import { DeckIcon, ChevronDownIcon, LightningIcon, CloseIcon, ChatIcon, SyncIcon } from './ui/Icons';
+import { DeckIcon, ChevronDownIcon, LightningIcon, CloseIcon, ChatIcon, SyncIcon, TrashIcon } from './ui/Icons';
 import { useCardGeneration } from '../hooks/useCardGeneration';
 import { useSessionManagement } from '../hooks/useSessionManagement';
 import { useSidebarChat } from '../hooks/useSidebarChat';
 import { useAnkiConnection } from '../hooks/useAnkiConnection';
+import { llmApi } from '../services/api';
 import { Button } from './ui/Button';
 import { ChatMessage } from './sidebar/ChatMessage';
 import { LAYOUT } from '../constants/layout';
@@ -12,9 +13,10 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onNewSession: () => void;
+  onDeleteSession: () => void;
 }
 
-export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, onNewSession, onDeleteSession }: SidebarProps) {
   const currentSessionData = useStore((state) => state.currentSessionData);
   const {
     decks,
@@ -23,6 +25,8 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
     setPrompt,
     forceSync,
     setForceSync,
+    llmProvider,
+    setLlmProvider,
   } = useStore();
 
   const processing = useStore(selectIsProcessing);
@@ -33,6 +37,15 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
   const [cancelling, setCancelling] = useState(false);
 
   const deckEntries = Object.entries(decks);
+
+  // Fetch LLM provider on mount if not already loaded
+  useEffect(() => {
+    if (!llmProvider) {
+      llmApi.getConfig()
+        .then(config => setLlmProvider(config.provider))
+        .catch(() => {});
+    }
+  }, [llmProvider, setLlmProvider]);
 
   // Hooks
   const { generateSuggestions, currentSession } = useCardGeneration();
@@ -118,14 +131,24 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
         </div>
         <div className="flex items-center gap-2">
           {currentSessionData && (
-            <Button
-              onClick={handleNewSession}
-              variant="secondary"
-              size="sm"
-              icon={<LightningIcon className="w-4 h-4" />}
-            >
-              New Session
-            </Button>
+            <>
+              <Button
+                onClick={handleNewSession}
+                variant="secondary"
+                size="sm"
+                icon={<LightningIcon className="w-4 h-4" />}
+              >
+                New Session
+              </Button>
+              <Button
+                onClick={onDeleteSession}
+                variant="ghost"
+                size="sm"
+                icon={<TrashIcon className="w-4 h-4" />}
+                className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                title="Delete session"
+              />
+            </>
           )}
           <Button
             onClick={onClose}
@@ -186,7 +209,7 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {cacheInfo.count?.toLocaleString()} cards
             {cacheInfo.estimatedTokens && (
-              <span> · ~{cacheInfo.estimatedTokens.toLocaleString()} tokens</span>
+              <span> · ~{cacheInfo.estimatedTokens.toLocaleString()} input tokens</span>
             )}
           </div>
         )}
@@ -247,21 +270,30 @@ export default function Sidebar({ isOpen, onClose, onNewSession }: SidebarProps)
       {/* Chat Input - Only show when no active session */}
       {!currentSessionData && (
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <div className="mb-3 flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="force-sync"
-              checked={forceSync}
-              onChange={(e) => setForceSync(e.target.checked)}
-              disabled={syncing}
-              className="w-4 h-4 text-primary-600 dark:text-primary-500 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:ring-offset-0 cursor-pointer accent-primary-600 dark:accent-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <label
-              htmlFor="force-sync"
-              className={`text-sm text-gray-700 dark:text-gray-300 select-none ${syncing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            >
-              Sync deck before processing
-            </label>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="force-sync"
+                checked={forceSync}
+                onChange={(e) => setForceSync(e.target.checked)}
+                disabled={syncing}
+                className="w-4 h-4 text-primary-600 dark:text-primary-500 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:ring-offset-0 cursor-pointer accent-primary-600 dark:accent-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <label
+                htmlFor="force-sync"
+                className={`text-sm text-gray-700 dark:text-gray-300 select-none ${syncing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                Sync deck before processing
+              </label>
+            </div>
+            {/* Provider indicator */}
+            {llmProvider && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                <LightningIcon className="w-3 h-3" />
+                <span>{llmProvider === 'claude-code' ? 'Claude Code' : llmProvider === 'mock' ? 'Mock (Testing)' : llmProvider}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 items-end">

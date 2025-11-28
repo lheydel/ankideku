@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import useStore from '../store/useStore.js';
-import { ankiApi, llmApi, LLMHealthStatus } from '../services/api.js';
+import { ankiApi, llmApi } from '../services/api.js';
 import { CloseIcon, CheckIcon, LightningIcon } from './ui/Icons.js';
 import { Button } from './ui/Button.js';
 import type { Note } from '../types';
@@ -11,15 +11,24 @@ interface SettingsProps {
 }
 
 export default function Settings({ isOpen, onClose }: SettingsProps) {
-  const { queue, actionsHistory, fieldDisplayConfig, setFieldDisplayConfig } = useStore();
+  const {
+    queue,
+    actionsHistory,
+    fieldDisplayConfig,
+    setFieldDisplayConfig,
+    llmHealth,
+    llmProvider,
+    setLlmHealth,
+    setLlmProvider,
+  } = useStore();
 
   const [localConfig, setLocalConfig] = useState(fieldDisplayConfig);
   const [saving, setSaving] = useState(false);
 
-  // LLM health state
-  const [llmHealth, setLlmHealth] = useState<LLMHealthStatus | null>(null);
+  // Local LLM state
   const [llmChecking, setLlmChecking] = useState(false);
-  const [llmProvider, setLlmProvider] = useState<string>('');
+  const [availableProviders, setAvailableProviders] = useState<string[]>([]);
+  const [providerChanging, setProviderChanging] = useState(false);
 
   // Get all unique model types from queue, history, AND saved config
   const modelTypes = useMemo(() => {
@@ -54,20 +63,26 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
   useEffect(() => {
     if (isOpen) {
       setLocalConfig(fieldDisplayConfig);
-      checkLlmHealth();
+      loadLlmConfig();
     }
   }, [isOpen, fieldDisplayConfig]);
 
-  // Check LLM health
+  const loadLlmConfig = async () => {
+    try {
+      const config = await llmApi.getConfig();
+      setLlmProvider(config.provider);
+      setAvailableProviders(config.availableProviders);
+    } catch (error) {
+      console.error('Failed to load LLM config:', error);
+    }
+  };
+
+  // Check LLM health (called by Test Connection button)
   const checkLlmHealth = async () => {
     setLlmChecking(true);
     try {
-      const [health, config] = await Promise.all([
-        llmApi.checkHealth(),
-        llmApi.getConfig()
-      ]);
+      const health = await llmApi.checkHealth();
       setLlmHealth(health);
-      setLlmProvider(config.provider);
     } catch (error) {
       setLlmHealth({ available: false, error: 'Failed to connect to backend' });
     } finally {
@@ -75,9 +90,48 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
     }
   };
 
+  // Handle provider change
+  const handleProviderChange = async (newProvider: string) => {
+    if (newProvider === llmProvider) return;
+
+    setProviderChanging(true);
+    try {
+      await llmApi.updateConfig(newProvider);
+      setLlmProvider(newProvider);
+      // Reset health state - user needs to test or save will test
+      setLlmHealth(null);
+    } catch (error) {
+      console.error('Failed to change provider:', error);
+      alert('Failed to change provider. Please try again.');
+    } finally {
+      setProviderChanging(false);
+    }
+  };
+
+  // Format provider name for display
+  const formatProviderName = (provider: string): string => {
+    switch (provider) {
+      case 'claude-code': return 'Claude Code';
+      case 'mock': return 'Mock (Testing)';
+      default: return provider;
+    }
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
+
+      // Check health if not already tested by user
+      if (llmHealth === null) {
+        setLlmChecking(true);
+        try {
+          const health = await llmApi.checkHealth();
+          setLlmHealth(health);
+        } finally {
+          setLlmChecking(false);
+        }
+      }
+
       await ankiApi.updateFieldDisplayConfig(localConfig);
       setFieldDisplayConfig(localConfig);
       onClose();
@@ -122,20 +176,38 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
             </h3>
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-gray-100">
-                    {llmProvider || 'Claude Code'}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <select
+                      value={llmProvider}
+                      onChange={(e) => handleProviderChange(e.target.value)}
+                      disabled={providerChanging || llmChecking || availableProviders.length === 0}
+                      className="px-3 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[180px]"
+                    >
+                      {availableProviders.map(provider => (
+                        <option key={provider} value={provider}>
+                          {formatProviderName(provider)}
+                        </option>
+                      ))}
+                    </select>
+                    {providerChanging && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Switching...</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {llmChecking ? (
                       'Checking connection...'
                     ) : llmHealth?.available ? (
                       <span className="text-green-600 dark:text-green-400">
                         {llmHealth.info || 'Connected'}
                       </span>
-                    ) : (
+                    ) : llmHealth !== null ? (
                       <span className="text-red-600 dark:text-red-400">
-                        {llmHealth?.error || 'Not connected'}
+                        {llmHealth.error || 'Connection failed'}
+                      </span>
+                    ) : (
+                      <span className="text-orange-600 dark:text-orange-400">
+                        Not tested - click Test Connection to verify
                       </span>
                     )}
                   </p>
@@ -143,28 +215,30 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
                 <div className="flex items-center gap-3">
                   {/* Status indicator */}
                   <div className={`w-3 h-3 rounded-full ${
-                    llmChecking
+                    llmChecking || providerChanging
                       ? 'bg-yellow-400 animate-pulse'
                       : llmHealth?.available
                         ? 'bg-green-500'
-                        : 'bg-red-500'
+                        : llmHealth !== null
+                          ? 'bg-red-500'
+                          : 'bg-orange-500'
                   }`} />
                   {/* Test button */}
                   <Button
                     onClick={checkLlmHealth}
                     variant="secondary"
                     size="sm"
-                    disabled={llmChecking}
+                    disabled={llmChecking || providerChanging}
                     loading={llmChecking}
                   >
                     Test Connection
                   </Button>
                 </div>
               </div>
-              {llmHealth?.error && !llmHealth.available && (
+              {llmHealth !== null && !llmHealth.available && (
                 <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-md border border-red-200 dark:border-red-800">
                   <p className="text-sm text-red-700 dark:text-red-300">
-                    <strong>Error:</strong> {llmHealth.error}
+                    <strong>Error:</strong> {llmHealth.error || 'Connection failed'}
                   </p>
                   <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                     Make sure Claude Code CLI is installed and accessible in your PATH.

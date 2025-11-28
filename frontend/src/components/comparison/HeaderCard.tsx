@@ -35,7 +35,7 @@ export function HeaderCard({ deckName, modelName, currentIndex, queueLength, cop
             title="Copy to clipboard for external LLM review"
           >
             <ClipboardIcon className="w-4 h-4" />
-            {copySuccess ? 'Copied!' : 'Copy for Review'}
+            {copySuccess ? 'Copied!' : 'Copy Suggestion'}
           </button>
           <div className="flex items-center gap-2 bg-primary-100 dark:bg-primary-900/30 px-3 py-1.5 rounded-full">
             <ClipboardIcon className="w-4 h-4 text-primary-700 dark:text-primary-400" />

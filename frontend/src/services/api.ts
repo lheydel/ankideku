@@ -152,6 +152,12 @@ export const llmApi = {
     return response.data;
   },
 
+  // Update LLM provider
+  updateConfig: async (provider: string): Promise<{ success: boolean; provider: string }> => {
+    const response = await api.put<{ success: boolean; provider: string }>('/llm/config', { provider });
+    return response.data;
+  },
+
   // Get available providers
   getProviders: async (): Promise<{ providers: string[] }> => {
     const response = await api.get<{ providers: string[] }>('/llm/providers');

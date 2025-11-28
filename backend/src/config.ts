@@ -45,6 +45,14 @@ export const CONFIG = {
     timeout: 5 * 60 * 1000, // 5 minutes per batch
     maxRetries: 2,
   },
+
+  /**
+   * Mock LLM provider configuration (for testing)
+   */
+  mock: {
+    responseDelay: 100, // ms delay before responding
+    suggestionRate: 0.5, // Probability of generating suggestion per card (0-1)
+  },
 } as const;
 
 /**

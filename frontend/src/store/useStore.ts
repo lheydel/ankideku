@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { StoreState, DeckInfo, CardSuggestion, ActionHistoryEntry, SessionData, SessionMetadata, ComparisonCard, SessionStateData } from '../types/index.js';
+import type { StoreState, DeckInfo, CardSuggestion, ActionHistoryEntry, SessionData, SessionMetadata, ComparisonCard, SessionStateData, LLMHealthStatus } from '../types/index.js';
 
 const useStore = create<StoreState>((set, get) => ({
   // Connection state
@@ -116,6 +116,12 @@ const useStore = create<StoreState>((set, get) => ({
   updateFieldDisplay: (modelName: string, fieldName: string) => set((state) => ({
     fieldDisplayConfig: { ...state.fieldDisplayConfig, [modelName]: fieldName }
   })),
+
+  // LLM Health
+  llmHealth: null,
+  llmProvider: '',
+  setLlmHealth: (health: LLMHealthStatus | null) => set({ llmHealth: health }),
+  setLlmProvider: (provider: string) => set({ llmProvider: provider }),
 
   // Reset
   reset: () => set({

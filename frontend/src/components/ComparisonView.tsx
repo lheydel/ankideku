@@ -116,7 +116,7 @@ export default function ComparisonView({
   const { original, changes, reasoning } = card;
   const changedFields = Object.keys(changes || {});
   const styles = getSuggestionCardStyles(editor.showOriginalSuggestions, editor.hasManualEdits);
-  const isActionsDisabled = (editor.hasManualEdits && editor.showOriginalSuggestions) || actions.isAnyLoading;
+  const isActionsDisabled = editor.isEditing || (editor.hasManualEdits && editor.showOriginalSuggestions) || actions.isAnyLoading;
 
   return (
     <div className="space-y-6">

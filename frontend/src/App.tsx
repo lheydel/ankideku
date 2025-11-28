@@ -193,6 +193,7 @@ function App() {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           onNewSession={handleClearSession}
+          onDeleteSession={() => currentSession && setSessionToDelete(currentSession)}
         />
       </div>
 

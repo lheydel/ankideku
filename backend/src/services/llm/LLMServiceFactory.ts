@@ -6,6 +6,7 @@
 
 import type { LLMService, LLMConfig, LLMProvider } from './LLMService.js';
 import { ClaudeCodeService } from './ClaudeCodeService.js';
+import { MockLLMService } from './MockLLMService.js';
 import { DEFAULT_LLM_CONFIG } from './LLMService.js';
 
 /**
@@ -24,6 +25,9 @@ export class LLMServiceFactory {
     switch (config.provider) {
       case 'claude-code':
         return new ClaudeCodeService();
+
+      case 'mock':
+        return new MockLLMService();
 
       // case 'claude-api':
       //   // Future: Implement ClaudeAPIService
@@ -75,7 +79,7 @@ export class LLMServiceFactory {
    * Get list of available providers
    */
   static getAvailableProviders(): LLMProvider[] {
-    return ['claude-code']; // Add more as they're implemented
+    return ['claude-code', 'mock'];
   }
 
   /**

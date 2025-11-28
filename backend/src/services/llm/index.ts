@@ -19,8 +19,12 @@ export { DEFAULT_LLM_CONFIG } from './LLMService.js';
 // Factory
 export { LLMServiceFactory } from './LLMServiceFactory.js';
 
+// Base class
+export { BaseLLMService } from './BaseLLMService.js';
+
 // Implementations
 export { ClaudeCodeService } from './ClaudeCodeService.js';
+export { MockLLMService } from './MockLLMService.js';
 
 // Parser
 export { ResponseParser } from './ResponseParser.js';

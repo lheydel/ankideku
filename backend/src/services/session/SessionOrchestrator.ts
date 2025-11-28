@@ -11,6 +11,7 @@ import { SuggestionWriter } from '../storage/SuggestionWriter.js';
 import { SessionEventEmitter } from './SessionEventEmitter.js';
 import { sessionService } from './SessionService.js';
 import { cacheService } from '../anki/CacheService.js';
+import { settingsService } from '../storage/SettingsService.js';
 import { createTokenBasedBatches } from '../../utils/tokenizer.js';
 import { CONFIG } from '../../config.js';
 import pLimit from 'p-limit';
@@ -58,7 +59,8 @@ export class SessionOrchestrator {
     eventEmitter: SessionEventEmitter,
     config: Partial<OrchestratorConfig> = {}
   ) {
-    this.llmService = LLMServiceFactory.getInstance();
+    // LLM service will be initialized in executeSession based on current settings
+    this.llmService = null!;
     this.suggestionWriter = suggestionWriter;
     this.eventEmitter = eventEmitter;
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -91,6 +93,10 @@ export class SessionOrchestrator {
     };
 
     try {
+      // Get LLM service based on current settings
+      const llmConfig = await settingsService.getLLMConfig();
+      this.llmService = LLMServiceFactory.getInstance(llmConfig);
+
       // Check LLM health early - fail fast before loading cards
       const health = await this.llmService.getHealth();
       if (!health.available) {

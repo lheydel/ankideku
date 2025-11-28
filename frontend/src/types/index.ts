@@ -41,6 +41,12 @@ export { SessionState, SocketEvent } from '../../../contract/types';
 
 // Frontend-specific types
 
+export interface LLMHealthStatus {
+  available: boolean;
+  error?: string;
+  info?: string;
+}
+
 export interface SessionMetadata {
   sessionId: string;
   timestamp: string;
@@ -111,6 +117,12 @@ export interface StoreState {
   fieldDisplayConfig: FieldDisplayConfig;
   setFieldDisplayConfig: (config: FieldDisplayConfig) => void;
   updateFieldDisplay: (modelName: string, fieldName: string) => void;
+
+  // LLM Health
+  llmHealth: LLMHealthStatus | null;
+  llmProvider: string;
+  setLlmHealth: (health: LLMHealthStatus | null) => void;
+  setLlmProvider: (provider: string) => void;
 
   // Reset
   reset: () => void;

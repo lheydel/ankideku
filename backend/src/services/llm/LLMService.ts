@@ -71,7 +71,7 @@ export interface LLMService {
 /**
  * Supported LLM providers
  */
-export type LLMProvider = 'claude-code' //| 'claude-api' | 'openai';
+export type LLMProvider = 'claude-code' | 'mock'; //| 'claude-api' | 'openai';
 
 /**
  * LLM configuration stored in settings
