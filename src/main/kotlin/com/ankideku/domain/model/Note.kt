@@ -24,4 +24,6 @@ data class Deck(
     val name: String,
     val id: DeckId,
     val lastSyncTimestamp: Long? = null,
+    val noteCount: Int = 0,
+    val tokenEstimate: Int = 0,
 )

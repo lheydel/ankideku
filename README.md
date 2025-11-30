@@ -2,7 +2,7 @@
 
 **AI-Powered Anki Deck Revision Tool**
 
-AnkiDeku is a modern web application that uses AI to intelligently suggest improvements to your Anki flashcards. Review suggestions in real-time, accept or reject changes, and apply updates directly to your Anki collection - all through an intuitive chat-based interface.
+AnkiDeku is a native desktop application that uses AI to intelligently suggest improvements to your Anki flashcards. Review suggestions in real-time, accept or reject changes, and apply updates directly to your Anki collection.
 
 ---
 
@@ -14,49 +14,29 @@ AnkiDeku is a modern web application that uses AI to intelligently suggest impro
    - Get AnkiConnect: Tools > Add-ons > Get Add-ons > Enter code `2055492159`
    - Restart Anki after installation
 
-2. **Node.js** v20+ (v20.18.0 or higher recommended)
+2. **Java 17+** (JDK required for development, JRE for running)
 
 3. **Claude Code CLI** installed and authenticated
    - Install from: https://claude.ai/download
    - Run `claude` once to authenticate
 
-### Installation
+### Running from Source
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone git@github.com:lheydel/ankideku.git
 cd ankideku
 
-# Install backend dependencies
-cd backend
-npm install
-
-# Install frontend dependencies
-cd ../frontend
-npm install
+# Run the application
+./gradlew run
 ```
 
-### Running the Application
+### Installing from Release
 
-You need **three things running**:
-
-1. **Anki Desktop** - Start Anki (AnkiConnect runs on http://localhost:8765)
-
-2. **Backend** - In one terminal:
-   ```bash
-   cd backend
-   npm run dev
-   # Runs on http://localhost:3001
-   ```
-
-3. **Frontend** - In another terminal:
-   ```bash
-   cd frontend
-   npm run dev
-   # Runs on http://localhost:5173
-   ```
-
-Open http://localhost:5173 in your browser.
+Download the installer for your platform:
+- **Windows**: `AnkiDeku-1.0.0.msi`
+- **macOS**: `AnkiDeku-1.0.0.dmg`
+- **Linux**: `AnkiDeku-1.0.0.deb`
 
 ---
 
@@ -149,36 +129,58 @@ For each suggestion, you can:
 
 ---
 
-## Project Structure
+## Development
+
+### Project Structure
 
 ```
 ankideku/
-├── backend/                  # Express.js + TypeScript
-│   └── src/
-│       ├── index.ts          # Server entry with WebSocket
-│       ├── routes/           # API endpoints
-│       ├── services/
-│       │   ├── anki/         # AnkiConnect, sync, cache
-│       │   ├── session/      # AI session orchestration
-│       │   ├── llm/          # LLM integration
-│       │   └── storage/      # File-based persistence
-│       └── types/
-│
-├── frontend/                 # React + Vite + TypeScript
-│   └── src/
-│       ├── components/       # React components
-│       ├── hooks/            # Custom hooks
-│       ├── services/         # API clients
-│       └── store/            # Zustand state
-│
-├── contract/                 # Shared TypeScript types
-│   └── types.ts
-│
-└── database/                 # Persistent data (gitignored)
-    ├── decks/                # Cached deck data
-    ├── ai-sessions/          # Session files
-    └── settings.json         # User preferences
+├── src/main/kotlin/com/ankideku/
+│   ├── Main.kt                    # Application entry point
+│   ├── di/                        # Koin dependency injection
+│   ├── data/
+│   │   ├── local/                 # SQLite database (SQLDelight)
+│   │   ├── remote/                # AnkiConnect client
+│   │   └── repository/            # Data repositories
+│   ├── domain/
+│   │   ├── model/                 # Domain models
+│   │   ├── repository/            # Repository interfaces
+│   │   └── usecase/               # Business logic
+│   └── ui/
+│       ├── components/            # Reusable UI components
+│       ├── screens/               # Screen composables
+│       └── theme/                 # Material 3 theming
+├── src/main/sqldelight/           # Database schema
+└── build.gradle.kts               # Build configuration
 ```
+
+### Build Commands
+
+```bash
+# Run in development
+./gradlew run
+
+# Build (compile + test)
+./gradlew build
+
+# Package for distribution
+./gradlew packageMsi    # Windows
+./gradlew packageDmg    # macOS
+./gradlew packageDeb    # Linux
+
+# Output location
+# build/compose/binaries/main/{msi,dmg,deb}/
+```
+
+### Tech Stack
+
+- **Kotlin** - Language
+- **Compose Desktop** - UI framework (Material 3)
+- **SQLDelight** - Type-safe SQLite
+- **Koin** - Dependency injection
+- **Ktor Client** - HTTP client for AnkiConnect
+- **Kotlinx Coroutines** - Async programming
+- **Kotlinx Serialization** - JSON parsing
 
 ---
 
@@ -193,8 +195,7 @@ ankideku/
 ### No Suggestions Generated
 - Check Claude Code CLI is installed: `claude --version`
 - Ensure you're authenticated: run `claude` in terminal
-- Check backend logs for errors
-- View session output logs via "View Output" button
+- Check the session log in the sidebar for errors
 
 ### Cards Not Updating in Anki
 - Don't have the card open in Anki's browser while updating
@@ -208,33 +209,9 @@ ankideku/
 
 ---
 
-## API Reference
-
-### Deck Operations
-- `GET /api/decks` - List all decks
-- `GET /api/decks/:name/notes` - Get cached notes
-- `POST /api/decks/:name/sync` - Sync deck from Anki
-- `GET /api/decks/:name/cache-info` - Get cache stats
-
-### Session Operations
-- `POST /api/sessions/new` - Create AI session
-- `GET /api/sessions` - List sessions
-- `GET /api/sessions/:id` - Get session with suggestions
-- `POST /api/sessions/:id/cancel` - Cancel session
-- `DELETE /api/sessions/:id` - Delete session
-
-### WebSocket Events
-- `subscribe:session` / `unsubscribe:session` - Session updates
-- `subscribe:sync` / `unsubscribe:sync` - Sync progress
-- `suggestion:new` - New suggestion available
-- `state:change` - Session state changed
-- `sync:progress` - Deck sync progress
-
----
-
 ## Disclaimer
 
-**Personal Project**: AnkiDeku was built for personal use and developed with AI assistance in a short amount of time. While functional, it may have edge cases not yet discovered.
+**Personal Project**: AnkiDeku was built for personal use. While functional, it may have edge cases not yet discovered.
 
 **Backup your collection**: Always backup your Anki data before using this tool. Test on a small deck first.
 
@@ -243,11 +220,3 @@ ankideku/
 ## License
 
 MIT License
-
----
-
-## Acknowledgments
-
-- **AnkiConnect** by FooSoft - Anki API integration
-- **Claude** by Anthropic - AI-powered analysis
-- **Anki** - Spaced repetition software

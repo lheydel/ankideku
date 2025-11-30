@@ -1,11 +1,14 @@
-package com.ankideku.domain.usecase
+package com.ankideku.domain.usecase.suggestion
 
+import com.ankideku.data.remote.llm.LlmConfig
 import com.ankideku.data.remote.llm.LlmResponse
 import com.ankideku.data.remote.llm.LlmService
+import com.ankideku.data.remote.llm.LlmServiceFactory
 import com.ankideku.data.remote.llm.NoteTypeInfo
 import com.ankideku.domain.model.*
 import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.repository.SessionRepository
+import com.ankideku.domain.repository.SettingsRepository
 import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.util.TokenBatcher
 import com.ankideku.util.onIO
@@ -33,7 +36,7 @@ class SessionOrchestrator(
     private val sessionRepository: SessionRepository,
     private val suggestionRepository: SuggestionRepository,
     private val deckRepository: DeckRepository,
-    private val llmService: LlmService,
+    private val settingsRepository: SettingsRepository,
 ) {
     companion object {
         private const val MAX_CONCURRENT_BATCHES = 8
@@ -72,6 +75,10 @@ class SessionOrchestrator(
      * Prepare session: validate, load data, create batches, persist session.
      */
     private suspend fun prepareSession(deckId: DeckId, prompt: String): SessionContext {
+        // Get LLM service with current settings
+        val provider = onIO { settingsRepository.getSettings().llmProvider }
+        val llmService = LlmServiceFactory.getInstance(LlmConfig(provider))
+
         // Health check - fail fast
         val health = llmService.getHealth()
         if (!health.available) {
@@ -102,7 +109,7 @@ class SessionOrchestrator(
         )
         val sessionId = onIO { sessionRepository.create(session) }
 
-        return SessionContext(sessionId, deck, notes, batches, noteType, prompt)
+        return SessionContext(sessionId, deck, notes, batches, noteType, prompt, llmService)
     }
 
     private fun extractNoteType(note: Note) = NoteTypeInfo(
@@ -147,7 +154,7 @@ class SessionOrchestrator(
         emit(SessionEvent.BatchStarted(context.sessionId, batchIndex + 1, context.batches.size))
 
         try {
-            val response = llmService.analyzeBatch(batchNotes, context.prompt, context.noteType)
+            val response = context.llmService.analyzeBatch(batchNotes, context.prompt, context.noteType)
             val suggestions = saveSuggestions(context.sessionId, batchNotes, response)
 
             state.recordSuccess(batchNotes.size, suggestions.size, response.usage.inputTokens, response.usage.outputTokens)
@@ -214,6 +221,7 @@ private data class SessionContext(
     val batches: List<List<Note>>,
     val noteType: NoteTypeInfo,
     val prompt: String,
+    val llmService: LlmService,
 )
 
 /**

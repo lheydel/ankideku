@@ -1,76 +1,96 @@
 package com.ankideku.data.remote.anki
 
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.stateIn
 
 /**
- * Monitors AnkiConnect connection status with background polling.
+ * Monitors AnkiConnect connection status using Flow-based polling.
  *
- * Per design decision: background polling with warning to user if disconnected
- * and disabled suggestion validation buttons.
+ * Polling automatically starts when connection state is collected and stops
+ * when there are no active collectors (after a 5-second grace period).
  */
 class AnkiConnectionMonitor(
     private val client: AnkiConnectClient,
     private val pollingIntervalMs: Long = 5_000,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+    scope: CoroutineScope,
 ) {
-    private val _isConnected = MutableStateFlow(false)
-    val isConnected: StateFlow<Boolean> = _isConnected
+    /** Trigger for manual refresh via [checkNow] */
+    private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
-    private val _lastError = MutableStateFlow<String?>(null)
-    val lastError: StateFlow<String?> = _lastError
-
-    private var pollingJob: Job? = null
-
-    /**
-     * Start monitoring the connection.
-     */
-    fun start() {
-        if (pollingJob?.isActive == true) return
-
-        pollingJob = scope.launch {
-            // Initial check
-            checkConnection()
-
-            // Continuous polling
-            while (isActive) {
-                delay(pollingIntervalMs)
-                checkConnection()
-            }
+    /** Connection state as a cold flow that polls continuously */
+    private val pollingFlow = flow {
+        while (true) {
+            emit(checkConnection())
+            delay(pollingIntervalMs)
         }
     }
 
-    /**
-     * Stop monitoring the connection.
-     */
-    fun stop() {
-        pollingJob?.cancel()
-        pollingJob = null
+    /** Manual refresh flow */
+    private val manualRefreshFlow = flow {
+        refreshTrigger.collect {
+            emit(checkConnection())
+        }
     }
 
+    /** Combined connection state - auto-starts polling when collected */
+    private val connectionState: StateFlow<ConnectionState> = merge(pollingFlow, manualRefreshFlow)
+        .stateIn(
+            scope = scope,
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+            initialValue = ConnectionState(isConnected = true, lastError = null),
+        )
+
+    /** Whether AnkiConnect is currently reachable */
+    val isConnected: StateFlow<Boolean> = connectionState
+        .mapState(scope) { it.isConnected }
+
+    /** Last error message, if any */
+    val lastError: StateFlow<String?> = connectionState
+        .mapState(scope) { it.lastError }
+
     /**
-     * Manually trigger a connection check.
+     * Manually trigger an immediate connection check.
+     * @return true if connected, false otherwise
      */
     suspend fun checkNow(): Boolean {
-        return checkConnection()
+        val state = checkConnection()
+        refreshTrigger.tryEmit(Unit)
+        return state.isConnected
     }
 
-    private suspend fun checkConnection(): Boolean {
+    private suspend fun checkConnection(): ConnectionState {
         return try {
             val connected = client.ping()
-            _isConnected.value = connected
-            _lastError.value = if (connected) null else "AnkiConnect is not responding"
-            connected
+            ConnectionState(
+                isConnected = connected,
+                lastError = if (connected) null else "AnkiConnect is not responding",
+            )
         } catch (e: AnkiConnectException) {
-            _isConnected.value = false
-            _lastError.value = e.message
-            false
+            ConnectionState(isConnected = false, lastError = e.message)
         } catch (e: Exception) {
-            _isConnected.value = false
-            _lastError.value = "Connection error: ${e.message}"
-            false
+            ConnectionState(isConnected = false, lastError = "Connection error: ${e.message}")
         }
     }
+
+    private data class ConnectionState(
+        val isConnected: Boolean,
+        val lastError: String?,
+    )
 }
+
+/** Helper to map a StateFlow to a derived StateFlow */
+private fun <T, R> StateFlow<T>.mapState(
+    scope: CoroutineScope,
+    transform: (T) -> R,
+): StateFlow<R> = flow { collect { emit(transform(it)) } }
+    .stateIn(
+        scope = scope,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+        initialValue = transform(value),
+    )

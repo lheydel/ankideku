@@ -1,4 +1,4 @@
-package com.ankideku.domain.usecase
+package com.ankideku.domain.usecase.deck
 
 import com.ankideku.data.mapper.toDomain
 import com.ankideku.data.remote.anki.AnkiConnectClient
@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.flow
  * Synchronizes deck notes from Anki to local cache.
  * Queries each sub-deck separately to avoid slow cardsInfo enrichment.
  */
-class SyncDeckUseCase(
+class SyncDeckFeature(
     private val ankiClient: AnkiConnectClient,
     private val deckRepository: DeckRepository,
     private val transactionService: TransactionService,
@@ -65,14 +65,15 @@ class SyncDeckUseCase(
             }
         }
 
+        val totalTokens = allNotes.sumOf { it.estimatedTokens ?: 0 }
+
         emit(SyncProgress.SavingToCache(deckId, allNotes.size))
 
         transactionService.runInTransaction {
-            saveDeckSync(deckId, rootDeckName)
+            saveDeckSync(deckId, rootDeckName, allNotes.size, totalTokens)
             deckRepository.saveNotes(allNotes)
         }
 
-        val totalTokens = allNotes.sumOf { it.estimatedTokens ?: 0 }
         emit(SyncProgress.Completed(deckId, noteCount = allNotes.size, tokenEstimate = totalTokens))
     }
 
@@ -157,12 +158,18 @@ class SyncDeckUseCase(
         }
     }
 
-    private suspend fun saveDeck(deckId: DeckId, deckName: String) {
-        onIO { saveDeckSync(deckId, deckName) }
+    private suspend fun saveDeck(deckId: DeckId, deckName: String, noteCount: Int = 0, tokenEstimate: Int = 0) {
+        onIO { saveDeckSync(deckId, deckName, noteCount, tokenEstimate) }
     }
 
-    private fun saveDeckSync(deckId: DeckId, deckName: String) {
-        val deck = Deck(name = deckName, id = deckId, lastSyncTimestamp = System.currentTimeMillis())
+    private fun saveDeckSync(deckId: DeckId, deckName: String, noteCount: Int = 0, tokenEstimate: Int = 0) {
+        val deck = Deck(
+            name = deckName,
+            id = deckId,
+            lastSyncTimestamp = System.currentTimeMillis(),
+            noteCount = noteCount,
+            tokenEstimate = tokenEstimate,
+        )
         deckRepository.saveDeck(deck)
     }
 }

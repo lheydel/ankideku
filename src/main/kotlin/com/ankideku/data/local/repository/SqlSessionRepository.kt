@@ -4,6 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.ankideku.data.local.database.AnkiDekuDb
 import com.ankideku.data.mapper.toDomain
+import com.ankideku.domain.model.DeckId
 import com.ankideku.domain.model.Session
 import com.ankideku.domain.model.SessionId
 import com.ankideku.domain.model.SessionProgress
@@ -19,6 +20,13 @@ class SqlSessionRepository(
 
     override fun getAll(): Flow<List<Session>> {
         return database.sessionQueries.getAllSessions()
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { entities -> entities.map { it.toDomain() } }
+    }
+
+    override fun getForDeck(deckId: DeckId): Flow<List<Session>> {
+        return database.sessionQueries.getSessionsForDeck(deckId)
             .asFlow()
             .mapToList(Dispatchers.IO)
             .map { entities -> entities.map { it.toDomain() } }

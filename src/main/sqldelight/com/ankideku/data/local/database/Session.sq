@@ -36,6 +36,9 @@ SELECT * FROM session WHERE id = ?;
 getSessionsByState:
 SELECT * FROM session WHERE state = ? ORDER BY created_at DESC;
 
+getSessionsForDeck:
+SELECT * FROM session WHERE deck_id = ? ORDER BY created_at DESC;
+
 insertSession:
 INSERT INTO session (deck_id, deck_name, prompt, state, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?);

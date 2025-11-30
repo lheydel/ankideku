@@ -13,6 +13,8 @@ fun Deck_cache.toDomain(): Deck = Deck(
     name = name,
     id = anki_id,
     lastSyncTimestamp = last_sync_timestamp,
+    noteCount = note_count.toInt(),
+    tokenEstimate = token_estimate.toInt(),
 )
 
 fun Cached_note.toDomain(fieldValues: List<Field_value>): Note = Note(

@@ -39,6 +39,8 @@ class SqlDeckRepository(
             anki_id = deck.id,
             name = deck.name,
             last_sync_timestamp = deck.lastSyncTimestamp,
+            note_count = deck.noteCount.toLong(),
+            token_estimate = deck.tokenEstimate.toLong(),
             created_at = now,
             updated_at = now,
         )

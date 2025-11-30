@@ -47,7 +47,7 @@ dependencies {
     // Testing
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("io.mockk:mockk:1.13.14")
+    testImplementation("io.mockk:mockk:1.14.6")
 }
 
 sqldelight {
@@ -66,7 +66,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "AnkiDeku"
-            packageVersion = "2.0.0"
+            packageVersion = "1.0.0"
             description = "AI-powered Anki deck improvement tool"
             vendor = "AnkiDeku"
 

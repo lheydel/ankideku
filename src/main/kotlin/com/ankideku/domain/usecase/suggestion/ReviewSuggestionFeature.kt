@@ -1,4 +1,4 @@
-package com.ankideku.domain.usecase
+package com.ankideku.domain.usecase.suggestion
 
 import com.ankideku.data.remote.anki.AnkiConnectClient
 import com.ankideku.data.remote.anki.AnkiConnectException
@@ -14,7 +14,7 @@ import com.ankideku.util.onIO
  * Handles reviewing (accepting/rejecting/skipping) AI suggestions.
  * Uses TransactionService for atomic operations.
  */
-class ReviewSuggestionUseCase(
+class ReviewSuggestionFeature(
     private val sessionRepository: SessionRepository,
     private val suggestionRepository: SuggestionRepository,
     private val deckRepository: DeckRepository,

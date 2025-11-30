@@ -1,5 +1,6 @@
 package com.ankideku.domain.repository
 
+import com.ankideku.domain.model.DeckId
 import com.ankideku.domain.model.Session
 import com.ankideku.domain.model.SessionId
 import com.ankideku.domain.model.SessionProgress
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
  */
 interface SessionRepository {
     fun getAll(): Flow<List<Session>>
+    fun getForDeck(deckId: DeckId): Flow<List<Session>>
     fun getById(id: SessionId): Session?
     fun create(session: Session): SessionId
     fun updateState(sessionId: SessionId, state: SessionState)
