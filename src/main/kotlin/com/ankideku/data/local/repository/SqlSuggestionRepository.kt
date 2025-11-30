@@ -1,0 +1,105 @@
+package com.ankideku.data.local.repository
+
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
+import com.ankideku.data.local.database.AnkiDekuDb
+import com.ankideku.data.mapper.FieldContext
+import com.ankideku.data.mapper.FieldOwner
+import com.ankideku.data.mapper.insertFields
+import com.ankideku.data.mapper.insertFieldsFromMap
+import com.ankideku.data.mapper.toDomain
+import com.ankideku.domain.model.SessionId
+import com.ankideku.domain.model.Suggestion
+import com.ankideku.domain.model.SuggestionId
+import com.ankideku.domain.model.SuggestionStatus
+import com.ankideku.domain.repository.SuggestionRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import com.ankideku.data.local.database.Suggestion as DbSuggestion
+
+class SqlSuggestionRepository(
+    private val database: AnkiDekuDb,
+) : SuggestionRepository {
+
+    override fun getForSession(sessionId: SessionId): Flow<List<Suggestion>> {
+        return database.suggestionQueries.getSuggestionsForSession(sessionId)
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { entities -> mapWithFields(entities) }
+    }
+
+    override fun getPendingForSession(sessionId: SessionId): Flow<List<Suggestion>> {
+        return database.suggestionQueries.getPendingSuggestionsForSession(sessionId)
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { entities -> mapWithFields(entities) }
+    }
+
+    override fun getById(suggestionId: SuggestionId): Suggestion? {
+        val entity = database.suggestionQueries.getSuggestionById(suggestionId).executeAsOneOrNull()
+            ?: return null
+        val fields = database.fieldValueQueries.getFieldsForSuggestions(listOf(suggestionId)).executeAsList()
+        return entity.toDomain(fields)
+    }
+
+    override fun save(suggestion: Suggestion) {
+        saveAll(listOf(suggestion))
+    }
+
+    override fun saveAll(suggestions: List<Suggestion>) {
+        if (suggestions.isEmpty()) return
+        for (suggestion in suggestions) {
+            database.transaction {
+                database.suggestionQueries.insertSuggestion(
+                    session_id = suggestion.sessionId,
+                    note_id = suggestion.noteId,
+                    reasoning = suggestion.reasoning,
+                    status = suggestion.status.dbString,
+                    created_at = System.currentTimeMillis(),
+                )
+                val suggestionId = database.suggestionQueries.lastInsertedSuggestionId().executeAsOne()
+                val owner = FieldOwner.Suggestion(suggestionId)
+                database.fieldValueQueries.insertFields(owner, FieldContext.Original, suggestion.originalFields)
+                database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.Changes, suggestion.changes)
+            }
+        }
+    }
+
+    override fun updateStatus(
+        suggestionId: SuggestionId,
+        status: SuggestionStatus,
+    ) {
+        database.suggestionQueries.updateSuggestionStatus(
+            status = status.dbString,
+            decided_at = System.currentTimeMillis(),
+            id = suggestionId,
+        )
+    }
+
+    override fun saveEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>) {
+        replaceEditedChanges(suggestionId, editedChanges)
+        database.suggestionQueries.touchSuggestion(suggestionId)
+    }
+
+    override fun clearEditedChanges(suggestionId: SuggestionId) {
+        database.fieldValueQueries.deleteFieldsForSuggestionByContext(suggestionId, FieldContext.Edited.dbValue)
+        database.suggestionQueries.touchSuggestion(suggestionId)
+    }
+
+    private fun mapWithFields(entities: List<DbSuggestion>): List<Suggestion> {
+        if (entities.isEmpty()) return emptyList()
+
+        val suggestionIds = entities.map { it.id }
+        val allFields = database.fieldValueQueries.getFieldsForSuggestions(suggestionIds).executeAsList()
+        val fieldsBySuggestionId = allFields.groupBy { it.suggestion_id }
+
+        return entities.map { it.toDomain(fieldsBySuggestionId[it.id] ?: emptyList()) }
+    }
+
+    private fun replaceEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>) {
+        val owner = FieldOwner.Suggestion(suggestionId)
+        database.fieldValueQueries.deleteFieldsForSuggestionByContext(suggestionId, FieldContext.Edited.dbValue)
+        database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.Edited, editedChanges)
+    }
+}

@@ -6,6 +6,7 @@ import com.ankideku.data.local.repository.SqlDeckRepository
 import com.ankideku.data.local.repository.SqlHistoryRepository
 import com.ankideku.data.local.repository.SqlSessionRepository
 import com.ankideku.data.local.repository.SqlSettingsRepository
+import com.ankideku.data.local.repository.SqlSuggestionRepository
 import com.ankideku.data.local.service.SqlTransactionService
 import com.ankideku.data.remote.anki.AnkiConnectClient
 import com.ankideku.data.remote.anki.AnkiConnectionMonitor
@@ -16,6 +17,7 @@ import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.repository.HistoryRepository
 import com.ankideku.domain.repository.SessionRepository
 import com.ankideku.domain.repository.SettingsRepository
+import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.domain.service.TransactionService
 import com.ankideku.domain.usecase.ReviewSuggestionUseCase
 import com.ankideku.domain.usecase.SearchHistoryUseCase
@@ -72,6 +74,7 @@ val appModule = module {
     // Repositories
     single<DeckRepository> { SqlDeckRepository(get()) }
     single<SessionRepository> { SqlSessionRepository(get()) }
+    single<SuggestionRepository> { SqlSuggestionRepository(get()) }
     single<HistoryRepository> { SqlHistoryRepository(get()) }
     single<SettingsRepository> { SqlSettingsRepository(get()) }
 
@@ -80,8 +83,8 @@ val appModule = module {
 
     // Use cases
     factory { SyncDeckUseCase(get(), get(), get()) }
-    factory { SessionOrchestrator(get(), get(), get()) }
-    factory { ReviewSuggestionUseCase(get(), get(), get(), get(), get()) }
+    factory { SessionOrchestrator(get(), get(), get(), get()) }
+    factory { ReviewSuggestionUseCase(get(), get(), get(), get(), get(), get()) }
     factory { SearchHistoryUseCase(get()) }
 
     // ViewModels - Added in Phase 4

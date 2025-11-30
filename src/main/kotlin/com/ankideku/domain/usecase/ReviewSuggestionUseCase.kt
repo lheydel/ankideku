@@ -6,10 +6,9 @@ import com.ankideku.domain.model.*
 import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.repository.HistoryRepository
 import com.ankideku.domain.repository.SessionRepository
+import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.domain.service.TransactionService
 import com.ankideku.util.onIO
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * Handles reviewing (accepting/rejecting/skipping) AI suggestions.
@@ -17,6 +16,7 @@ import kotlinx.coroutines.withContext
  */
 class ReviewSuggestionUseCase(
     private val sessionRepository: SessionRepository,
+    private val suggestionRepository: SuggestionRepository,
     private val deckRepository: DeckRepository,
     private val historyRepository: HistoryRepository,
     private val transactionService: TransactionService,
@@ -56,7 +56,7 @@ class ReviewSuggestionUseCase(
      * Save user edits to a suggestion (without accepting).
      */
     suspend fun saveEdits(suggestionId: SuggestionId, editedChanges: Map<String, String>): ReviewResult {
-        onIO { sessionRepository.saveEditedChanges(suggestionId, editedChanges) }
+        onIO { suggestionRepository.saveEditedChanges(suggestionId, editedChanges) }
         return ReviewResult.Success
     }
 
@@ -64,15 +64,15 @@ class ReviewSuggestionUseCase(
      * Clear user edits from a suggestion (revert to AI suggestion).
      */
     suspend fun clearEdits(suggestionId: SuggestionId): ReviewResult {
-        onIO { sessionRepository.clearEditedChanges(suggestionId) }
+        onIO { suggestionRepository.clearEditedChanges(suggestionId) }
         return ReviewResult.Success
     }
 
     private suspend fun doAccept(suggestionId: SuggestionId, checkConflict: Boolean): ReviewResult {
-        val suggestion = onIO { sessionRepository.getSuggestionById(suggestionId) }
+        val suggestion = onIO { suggestionRepository.getById(suggestionId) }
             ?: return ReviewResult.Error("Suggestion not found")
 
-        val session = onIO { sessionRepository.getSession(suggestion.sessionId) }
+        val session = onIO { sessionRepository.getById(suggestion.sessionId) }
             ?: return ReviewResult.Error("Session not found")
 
         // Check for conflicts if requested
@@ -109,7 +109,7 @@ class ReviewSuggestionUseCase(
 
         transactionService.runInTransaction {
             deckRepository.updateNoteFields(suggestion.noteId, changesToApply)
-            sessionRepository.updateSuggestionStatus(suggestionId, SuggestionStatus.Accepted)
+            suggestionRepository.updateStatus(suggestionId, SuggestionStatus.Accepted)
             historyRepository.saveEntry(historyEntry)
         }
 
@@ -121,16 +121,16 @@ class ReviewSuggestionUseCase(
         status: SuggestionStatus,
         action: ReviewAction,
     ): ReviewResult {
-        val suggestion = onIO { sessionRepository.getSuggestionById(suggestionId) }
+        val suggestion = onIO { suggestionRepository.getById(suggestionId) }
             ?: return ReviewResult.Error("Suggestion not found")
 
-        val session = onIO { sessionRepository.getSession(suggestion.sessionId) }
+        val session = onIO { sessionRepository.getById(suggestion.sessionId) }
             ?: return ReviewResult.Error("Session not found")
 
         val historyEntry = createHistoryEntry(suggestion, session, action, appliedChanges = null, userEdits = null)
 
         transactionService.runInTransaction {
-            sessionRepository.updateSuggestionStatus(suggestionId, status)
+            suggestionRepository.updateStatus(suggestionId, status)
             historyRepository.saveEntry(historyEntry)
         }
 
@@ -190,7 +190,7 @@ class ReviewSuggestionUseCase(
 }
 
 /**
- * Result of a review action
+ * Result of a review action.
  */
 sealed class ReviewResult {
     data object Success : ReviewResult()

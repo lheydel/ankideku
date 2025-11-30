@@ -6,6 +6,7 @@ import com.ankideku.data.remote.llm.NoteTypeInfo
 import com.ankideku.domain.model.*
 import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.repository.SessionRepository
+import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.util.TokenBatcher
 import com.ankideku.util.onIO
 import kotlinx.coroutines.CancellationException
@@ -30,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class SessionOrchestrator(
     private val sessionRepository: SessionRepository,
+    private val suggestionRepository: SuggestionRepository,
     private val deckRepository: DeckRepository,
     private val llmService: LlmService,
 ) {
@@ -98,7 +100,7 @@ class SessionOrchestrator(
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis(),
         )
-        val sessionId = onIO { sessionRepository.createSession(session) }
+        val sessionId = onIO { sessionRepository.create(session) }
 
         return SessionContext(sessionId, deck, notes, batches, noteType, prompt)
     }
@@ -183,7 +185,7 @@ class SessionOrchestrator(
         }
 
         if (suggestions.isNotEmpty()) {
-            onIO { sessionRepository.saveSuggestions(suggestions) }
+            onIO { suggestionRepository.saveAll(suggestions) }
         }
 
         return suggestions
