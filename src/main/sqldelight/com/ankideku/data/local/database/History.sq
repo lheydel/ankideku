@@ -1,0 +1,48 @@
+-- History of user decisions on suggestions
+-- Field data (original, ai_changes, applied, user_edits) stored in field_value table
+
+CREATE TABLE history_entry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+    note_id INTEGER NOT NULL,
+    deck_id INTEGER NOT NULL,    -- not a FK, deck may be deleted later
+    deck_name TEXT NOT NULL,     -- snapshot of deck name at time of action
+    action TEXT NOT NULL,        -- accept, reject, skip
+    reasoning TEXT,
+    timestamp INTEGER NOT NULL
+);
+
+CREATE INDEX idx_history_session ON history_entry(session_id);
+CREATE INDEX idx_history_note ON history_entry(note_id);
+CREATE INDEX idx_history_deck ON history_entry(deck_id);
+CREATE INDEX idx_history_timestamp ON history_entry(timestamp DESC);
+
+-- History queries
+
+getHistoryForSession:
+SELECT * FROM history_entry WHERE session_id = ? ORDER BY timestamp DESC;
+
+getHistoryForNote:
+SELECT * FROM history_entry WHERE note_id = ? ORDER BY timestamp DESC;
+
+getHistoryForDeck:
+SELECT * FROM history_entry WHERE deck_id = ? ORDER BY timestamp DESC;
+
+getAllHistory:
+SELECT * FROM history_entry ORDER BY timestamp DESC LIMIT ?;
+
+getHistoryById:
+SELECT * FROM history_entry WHERE id = ?;
+
+insertHistoryEntry:
+INSERT INTO history_entry (session_id, note_id, deck_id, deck_name, action, reasoning, timestamp)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+lastInsertedHistoryId:
+SELECT last_insert_rowid();
+
+deleteHistoryEntry:
+DELETE FROM history_entry WHERE id = ?;
+
+deleteHistoryForSession:
+DELETE FROM history_entry WHERE session_id = ?;

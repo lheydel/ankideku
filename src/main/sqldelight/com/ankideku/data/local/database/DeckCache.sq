@@ -1,0 +1,107 @@
+-- Deck cache and cached notes tables
+
+CREATE TABLE deck_cache (
+    anki_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    last_sync_timestamp INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_deck_cache_name ON deck_cache(name);
+
+CREATE TABLE cached_note (
+    id INTEGER PRIMARY KEY,
+    deck_id INTEGER NOT NULL REFERENCES deck_cache(anki_id) ON DELETE CASCADE,
+    deck_name TEXT NOT NULL,  -- denormalized for hierarchical queries, updated on sync
+    model_name TEXT NOT NULL,
+    tags TEXT NOT NULL,    -- JSON: List<String>
+    mod INTEGER NOT NULL,
+    estimated_tokens INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_cached_note_deck_id ON cached_note(deck_id);
+CREATE INDEX idx_cached_note_deck_name ON cached_note(deck_name);
+CREATE INDEX idx_cached_note_model ON cached_note(model_name);
+CREATE INDEX idx_cached_note_mod ON cached_note(mod);
+
+-- Deck queries
+
+getAllDecks:
+SELECT * FROM deck_cache ORDER BY name;
+
+getDeckByName:
+SELECT * FROM deck_cache WHERE name = ?;
+
+getDeckById:
+SELECT * FROM deck_cache WHERE anki_id = ?;
+
+upsertDeck:
+INSERT INTO deck_cache (anki_id, name, last_sync_timestamp, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(anki_id) DO UPDATE SET
+    name = excluded.name,
+    last_sync_timestamp = excluded.last_sync_timestamp,
+    updated_at = excluded.updated_at;
+
+deleteDeck:
+DELETE FROM deck_cache WHERE anki_id = ?;
+
+deleteDeckByName:
+DELETE FROM deck_cache WHERE name = ?;
+
+-- Note queries
+
+getNotesForDeck:
+SELECT * FROM cached_note WHERE deck_name = ? OR deck_name LIKE ? || '::%';
+
+getNotesForDeckById:
+SELECT * FROM cached_note WHERE deck_id = ?;
+
+getNoteById:
+SELECT * FROM cached_note WHERE id = ?;
+
+getNotesModifiedSince:
+SELECT * FROM cached_note WHERE (deck_name = ? OR deck_name LIKE ? || '::%') AND mod > ?;
+
+countNotesForDeck:
+SELECT COUNT(*) FROM cached_note WHERE deck_id = ?;
+
+countNotesForDeckByName:
+SELECT COUNT(*) FROM cached_note WHERE deck_name = ? OR deck_name LIKE ? || '::%';
+
+sumTokensForDeck:
+SELECT COALESCE(SUM(estimated_tokens), 0) FROM cached_note WHERE deck_id = ?;
+
+sumTokensForDeckByName:
+SELECT COALESCE(SUM(estimated_tokens), 0) FROM cached_note WHERE deck_name = ? OR deck_name LIKE ? || '::%';
+
+upsertNote:
+INSERT INTO cached_note (id, deck_id, deck_name, model_name, tags, mod, estimated_tokens, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    deck_id = excluded.deck_id,
+    deck_name = excluded.deck_name,
+    model_name = excluded.model_name,
+    tags = excluded.tags,
+    mod = excluded.mod,
+    estimated_tokens = excluded.estimated_tokens,
+    updated_at = excluded.updated_at;
+
+updateNoteTokens:
+UPDATE cached_note SET estimated_tokens = ?, updated_at = ? WHERE id = ?;
+
+deleteNotesForDeck:
+DELETE FROM cached_note WHERE deck_name = ? OR deck_name LIKE ? || '::%';
+
+deleteNotesForDeckById:
+DELETE FROM cached_note WHERE deck_id = ?;
+
+deleteNoteById:
+DELETE FROM cached_note WHERE id = ?;
+
+-- Update deck_name for all notes when deck is renamed
+updateNotesDeckName:
+UPDATE cached_note SET deck_name = ?, updated_at = ? WHERE deck_id = ?;

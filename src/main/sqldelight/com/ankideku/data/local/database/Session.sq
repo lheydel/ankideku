@@ -1,0 +1,59 @@
+-- Session table for tracking LLM processing sessions
+
+CREATE TABLE session (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deck_id INTEGER NOT NULL,    -- not a FK, deck may be deleted later
+    deck_name TEXT NOT NULL,     -- snapshot of deck name at session creation
+    prompt TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'pending',  -- pending, running, completed, incomplete, failed, cancelled
+    state_message TEXT,
+    exit_code INTEGER,
+    progress_processed_batches INTEGER NOT NULL DEFAULT 0,
+    progress_total_batches INTEGER NOT NULL DEFAULT 0,
+    progress_suggestions_count INTEGER NOT NULL DEFAULT 0,
+    progress_input_tokens INTEGER NOT NULL DEFAULT 0,
+    progress_output_tokens INTEGER NOT NULL DEFAULT 0,
+    progress_failed_batches INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_session_state ON session(state);
+CREATE INDEX idx_session_deck_id ON session(deck_id);
+CREATE INDEX idx_session_deck_name ON session(deck_name);
+CREATE INDEX idx_session_created ON session(created_at DESC);
+
+-- Session queries
+
+getAllSessions:
+SELECT * FROM session ORDER BY created_at DESC;
+
+getSessionById:
+SELECT * FROM session WHERE id = ?;
+
+getSessionsByState:
+SELECT * FROM session WHERE state = ? ORDER BY created_at DESC;
+
+insertSession:
+INSERT INTO session (deck_id, deck_name, prompt, state, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+lastInsertedSessionId:
+SELECT last_insert_rowid();
+
+updateSessionState:
+UPDATE session SET state = ?, state_message = ?, exit_code = ?, updated_at = ? WHERE id = ?;
+
+updateSessionProgress:
+UPDATE session SET
+    progress_processed_batches = ?,
+    progress_total_batches = ?,
+    progress_suggestions_count = ?,
+    progress_input_tokens = ?,
+    progress_output_tokens = ?,
+    progress_failed_batches = ?,
+    updated_at = ?
+WHERE id = ?;
+
+deleteSession:
+DELETE FROM session WHERE id = ?;

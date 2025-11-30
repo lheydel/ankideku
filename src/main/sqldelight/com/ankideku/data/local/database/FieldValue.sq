@@ -1,0 +1,84 @@
+-- Normalized field storage for notes, suggestions, and history
+
+CREATE TABLE field_value (
+    id INTEGER PRIMARY KEY,
+    -- Exactly one of these FKs is set per row
+    note_id INTEGER REFERENCES cached_note(id) ON DELETE CASCADE,
+    suggestion_id INTEGER REFERENCES suggestion(id) ON DELETE CASCADE,
+    history_id INTEGER REFERENCES history_entry(id) ON DELETE CASCADE,
+    -- Context: what this field represents
+    context TEXT NOT NULL,
+    field_name TEXT NOT NULL,
+    field_value TEXT NOT NULL,
+    field_order INTEGER NOT NULL
+);
+
+-- Uniqueness per entity+context+field
+CREATE UNIQUE INDEX idx_field_note ON field_value(note_id, context, field_name) WHERE note_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_field_suggestion ON field_value(suggestion_id, context, field_name) WHERE suggestion_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_field_history ON field_value(history_id, context, field_name) WHERE history_id IS NOT NULL;
+
+-- For querying by field content
+CREATE INDEX idx_field_query ON field_value(field_name, field_value);
+CREATE INDEX idx_field_context ON field_value(context, field_name);
+
+-- Generic insert (exactly one of note_id, suggestion_id, history_id should be non-null)
+insertField:
+INSERT INTO field_value (note_id, suggestion_id, history_id, context, field_name, field_value, field_order)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- Note queries
+getFieldsForNote:
+SELECT * FROM field_value WHERE note_id = ? AND context = ? ORDER BY field_order;
+
+updateNoteField:
+UPDATE field_value SET field_value = ? WHERE note_id = ? AND context = ? AND field_name = ?;
+
+deleteFieldsForNote:
+DELETE FROM field_value WHERE note_id = ?;
+
+-- Suggestion queries
+getFieldsForSuggestion:
+SELECT * FROM field_value WHERE suggestion_id = ? ORDER BY context, field_order;
+
+getFieldsForSuggestionByContext:
+SELECT * FROM field_value WHERE suggestion_id = ? AND context = ? ORDER BY field_order;
+
+deleteFieldsForSuggestion:
+DELETE FROM field_value WHERE suggestion_id = ?;
+
+deleteFieldsForSuggestionByContext:
+DELETE FROM field_value WHERE suggestion_id = ? AND context = ?;
+
+-- History queries
+getFieldsForHistory:
+SELECT * FROM field_value WHERE history_id = ? ORDER BY context, field_order;
+
+getFieldsForHistoryByContext:
+SELECT * FROM field_value WHERE history_id = ? AND context = ? ORDER BY field_order;
+
+deleteFieldsForHistory:
+DELETE FROM field_value WHERE history_id = ?;
+
+-- Batch loading queries (avoid N+1)
+getFieldsForNotes:
+SELECT * FROM field_value WHERE note_id IN ? AND context = ? ORDER BY note_id, field_order;
+
+getFieldsForSuggestions:
+SELECT * FROM field_value WHERE suggestion_id IN ? ORDER BY suggestion_id, context, field_order;
+
+getFieldsForHistoryEntries:
+SELECT * FROM field_value WHERE history_id IN ? ORDER BY history_id, context, field_order;
+
+-- Cross-field query helpers
+findNotesByFieldValue:
+SELECT DISTINCT note_id FROM field_value
+WHERE note_id IS NOT NULL AND context = ? AND field_name = ? AND field_value = ?;
+
+findNotesByFieldContains:
+SELECT DISTINCT note_id FROM field_value
+WHERE note_id IS NOT NULL AND context = ? AND field_name = ? AND field_value LIKE ?;
+
+findNotesWithEmptyField:
+SELECT DISTINCT note_id FROM field_value
+WHERE note_id IS NOT NULL AND context = ? AND field_name = ? AND field_value = '';
