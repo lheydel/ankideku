@@ -1,16 +1,21 @@
 package com.ankideku.domain.repository
 
 import com.ankideku.domain.model.Deck
+import com.ankideku.domain.model.DeckId
 import com.ankideku.domain.model.Note
 import com.ankideku.domain.model.NoteId
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Repository for deck and note data.
+ * Methods are blocking - caller is responsible for dispatcher management via TransactionService.
+ */
 interface DeckRepository {
     fun getAllDecks(): Flow<List<Deck>>
-    suspend fun getDeck(name: String): Deck?
-    suspend fun saveDeck(deck: Deck)
-    suspend fun deleteDeck(deckName: String)
-    suspend fun getNotesForDeck(deckName: String): List<Note>
-    suspend fun saveNotes(notes: List<Note>)
-    suspend fun updateNoteFields(noteId: NoteId, fields: Map<String, String>)
+    fun getDeck(id: DeckId): Deck?
+    fun saveDeck(deck: Deck)
+    fun deleteDeck(deckId: DeckId)
+    fun getNotesForDeck(deckId: DeckId): List<Note>
+    fun saveNotes(notes: List<Note>)
+    fun updateNoteFields(noteId: NoteId, fields: Map<String, String>)
 }

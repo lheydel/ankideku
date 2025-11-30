@@ -1,16 +1,14 @@
 package com.ankideku.util
 
 import com.knuddels.jtokkit.Encodings
-import com.knuddels.jtokkit.api.EncodingRegistry
 import com.knuddels.jtokkit.api.EncodingType
 
 /**
  * Token estimator using JTokkit (tiktoken port for JVM)
  * Uses cl100k_base encoding (GPT-4, Claude compatible)
  */
-class TokenEstimator {
-    private val registry: EncodingRegistry = Encodings.newDefaultEncodingRegistry()
-    private val encoding = registry.getEncoding(EncodingType.CL100K_BASE)
+object TokenEstimator {
+    private val encoding = Encodings.newDefaultEncodingRegistry().getEncoding(EncodingType.CL100K_BASE)
 
     /**
      * Estimate token count for a string

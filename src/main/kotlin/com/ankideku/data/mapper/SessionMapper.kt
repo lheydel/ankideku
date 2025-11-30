@@ -16,6 +16,8 @@ fun DbSession.toDomain(): Session = Session(
         exit_code?.toInt()
     ),
     progress = SessionProgress(
+        processedCards = progress_processed_cards.toInt(),
+        totalCards = progress_total_cards.toInt(),
         processedBatches = progress_processed_batches.toInt(),
         totalBatches = progress_total_batches.toInt(),
         suggestionsCount = progress_suggestions_count.toInt(),

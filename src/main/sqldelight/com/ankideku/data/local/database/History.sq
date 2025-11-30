@@ -46,3 +46,10 @@ DELETE FROM history_entry WHERE id = ?;
 
 deleteHistoryForSession:
 DELETE FROM history_entry WHERE session_id = ?;
+
+searchHistory:
+SELECT * FROM history_entry
+WHERE reasoning LIKE '%' || :query || '%'
+   OR deck_name LIKE '%' || :query || '%'
+ORDER BY timestamp DESC
+LIMIT :limit;

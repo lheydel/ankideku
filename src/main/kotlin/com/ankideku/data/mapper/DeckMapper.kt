@@ -26,7 +26,7 @@ fun Cached_note.toDomain(fieldValues: List<Field_value>): Note = Note(
     estimatedTokens = estimated_tokens?.toInt(),
 )
 
-fun AnkiNoteInfo.toDomain(deckId: Long, deckName: String): Note = Note(
+fun AnkiNoteInfo.toDomain(deckId: Long, deckName: String, estimatedTokens: Int? = null): Note = Note(
     id = noteId,
     deckId = deckId,
     deckName = deckName,
@@ -40,4 +40,5 @@ fun AnkiNoteInfo.toDomain(deckId: Long, deckName: String): Note = Note(
     },
     tags = tags,
     mod = mod,
+    estimatedTokens = estimatedTokens,
 )

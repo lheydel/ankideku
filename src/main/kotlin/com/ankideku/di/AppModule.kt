@@ -6,6 +6,7 @@ import com.ankideku.data.local.repository.SqlDeckRepository
 import com.ankideku.data.local.repository.SqlHistoryRepository
 import com.ankideku.data.local.repository.SqlSessionRepository
 import com.ankideku.data.local.repository.SqlSettingsRepository
+import com.ankideku.data.local.service.SqlTransactionService
 import com.ankideku.data.remote.anki.AnkiConnectClient
 import com.ankideku.data.remote.anki.AnkiConnectionMonitor
 import com.ankideku.data.remote.llm.LlmConfig
@@ -15,10 +16,18 @@ import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.repository.HistoryRepository
 import com.ankideku.domain.repository.SessionRepository
 import com.ankideku.domain.repository.SettingsRepository
+import com.ankideku.domain.service.TransactionService
+import com.ankideku.domain.usecase.ReviewSuggestionUseCase
+import com.ankideku.domain.usecase.SearchHistoryUseCase
+import com.ankideku.domain.usecase.SessionOrchestrator
+import com.ankideku.domain.usecase.SyncDeckUseCase
 import com.ankideku.util.json
+import com.ankideku.util.onIO
 import io.ktor.client.*
-import kotlinx.coroutines.runBlocking
 import io.ktor.client.engine.cio.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import org.koin.dsl.module
@@ -56,7 +65,7 @@ val appModule = module {
     // Use 'factory' so it reads current settings each time
     factory<LlmService> {
         val settingsRepo = get<SettingsRepository>()
-        val provider = runBlocking { settingsRepo.getSettings().llmProvider }
+        val provider = runBlocking { onIO { settingsRepo.getSettings().llmProvider } }
         LlmServiceFactory.getInstance(LlmConfig(provider))
     }
 
@@ -66,7 +75,14 @@ val appModule = module {
     single<HistoryRepository> { SqlHistoryRepository(get()) }
     single<SettingsRepository> { SqlSettingsRepository(get()) }
 
-    // Use cases - Added in Phase 3
+    // Services
+    single<TransactionService> { SqlTransactionService(get()) }
+
+    // Use cases
+    factory { SyncDeckUseCase(get(), get(), get()) }
+    factory { SessionOrchestrator(get(), get(), get()) }
+    factory { ReviewSuggestionUseCase(get(), get(), get(), get(), get()) }
+    factory { SearchHistoryUseCase(get()) }
 
     // ViewModels - Added in Phase 4
 }

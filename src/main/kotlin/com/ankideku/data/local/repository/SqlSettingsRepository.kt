@@ -1,15 +1,12 @@
 package com.ankideku.data.local.repository
 
 import com.ankideku.data.local.database.AnkiDekuDb
-import com.ankideku.data.local.database.withTransaction
 import com.ankideku.data.remote.llm.LlmProvider
 import com.ankideku.domain.model.AppTheme
 import com.ankideku.domain.model.Settings
 import com.ankideku.domain.repository.SettingsRepository
 import com.ankideku.util.parseJson
 import com.ankideku.util.toJson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class SqlSettingsRepository(
     private val database: AnkiDekuDb,
@@ -21,7 +18,7 @@ class SqlSettingsRepository(
         private const val KEY_LLM_PROVIDER = "llm_provider"
     }
 
-    override suspend fun getSettings(): Settings = withContext(Dispatchers.IO) {
+    override fun getSettings(): Settings {
         val fieldDisplayConfig = getSetting(KEY_FIELD_DISPLAY_CONFIG)
             ?.parseJson<Map<String, String>>()
             ?: emptyMap()
@@ -38,22 +35,22 @@ class SqlSettingsRepository(
             ?.parseJson<LlmProvider>()
             ?: LlmProvider.MOCK
 
-        Settings(
+        return Settings(
             fieldDisplayConfig = fieldDisplayConfig,
             theme = theme,
             llmProvider = llmProvider,
         )
     }
 
-    override suspend fun updateFieldDisplayConfig(config: Map<String, String>) = database.withTransaction {
+    override fun updateFieldDisplayConfig(config: Map<String, String>) {
         setSetting(KEY_FIELD_DISPLAY_CONFIG, config.toJson())
     }
 
-    override suspend fun updateTheme(theme: AppTheme) = database.withTransaction {
+    override fun updateTheme(theme: AppTheme) {
         setSetting(KEY_THEME, theme.name)
     }
 
-    override suspend fun updateLlmProvider(provider: LlmProvider) = database.withTransaction {
+    override fun updateLlmProvider(provider: LlmProvider) {
         setSetting(KEY_LLM_PROVIDER, provider.toJson())
     }
 

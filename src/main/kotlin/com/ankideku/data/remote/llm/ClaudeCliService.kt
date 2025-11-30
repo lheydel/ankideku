@@ -1,8 +1,7 @@
 package com.ankideku.data.remote.llm
 
-import kotlinx.coroutines.Dispatchers
+import com.ankideku.util.onIO
 import kotlinx.coroutines.async
-import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
@@ -17,11 +16,11 @@ class ClaudeCliService(
 
     private val activeProcesses = ConcurrentHashMap<String, Process>()
 
-    override suspend fun getHealth(): LlmHealthStatus = withContext(Dispatchers.IO) {
+    override suspend fun getHealth(): LlmHealthStatus = onIO {
         try {
             val isInstalled = isClaudeInstalled()
             if (!isInstalled) {
-                return@withContext LlmHealthStatus(
+                return@onIO LlmHealthStatus(
                     available = false,
                     error = "Claude Code CLI is not installed or not in PATH"
                 )
@@ -40,7 +39,7 @@ class ClaudeCliService(
         }
     }
 
-    override suspend fun callLlm(prompt: String): String = withContext(Dispatchers.IO) {
+    override suspend fun callLlm(prompt: String): String = onIO {
         val processId = "${System.currentTimeMillis()}-${(Math.random() * 1000000).toInt()}"
 
         try {

@@ -8,6 +8,8 @@ CREATE TABLE session (
     state TEXT NOT NULL DEFAULT 'pending',  -- pending, running, completed, incomplete, failed, cancelled
     state_message TEXT,
     exit_code INTEGER,
+    progress_processed_cards INTEGER NOT NULL DEFAULT 0,
+    progress_total_cards INTEGER NOT NULL DEFAULT 0,
     progress_processed_batches INTEGER NOT NULL DEFAULT 0,
     progress_total_batches INTEGER NOT NULL DEFAULT 0,
     progress_suggestions_count INTEGER NOT NULL DEFAULT 0,
@@ -46,6 +48,8 @@ UPDATE session SET state = ?, state_message = ?, exit_code = ?, updated_at = ? W
 
 updateSessionProgress:
 UPDATE session SET
+    progress_processed_cards = ?,
+    progress_total_cards = ?,
     progress_processed_batches = ?,
     progress_total_batches = ?,
     progress_suggestions_count = ?,

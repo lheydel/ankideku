@@ -2,6 +2,7 @@ package com.ankideku.data.remote.llm
 
 import com.ankideku.domain.model.Note
 import com.ankideku.util.TokenEstimator
+import com.ankideku.util.onIO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
@@ -12,9 +13,6 @@ import kotlin.coroutines.cancellation.CancellationException
  * Subclasses only need to implement callLlm() and getHealth().
  */
 abstract class BaseLlmService(
-    private val promptBuilder: PromptBuilder = PromptBuilder(),
-    private val responseParser: ResponseParser = ResponseParser(),
-    private val tokenEstimator: TokenEstimator = TokenEstimator(),
     protected val maxRetries: Int = 2,
 ) : LlmService {
 
@@ -26,10 +24,10 @@ abstract class BaseLlmService(
         notes: List<Note>,
         userPrompt: String,
         noteType: NoteTypeInfo,
-    ): LlmResponse = withContext(Dispatchers.IO) {
+    ): LlmResponse = onIO {
         // Build prompt
-        val fullPrompt = promptBuilder.buildPrompt(notes, userPrompt, noteType)
-        val inputTokens = tokenEstimator.estimate(fullPrompt)
+        val fullPrompt = PromptBuilder.buildPrompt(notes, userPrompt, noteType)
+        val inputTokens = TokenEstimator.estimate(fullPrompt)
         val validNoteIds = notes.map { it.id }.toSet()
 
         // Try with retries
@@ -37,10 +35,10 @@ abstract class BaseLlmService(
         repeat(maxRetries + 1) { attempt ->
             try {
                 val rawResponse = callLlm(fullPrompt)
-                val suggestions = responseParser.parse(rawResponse, validNoteIds)
-                val outputTokens = tokenEstimator.estimate(rawResponse)
+                val suggestions = ResponseParser.parse(rawResponse, validNoteIds)
+                val outputTokens = TokenEstimator.estimate(rawResponse)
 
-                return@withContext LlmResponse(
+                return@onIO LlmResponse(
                     suggestions = suggestions,
                     usage = TokenUsage(
                         inputTokens = inputTokens,

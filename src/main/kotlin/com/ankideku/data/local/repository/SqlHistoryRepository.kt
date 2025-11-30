@@ -2,21 +2,18 @@ package com.ankideku.data.local.repository
 
 import com.ankideku.data.local.database.AnkiDekuDb
 import com.ankideku.data.local.database.History_entry
-import com.ankideku.data.local.database.withTransaction
 import com.ankideku.data.mapper.*
 import com.ankideku.domain.model.DeckId
 import com.ankideku.domain.model.HistoryEntry
 import com.ankideku.domain.model.NoteId
 import com.ankideku.domain.model.SessionId
 import com.ankideku.domain.repository.HistoryRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class SqlHistoryRepository(
     private val database: AnkiDekuDb,
 ) : HistoryRepository {
 
-    override suspend fun saveEntry(entry: HistoryEntry) = database.withTransaction {
+    override fun saveEntry(entry: HistoryEntry) {
         database.historyQueries.insertHistoryEntry(
             session_id = entry.sessionId,
             note_id = entry.noteId,
@@ -39,24 +36,24 @@ class SqlHistoryRepository(
         }
     }
 
-    override suspend fun getForSession(sessionId: SessionId): List<HistoryEntry> = withContext(Dispatchers.IO) {
+    override fun getForSession(sessionId: SessionId): List<HistoryEntry> {
         val entities = database.historyQueries.getHistoryForSession(sessionId).executeAsList()
-        mapWithFields(entities)
+        return mapWithFields(entities)
     }
 
-    override suspend fun getForNote(noteId: NoteId): List<HistoryEntry> = withContext(Dispatchers.IO) {
+    override fun getForNote(noteId: NoteId): List<HistoryEntry> {
         val entities = database.historyQueries.getHistoryForNote(noteId).executeAsList()
-        mapWithFields(entities)
+        return mapWithFields(entities)
     }
 
-    override suspend fun getForDeck(deckId: DeckId): List<HistoryEntry> = withContext(Dispatchers.IO) {
+    override fun getForDeck(deckId: DeckId): List<HistoryEntry> {
         val entities = database.historyQueries.getHistoryForDeck(deckId).executeAsList()
-        mapWithFields(entities)
+        return mapWithFields(entities)
     }
 
-    override suspend fun getAll(limit: Int): List<HistoryEntry> = withContext(Dispatchers.IO) {
+    override fun getAll(limit: Int): List<HistoryEntry> {
         val entities = database.historyQueries.getAllHistory(limit.toLong()).executeAsList()
-        mapWithFields(entities)
+        return mapWithFields(entities)
     }
 
     private fun mapWithFields(entities: List<History_entry>): List<HistoryEntry> {
@@ -69,9 +66,15 @@ class SqlHistoryRepository(
         return entities.map { it.toDomain(fieldsByHistoryId[it.id] ?: emptyList()) }
     }
 
-    override suspend fun getById(id: Long): HistoryEntry? = withContext(Dispatchers.IO) {
-        val entity = database.historyQueries.getHistoryById(id).executeAsOneOrNull() ?: return@withContext null
+    override fun getById(id: Long): HistoryEntry? {
+        val entity = database.historyQueries.getHistoryById(id).executeAsOneOrNull() ?: return null
         val fieldValues = database.fieldValueQueries.getFieldsForHistory(entity.id).executeAsList()
-        entity.toDomain(fieldValues)
+        return entity.toDomain(fieldValues)
+    }
+
+    override fun search(query: String, limit: Int): List<HistoryEntry> {
+        if (query.isBlank()) return emptyList()
+        val entities = database.historyQueries.searchHistory(query, limit.toLong()).executeAsList()
+        return mapWithFields(entities)
     }
 }

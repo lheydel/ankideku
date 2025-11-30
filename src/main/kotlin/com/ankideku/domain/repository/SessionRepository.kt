@@ -9,22 +9,27 @@ import com.ankideku.domain.model.SuggestionId
 import com.ankideku.domain.model.SuggestionStatus
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Repository for sessions and suggestions.
+ * Methods are blocking - caller is responsible for dispatcher management via TransactionService.
+ */
 interface SessionRepository {
     fun getAllSessions(): Flow<List<Session>>
-    suspend fun getSession(id: SessionId): Session?
-    suspend fun createSession(session: Session): SessionId  // Returns auto-generated ID
-    suspend fun updateState(sessionId: SessionId, state: SessionState)
-    suspend fun updateProgress(sessionId: SessionId, progress: SessionProgress)
-    suspend fun deleteSession(sessionId: SessionId)
+    fun getSession(id: SessionId): Session?
+    fun createSession(session: Session): SessionId
+    fun updateState(sessionId: SessionId, state: SessionState)
+    fun updateProgress(sessionId: SessionId, progress: SessionProgress)
+    fun deleteSession(sessionId: SessionId)
     fun getSuggestions(sessionId: SessionId): Flow<List<Suggestion>>
     fun getPendingSuggestions(sessionId: SessionId): Flow<List<Suggestion>>
-    suspend fun saveSuggestion(suggestion: Suggestion)
-    suspend fun saveSuggestions(suggestions: List<Suggestion>)
-    suspend fun updateSuggestionStatus(
+    fun getSuggestionById(suggestionId: SuggestionId): Suggestion?
+    fun saveSuggestion(suggestion: Suggestion)
+    fun saveSuggestions(suggestions: List<Suggestion>)
+    fun updateSuggestionStatus(
         suggestionId: SuggestionId,
         status: SuggestionStatus,
         editedChanges: Map<String, String>? = null,
     )
-    suspend fun saveEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>)
-    suspend fun clearEditedChanges(suggestionId: SuggestionId)
+    fun saveEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>)
+    fun clearEditedChanges(suggestionId: SuggestionId)
 }

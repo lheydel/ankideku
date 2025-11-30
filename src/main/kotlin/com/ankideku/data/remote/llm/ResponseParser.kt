@@ -11,7 +11,7 @@ import kotlinx.serialization.json.*
  * Parses raw LLM response into validated suggestions.
  * Handles cases where LLM includes extra text around JSON.
  */
-class ResponseParser {
+object ResponseParser {
 
     /**
      * Parse raw LLM response into validated suggestions

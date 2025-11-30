@@ -37,6 +37,8 @@ sealed class SessionState(val dbString: String) {
 }
 
 data class SessionProgress(
+    val processedCards: Int = 0,
+    val totalCards: Int = 0,
     val processedBatches: Int = 0,
     val totalBatches: Int = 0,
     val suggestionsCount: Int = 0,
@@ -44,5 +46,5 @@ data class SessionProgress(
     val outputTokens: Int = 0,
     val failedBatches: Int = 0,
 ) {
-    val percentage: Float get() = if (totalBatches > 0) processedBatches.toFloat() / totalBatches else 0f
+    val percentage: Float get() = if (totalCards > 0) processedCards.toFloat() / totalCards else 0f
 }

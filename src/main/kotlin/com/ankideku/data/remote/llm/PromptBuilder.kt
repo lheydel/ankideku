@@ -10,7 +10,7 @@ import com.ankideku.domain.model.Note
  * Builds prompts for LLM batch analysis.
  * Formats card data efficiently to save tokens.
  */
-class PromptBuilder {
+object PromptBuilder {
 
     /**
      * Build the complete prompt for a batch of notes
@@ -25,7 +25,10 @@ class PromptBuilder {
         return "$systemPrompt\n\n---\n\n$batchPrompt"
     }
 
-    private fun buildSystemPrompt(): String = """
+    /**
+     * Build the system prompt (fixed overhead)
+     */
+    fun buildSystemPrompt(): String = """
 You are an expert at analyzing Anki flashcard notes and suggesting improvements.
 
 Your task: Analyze notes and suggest field modifications based on user instructions.
@@ -51,6 +54,22 @@ Rules:
 - CRITICAL: Your response will be parsed programmatically. Invalid JSON will cause errors. Ensure proper formatting.
 - Field names in "$CHANGES" must exactly match the available fields listed
 - $NOTE_ID must match one of the provided note IDs
+""".trimIndent()
+
+    /**
+     * Build the batch prompt header (without notes).
+     * Used for token estimation of fixed overhead per batch.
+     */
+    fun buildBatchHeader(userPrompt: String, noteType: NoteTypeInfo): String = """
+Note type: "${noteType.name}"
+Available fields: [${noteType.fields.joinToString(", ") { "\"$it\"" }}]
+
+User request: "$userPrompt"
+
+Notes to analyze:
+
+Analyze these notes and suggest improvements following the user's request.
+Return ONLY the JSON output, no other text.
 """.trimIndent()
 
     private fun buildBatchPrompt(
@@ -80,7 +99,7 @@ Return ONLY the JSON output, no other text.
      * Format a single note for the prompt.
      * Omits empty fields to save tokens.
      */
-    private fun formatNote(note: Note, index: Int): String = buildString {
+    fun formatNote(note: Note, index: Int): String = buildString {
         appendLine("Note ${index + 1} (ID: ${note.id}):")
 
         // Add non-empty fields only
