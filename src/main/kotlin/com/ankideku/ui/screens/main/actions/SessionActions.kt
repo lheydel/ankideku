@@ -167,6 +167,7 @@ class SessionActionsImpl(
         // System message with session info (matching V1 format)
         val sessionInfo = buildString {
             append("Session ${session.id}")
+            append(" - ${formatDate(session.createdAt)}")
             append("\nDeck: ${session.deckName}")
             append("\n${formatNumber(session.progress.totalCards)} cards")
             append("\nTokens estimate: ${formatNumber(session.progress.inputTokens)} in / ${formatNumber(session.progress.outputTokens)} out")
@@ -205,6 +206,13 @@ class SessionActionsImpl(
     }
 
     private fun formatNumber(n: Int): String = "%,d".format(n)
+
+    private fun formatDate(timestamp: Long): String {
+        val instant = java.time.Instant.ofEpochMilli(timestamp)
+        val localDate = instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        val formatter = java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+        return localDate.format(formatter)
+    }
 
     override fun deleteSession(sessionId: Long) {
         ctx.scope.launch {

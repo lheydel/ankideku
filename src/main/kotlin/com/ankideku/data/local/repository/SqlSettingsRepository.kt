@@ -13,16 +13,11 @@ class SqlSettingsRepository(
 ) : SettingsRepository {
 
     companion object {
-        private const val KEY_FIELD_DISPLAY_CONFIG = "field_display_config"
         private const val KEY_THEME = "theme"
         private const val KEY_LLM_PROVIDER = "llm_provider"
     }
 
     override fun getSettings(): Settings {
-        val fieldDisplayConfig = getSetting(KEY_FIELD_DISPLAY_CONFIG)
-            ?.parseJson<Map<String, String>>()
-            ?: emptyMap()
-
         val theme = getSetting(KEY_THEME)?.let {
             try {
                 AppTheme.valueOf(it)
@@ -36,14 +31,9 @@ class SqlSettingsRepository(
             ?: LlmProvider.MOCK
 
         return Settings(
-            fieldDisplayConfig = fieldDisplayConfig,
             theme = theme,
             llmProvider = llmProvider,
         )
-    }
-
-    override fun updateFieldDisplayConfig(config: Map<String, String>) {
-        setSetting(KEY_FIELD_DISPLAY_CONFIG, config.toJson())
     }
 
     override fun updateTheme(theme: AppTheme) {

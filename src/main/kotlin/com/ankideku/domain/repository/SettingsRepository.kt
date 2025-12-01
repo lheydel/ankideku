@@ -10,7 +10,6 @@ import com.ankideku.domain.model.Settings
  */
 interface SettingsRepository {
     fun getSettings(): Settings
-    fun updateFieldDisplayConfig(config: Map<String, String>)
     fun updateTheme(theme: AppTheme)
     fun updateLlmProvider(provider: LlmProvider)
 }

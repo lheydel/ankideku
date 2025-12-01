@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.NoteField
+import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.domain.model.ReviewAction
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
@@ -62,6 +63,7 @@ fun ChangesCard(
     changes: Map<String, String>,
     editedFields: Map<String, String> = emptyMap(),
     userEdits: Map<String, String>? = null,
+    noteTypeConfig: NoteTypeConfig? = null,
     mode: ChangesCardMode,
     onEditField: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
@@ -148,6 +150,7 @@ fun ChangesCard(
                                     fieldName = fieldName,
                                     value = displayValue,
                                     isChanged = displayChanged,
+                                    noteTypeConfig = noteTypeConfig,
                                     style = suggestedFieldStyle(displayChanged),
                                     diffContent = if (displayChanged && displayValue.isNotEmpty()) {
                                         { DiffHighlightedText(field.value, displayValue, DiffDisplayMode.Suggested) }
@@ -164,6 +167,7 @@ fun ChangesCard(
                                 isChanged = isChanged,
                                 wasEdited = wasEdited,
                                 action = mode.action,
+                                noteTypeConfig = noteTypeConfig,
                             )
                         }
                     }
@@ -273,6 +277,7 @@ private fun HistoryFieldItem(
     isChanged: Boolean,
     wasEdited: Boolean,
     action: ReviewAction,
+    noteTypeConfig: NoteTypeConfig?,
 ) {
     val colors = LocalAppColors.current
 
@@ -309,6 +314,7 @@ private fun HistoryFieldItem(
         fieldName = fieldName,
         value = changedValue,
         isChanged = isChanged,
+        noteTypeConfig = noteTypeConfig,
         style = FieldItemStyle(
             icon = icon,
             iconTint = labelColor,

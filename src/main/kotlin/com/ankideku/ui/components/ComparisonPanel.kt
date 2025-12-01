@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.HistoryEntry
 import com.ankideku.domain.model.NoteField
+import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.domain.model.Session
 import com.ankideku.domain.model.Suggestion
 import com.ankideku.ui.theme.LocalAppColors
@@ -40,6 +41,7 @@ fun ComparisonPanel(
     isActionLoading: Boolean,
     isProcessing: Boolean,
     historyEntry: HistoryEntry?,
+    noteTypeConfigs: Map<String, NoteTypeConfig>,
     onAccept: () -> Unit,
     onReject: () -> Unit,
     onSkip: () -> Unit,
@@ -49,6 +51,7 @@ fun ComparisonPanel(
     onBackToSessions: () -> Unit,
     onRevertEdits: () -> Unit,
     onCloseHistoryView: () -> Unit,
+    onOpenNoteTypeSettings: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboard.current
@@ -77,6 +80,7 @@ fun ComparisonPanel(
             if (historyEntry != null) {
                 HistoryContent(
                     entry = historyEntry,
+                    noteTypeConfigs = noteTypeConfigs,
                     onClose = onCloseHistoryView,
                     onCopy = copyToClipboard,
                 )
@@ -92,6 +96,7 @@ fun ComparisonPanel(
                     showOriginal = showOriginal,
                     isActionLoading = isActionLoading,
                     isProcessing = isProcessing,
+                    noteTypeConfig = noteTypeConfigs[suggestion?.modelName ?: ""],
                     onAccept = onAccept,
                     onReject = onReject,
                     onSkip = onSkip,
@@ -101,6 +106,7 @@ fun ComparisonPanel(
                     onBackToSessions = onBackToSessions,
                     onRevertEdits = onRevertEdits,
                     onCopy = copyToClipboard,
+                    onOpenNoteTypeSettings = onOpenNoteTypeSettings,
                 )
             }
         }
@@ -110,6 +116,7 @@ fun ComparisonPanel(
 @Composable
 private fun ColumnScope.HistoryContent(
     entry: HistoryEntry,
+    noteTypeConfigs: Map<String, NoteTypeConfig>,
     onClose: () -> Unit,
     onCopy: (String) -> Unit,
 ) {
@@ -128,6 +135,7 @@ private fun ColumnScope.HistoryContent(
     ComparisonRow(
         originalFields = entry.originalFields,
         changes = entry.appliedChanges ?: entry.aiChanges,
+        noteTypeConfig = noteTypeConfigs[entry.modelName],
         modifier = Modifier.weight(1f),
     ) {
         // Changes card (right column) - History mode
@@ -135,6 +143,7 @@ private fun ColumnScope.HistoryContent(
             fields = entry.originalFields,
             changes = entry.appliedChanges ?: entry.aiChanges,
             userEdits = entry.userEdits,
+            noteTypeConfig = noteTypeConfigs[entry.modelName],
             mode = ChangesCardMode.History(
                 action = entry.action,
                 hasUserEdits = !entry.userEdits.isNullOrEmpty(),
@@ -156,6 +165,7 @@ private fun ColumnScope.SuggestionContent(
     showOriginal: Boolean,
     isActionLoading: Boolean,
     isProcessing: Boolean,
+    noteTypeConfig: NoteTypeConfig?,
     onAccept: () -> Unit,
     onReject: () -> Unit,
     onSkip: () -> Unit,
@@ -165,6 +175,7 @@ private fun ColumnScope.SuggestionContent(
     onBackToSessions: () -> Unit,
     onRevertEdits: () -> Unit,
     onCopy: (String) -> Unit,
+    onOpenNoteTypeSettings: (String) -> Unit,
 ) {
     Breadcrumb(text = "Back to Sessions", onClick = onBackToSessions)
     Spacer(Modifier.height(Spacing.sm))
@@ -178,11 +189,13 @@ private fun ColumnScope.SuggestionContent(
     } else {
         SuggestionHeaderCard(
             deckName = session?.deckName ?: "Unknown Deck",
+            modelName = suggestion.modelName,
             currentIndex = currentIndex,
             totalSuggestions = suggestions.size,
             suggestion = suggestion,
             editedFields = editedFields,
             onCopy = onCopy,
+            onOpenNoteTypeSettings = onOpenNoteTypeSettings,
         )
         Spacer(Modifier.height(Spacing.md))
 
@@ -193,6 +206,7 @@ private fun ColumnScope.SuggestionContent(
         ComparisonRow(
             originalFields = suggestion.originalFields,
             changes = suggestion.changes.plus(editedFields),
+            noteTypeConfig = noteTypeConfig,
             modifier = Modifier.weight(1f),
         ) {
             // Changes card (right column) - Suggestion mode
@@ -200,6 +214,7 @@ private fun ColumnScope.SuggestionContent(
                 fields = suggestion.originalFields,
                 changes = suggestion.changes,
                 editedFields = editedFields,
+                noteTypeConfig = noteTypeConfig,
                 mode = ChangesCardMode.Suggestion(
                     isEditMode = isEditMode,
                     hasManualEdits = hasManualEdits,
@@ -234,6 +249,7 @@ private fun ColumnScope.SuggestionContent(
 private fun ComparisonRow(
     originalFields: Map<String, NoteField>,
     changes: Map<String, String>,
+    noteTypeConfig: NoteTypeConfig?,
     modifier: Modifier = Modifier,
     changesCard: @Composable RowScope.() -> Unit,
 ) {
@@ -244,6 +260,7 @@ private fun ComparisonRow(
         OriginalCard(
             fields = originalFields,
             changes = changes,
+            noteTypeConfig = noteTypeConfig,
             modifier = Modifier.weight(1f),
         )
         changesCard()
@@ -253,11 +270,13 @@ private fun ComparisonRow(
 @Composable
 private fun SuggestionHeaderCard(
     deckName: String,
+    modelName: String,
     currentIndex: Int,
     totalSuggestions: Int,
     suggestion: Suggestion,
     editedFields: Map<String, String>,
     onCopy: (String) -> Unit,
+    onOpenNoteTypeSettings: (String) -> Unit,
 ) {
     val colors = LocalAppColors.current
     val gradientBrush = Brush.horizontalGradient(
@@ -278,7 +297,7 @@ private fun SuggestionHeaderCard(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 IconLabel(
                     icon = Icons.Default.Folder,
@@ -287,6 +306,45 @@ private fun SuggestionHeaderCard(
                     textColor = colors.textSecondary,
                     fontWeight = FontWeight.SemiBold,
                 )
+
+                // Separator
+                if (modelName.isNotBlank()) {
+                    Text(
+                        text = "|",
+                        color = colors.textMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+
+                    // Note type with settings button
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = colors.secondary,
+                        )
+                        Text(
+                            text = modelName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textSecondary,
+                        )
+                        IconButton(
+                            onClick = { onOpenNoteTypeSettings(modelName) },
+                            modifier = Modifier.size(24.dp).handPointer(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Configure note type",
+                                modifier = Modifier.size(14.dp),
+                                tint = colors.textMuted,
+                            )
+                        }
+                    }
+                }
             }
 
             Row(
@@ -347,6 +405,7 @@ private fun buildCopyText(suggestion: Suggestion, editedFields: Map<String, Stri
 private fun OriginalCard(
     fields: Map<String, NoteField>,
     changes: Map<String, String>,
+    noteTypeConfig: NoteTypeConfig?,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalAppColors.current
@@ -392,6 +451,7 @@ private fun OriginalCard(
                         fieldName = fieldName,
                         value = field.value,
                         isChanged = isChanged,
+                        noteTypeConfig = noteTypeConfig,
                         style = originalFieldStyle(isChanged),
                         diffContent = if (isChanged && field.value.isNotEmpty() && suggestedValue != null) {
                             { DiffHighlightedText(field.value, suggestedValue, DiffDisplayMode.Original) }

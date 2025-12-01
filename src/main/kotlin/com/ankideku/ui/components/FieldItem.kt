@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.ui.theme.InputShape
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
@@ -43,6 +44,7 @@ fun FieldItem(
     fieldName: String,
     value: String,
     isChanged: Boolean,
+    noteTypeConfig: NoteTypeConfig?,
     style: FieldItemStyle,
     modifier: Modifier = Modifier,
     diffContent: @Composable (() -> Unit)? = null,
@@ -101,8 +103,10 @@ fun FieldItem(
                 diffContent()
             } else {
                 SelectionContainer {
-                    Text(
+                    ConfiguredText(
                         text = value,
+                        fieldName = fieldName,
+                        noteTypeConfig = noteTypeConfig,
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textPrimary,
                     )

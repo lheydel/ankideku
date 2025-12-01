@@ -44,8 +44,15 @@ data class MainUiState(
     // Settings
     val settings: Settings = Settings(),
     val showSettingsDialog: Boolean = false,
+    val settingsInitialNoteType: String? = null,  // When opening settings from note type button
     val llmHealthStatus: LlmHealthStatus? = null,
     val llmHealthChecking: Boolean = false,
+
+    // Note Type Config
+    val defaultDisplayFieldMap: Map<String, String> = emptyMap(),  // modelName -> fieldName
+    val availableNoteTypes: List<String> = emptyList(),
+    val noteTypeConfigs: Map<String, NoteTypeConfig> = emptyMap(),
+    val noteTypeFields: Map<String, List<String>> = emptyMap(),
 
     // Session control
     val forceSyncBeforeStart: Boolean = false,

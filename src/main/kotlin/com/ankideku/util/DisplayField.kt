@@ -1,6 +1,7 @@
 package com.ankideku.util
 
 import com.ankideku.domain.model.NoteField
+import com.ankideku.domain.model.NoteTypeConfig
 
 /**
  * Gets the display value for a note based on the field display configuration.
@@ -11,30 +12,29 @@ import com.ankideku.domain.model.NoteField
  * @param fieldDisplayConfig Map of model name to preferred field name
  * @param maxLength Maximum length of returned string (will be truncated if longer)
  * @param stripHtml Whether to strip HTML tags from the value
- * @return The display value for the note
+ * @return pair of field name and its display value
  */
 fun getDisplayField(
-    modelName: String,
     fields: Map<String, NoteField>,
-    fieldDisplayConfig: Map<String, String>,
+    noteTypeConfig: NoteTypeConfig?,
     maxLength: Int = 100,
     stripHtml: Boolean = true,
-): String {
-    val configuredFieldName = fieldDisplayConfig[modelName]
+): Pair<String, String> {
+    val configuredFieldName = noteTypeConfig?.defaultDisplayField
 
-    val fieldValue = if (configuredFieldName != null && fields.containsKey(configuredFieldName)) {
-        fields[configuredFieldName]?.value
+    val fieldName = if (configuredFieldName != null && fields.containsKey(configuredFieldName)) {
+        configuredFieldName
     } else {
         // Fallback to first field by order
-        fields.values.minByOrNull { it.order }?.value
+        fields.values.minByOrNull { it.order }?.name ?: "Unknown Field"
     }
 
-    if (fieldValue.isNullOrBlank()) return "No content"
+    val fieldValue = fields[fieldName]?.value ?: ""
 
     var result = fieldValue
     if (stripHtml) {
         result = result.replace(Regex("<[^>]*>"), "")
     }
 
-    return result.take(maxLength).trim().ifBlank { "No content" }
+    return fieldName to result.trim().take(maxLength)
 }

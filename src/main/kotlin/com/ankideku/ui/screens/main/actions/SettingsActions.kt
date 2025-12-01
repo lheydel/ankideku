@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 interface SettingsActions {
     fun showSettingsDialog()
     fun hideSettingsDialog()
+    fun openNoteTypeSettings(modelName: String)
     fun updateSettings(settings: Settings)
     fun toggleSidebar()
     fun testLlmConnection()
@@ -22,11 +23,15 @@ class SettingsActionsImpl(
 ) : SettingsActions {
 
     override fun showSettingsDialog() {
-        ctx.update { copy(showSettingsDialog = true) }
+        ctx.update { copy(showSettingsDialog = true, settingsInitialNoteType = null) }
     }
 
     override fun hideSettingsDialog() {
-        ctx.update { copy(showSettingsDialog = false) }
+        ctx.update { copy(showSettingsDialog = false, settingsInitialNoteType = null) }
+    }
+
+    override fun openNoteTypeSettings(modelName: String) {
+        ctx.update { copy(showSettingsDialog = true, settingsInitialNoteType = modelName) }
     }
 
     override fun updateSettings(settings: Settings) {

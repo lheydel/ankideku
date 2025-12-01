@@ -4,6 +4,7 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.ankideku.data.local.database.AnkiDekuDb
 import com.ankideku.data.local.repository.SqlDeckRepository
 import com.ankideku.data.local.repository.SqlHistoryRepository
+import com.ankideku.data.local.repository.SqlNoteTypeConfigRepository
 import com.ankideku.data.local.repository.SqlSessionRepository
 import com.ankideku.data.local.repository.SqlSettingsRepository
 import com.ankideku.data.local.repository.SqlSuggestionRepository
@@ -12,12 +13,14 @@ import com.ankideku.data.remote.anki.AnkiConnectClient
 import com.ankideku.data.remote.anki.AnkiConnectionMonitor
 import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.repository.HistoryRepository
+import com.ankideku.domain.repository.NoteTypeConfigRepository
 import com.ankideku.domain.repository.SessionRepository
 import com.ankideku.domain.repository.SettingsRepository
 import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.domain.service.TransactionService
 import com.ankideku.domain.usecase.deck.DeckFinder
 import com.ankideku.domain.usecase.history.HistoryFinder
+import com.ankideku.domain.usecase.notetype.NoteTypeConfigFinder
 import com.ankideku.domain.usecase.suggestion.ReviewSuggestionFeature
 import com.ankideku.domain.usecase.session.SessionFinder
 import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
@@ -53,17 +56,7 @@ val appModule = module {
     // Database
     single {
         val dbPath = "${getAppDataDir().absolutePath}/ankideku.db"
-        val dbFile = File(dbPath)
-        val dbExists = dbFile.exists()
-
-        val driver = JdbcSqliteDriver("jdbc:sqlite:$dbPath")
-
-        // Only create schema if this is a new database
-        if (!dbExists) {
-            AnkiDekuDb.Schema.create(driver)
-        }
-
-        AnkiDekuDb(driver)
+        DatabaseFactory.createWithFile(dbPath)
     }
 
     // Remote services
@@ -79,6 +72,7 @@ val appModule = module {
     single<SuggestionRepository> { SqlSuggestionRepository(get()) }
     single<HistoryRepository> { SqlHistoryRepository(get()) }
     single<SettingsRepository> { SqlSettingsRepository(get()) }
+    single<NoteTypeConfigRepository> { SqlNoteTypeConfigRepository(get()) }
 
     // Services
     single<TransactionService> { SqlTransactionService(get()) }
@@ -89,6 +83,7 @@ val appModule = module {
     single { SuggestionFinder(get()) }
     single { HistoryFinder(get()) }
     single { SettingsManager(get()) }
+    single { NoteTypeConfigFinder(get()) }
 
     // Use cases (complex operations)
     factory { SyncDeckFeature(get(), get(), get()) }
@@ -110,6 +105,7 @@ val appModule = module {
             historyFinder = get(),
             settingsManager = get(),
             connectionMonitor = get(),
+            noteTypeConfigFinder = get(),
             v1Importer = get(),  // DEV ONLY: Remove after migration
         )
     }

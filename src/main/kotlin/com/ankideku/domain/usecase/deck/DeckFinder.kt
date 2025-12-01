@@ -28,4 +28,33 @@ class DeckFinder(
             )
         }.sortedBy { it.name }
     }
+
+    /**
+     * Fetch all note type (model) names from Anki
+     */
+    suspend fun fetchNoteTypes(): List<String> {
+        return try {
+            ankiClient.getModelNames().sorted()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Fetch field names for a specific note type from Anki
+     */
+    suspend fun fetchFieldsForNoteType(modelName: String): List<String> {
+        return try {
+            ankiClient.getModelFieldNames(modelName)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Fetch fields for all note types
+     */
+    suspend fun fetchAllNoteTypeFields(noteTypes: List<String>): Map<String, List<String>> {
+        return noteTypes.associateWith { fetchFieldsForNoteType(it) }
+    }
 }

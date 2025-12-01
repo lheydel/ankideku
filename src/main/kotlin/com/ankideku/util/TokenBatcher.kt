@@ -10,9 +10,11 @@ import com.ankideku.domain.model.Note
  */
 class TokenBatcher(
     private val maxInputTokens: Int = DEFAULT_MAX_INPUT_TOKENS,
+    private val maxPerBatch: Int = MAX_PER_BATCH,
 ) {
     companion object {
         const val DEFAULT_MAX_INPUT_TOKENS = 8_000
+        const val MAX_PER_BATCH = 50
     }
 
     /**
@@ -56,8 +58,8 @@ class TokenBatcher(
                 continue
             }
 
-            // Check if adding this note would exceed the limit
-            if (currentBatchTokens + noteTokens > availableTokens) {
+            // Check if adding this note would exceed token limit or batch size limit
+            if (currentBatchTokens + noteTokens > availableTokens || currentBatch.size >= maxPerBatch) {
                 batches.add(currentBatch.toList())
                 currentBatch = mutableListOf(note)
                 currentBatchTokens = noteTokens

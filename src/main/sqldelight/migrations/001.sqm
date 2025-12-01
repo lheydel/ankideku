@@ -1,0 +1,11 @@
+-- Migration 1: Add note_type_config table and remove fieldDisplayConfig from settings
+
+CREATE TABLE IF NOT EXISTS note_type_config (
+    model_name TEXT PRIMARY KEY,
+    default_display_field TEXT,
+    field_font_config TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- Remove old fieldDisplayConfig from settings (now per-note-type in note_type_config)
+DELETE FROM setting WHERE key = 'fieldDisplayConfig';

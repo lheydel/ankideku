@@ -1,5 +1,6 @@
 package com.ankideku.data.local.database
 
+import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import java.io.File
@@ -10,10 +11,24 @@ import java.io.File
 object DatabaseFactory {
 
     /**
-     * Create the SQLDelight database with the given driver
+     * Create or migrate the SQLDelight database with the given driver.
+     * - New databases: creates full schema
+     * - Existing databases: runs necessary migrations
      */
     fun create(driver: SqlDriver): AnkiDekuDb {
-        AnkiDekuDb.Schema.create(driver)
+        val currentVersion = getVersion(driver)
+        val schemaVersion = AnkiDekuDb.Schema.version
+
+        if (currentVersion == 0L) {
+            // New database - create full schema
+            AnkiDekuDb.Schema.create(driver)
+            setVersion(driver, schemaVersion)
+        } else if (currentVersion < schemaVersion) {
+            // Existing database - run migrations
+            AnkiDekuDb.Schema.migrate(driver, currentVersion, schemaVersion)
+            setVersion(driver, schemaVersion)
+        }
+
         return AnkiDekuDb(driver)
     }
 
@@ -44,5 +59,32 @@ object DatabaseFactory {
         val appDir = File(userHome, ".ankideku")
         appDir.mkdirs()
         return File(appDir, "ankideku.db").absolutePath
+    }
+
+    /**
+     * Get current database schema version (0 if not set = new database)
+     */
+    private fun getVersion(driver: SqlDriver): Long {
+        val result = driver.executeQuery<Long>(
+            identifier = null,
+            sql = "PRAGMA user_version;",
+            mapper = { cursor ->
+                val hasRow = cursor.next()
+                if (hasRow.value) {
+                    QueryResult.Value(cursor.getLong(0) ?: 0L)
+                } else {
+                    QueryResult.Value(0L)
+                }
+            },
+            parameters = 0,
+        )
+        return result.value
+    }
+
+    /**
+     * Set database schema version
+     */
+    private fun setVersion(driver: SqlDriver, version: Long) {
+        driver.execute(null, "PRAGMA user_version = $version;", 0)
     }
 }

@@ -39,7 +39,7 @@ fun QueuePanel(
     currentSession: Session?,
     historySearchQuery: String,
     historyViewMode: HistoryViewMode,
-    fieldDisplayConfig: Map<String, String>,
+    noteTypeConfigs: Map<String, NoteTypeConfig>,
     onTabChanged: (QueueTab) -> Unit,
     onHistoryViewModeChanged: (HistoryViewMode) -> Unit,
     onSuggestionClick: (Int) -> Unit,
@@ -84,7 +84,7 @@ fun QueuePanel(
                 QueueTab.Queue -> QueueContent(
                     suggestions = suggestions,
                     currentIndex = currentSuggestionIndex,
-                    fieldDisplayConfig = fieldDisplayConfig,
+                    noteTypeConfigs = noteTypeConfigs,
                     onSuggestionClick = onSuggestionClick,
                 )
                 QueueTab.History -> HistoryContent(
@@ -92,7 +92,7 @@ fun QueuePanel(
                     searchQuery = historySearchQuery,
                     viewMode = historyViewMode,
                     currentSessionId = currentSession?.id,
-                    fieldDisplayConfig = fieldDisplayConfig,
+                    noteTypeConfigs = noteTypeConfigs,
                     onViewModeChanged = onHistoryViewModeChanged,
                     onHistoryClick = onHistoryClick,
                 )
@@ -252,7 +252,7 @@ private fun SessionInfoCard(session: Session) {
 private fun QueueContent(
     suggestions: List<Suggestion>,
     currentIndex: Int,
-    fieldDisplayConfig: Map<String, String>,
+    noteTypeConfigs: Map<String, NoteTypeConfig>,
     onSuggestionClick: (Int) -> Unit,
 ) {
     val colors = LocalAppColors.current
@@ -284,7 +284,7 @@ private fun QueueContent(
                         suggestion = suggestion,
                         index = index + 1,  // 1-based display
                         isCurrent = index == currentIndex,
-                        fieldDisplayConfig = fieldDisplayConfig,
+                        noteTypeConfig = noteTypeConfigs[suggestion.modelName],
                         onClick = { onSuggestionClick(index) },
                     )
                 }
@@ -342,16 +342,15 @@ private fun QueueCard(
     suggestion: Suggestion,
     index: Int,
     isCurrent: Boolean,
-    fieldDisplayConfig: Map<String, String>,
+    noteTypeConfig: NoteTypeConfig?,
     onClick: () -> Unit,
 ) {
     val colors = LocalAppColors.current
-    // Get field value based on display config
-    val displayValue = com.ankideku.util.getDisplayField(
-        modelName = suggestion.modelName,
+    val (fieldName, fieldValue) = com.ankideku.util.getDisplayField(
         fields = suggestion.originalFields,
-        fieldDisplayConfig = fieldDisplayConfig,
-    ).ifBlank { "Note #${suggestion.noteId}" }
+        noteTypeConfig = noteTypeConfig,
+    )
+    val displayValue = fieldValue.ifBlank { "Note #${suggestion.noteId}" }
 
     val cardBackground = if (isCurrent) {
         Brush.horizontalGradient(
@@ -423,11 +422,13 @@ private fun QueueCard(
 
             // Card content
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                ConfiguredText(
                     text = displayValue,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    fieldName = fieldName,
+                    noteTypeConfig = noteTypeConfig,
                 )
                 Spacer(Modifier.height(Spacing.xxs))
                 Text(
@@ -446,7 +447,7 @@ private fun HistoryContent(
     searchQuery: String,
     viewMode: HistoryViewMode,
     currentSessionId: Long?,
-    fieldDisplayConfig: Map<String, String>,
+    noteTypeConfigs: Map<String, NoteTypeConfig>,
     onViewModeChanged: (HistoryViewMode) -> Unit,
     onHistoryClick: (HistoryEntry) -> Unit,
 ) {
@@ -508,7 +509,7 @@ private fun HistoryContent(
                     HistoryCard(
                         entry = entry,
                         showDeckName = viewMode == HistoryViewMode.Global,
-                        fieldDisplayConfig = fieldDisplayConfig,
+                        noteTypeConfig = noteTypeConfigs[entry.modelName],
                         onClick = { onHistoryClick(entry) },
                     )
                 }
@@ -521,7 +522,7 @@ private fun HistoryContent(
 private fun HistoryCard(
     entry: HistoryEntry,
     showDeckName: Boolean,
-    fieldDisplayConfig: Map<String, String>,
+    noteTypeConfig: NoteTypeConfig?,
     onClick: () -> Unit,
 ) {
     val colors = LocalAppColors.current
@@ -531,12 +532,12 @@ private fun HistoryCard(
     }
 
     // Get field value based on display config
-    val displayText = com.ankideku.util.getDisplayField(
-        modelName = entry.modelName,
+    val (fieldName, fieldValue) = com.ankideku.util.getDisplayField(
         fields = entry.originalFields,
-        fieldDisplayConfig = fieldDisplayConfig,
+        noteTypeConfig = noteTypeConfig,
         maxLength = 50,
-    ).ifBlank { "Note #${entry.noteId}" }
+    )
+    val displayText = fieldValue.ifBlank { "Note #${entry.noteId}" }
 
     Card(
         modifier = Modifier
@@ -566,11 +567,13 @@ private fun HistoryCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
+                    ConfiguredText(
                         text = displayText,
                         style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        fieldName = fieldName,
+                        noteTypeConfig = noteTypeConfig,
                         modifier = Modifier.weight(1f),
                     )
 

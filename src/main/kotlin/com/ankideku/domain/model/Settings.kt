@@ -3,7 +3,6 @@ package com.ankideku.domain.model
 import com.ankideku.data.remote.llm.LlmProvider
 
 data class Settings(
-    val fieldDisplayConfig: Map<String, String> = emptyMap(),  // modelName -> fieldName
     val llmProvider: LlmProvider = LlmProvider.MOCK,
     val theme: AppTheme = AppTheme.System,
 )

@@ -15,16 +15,10 @@ class SettingsManager(
 
     suspend fun updateLlmProvider(provider: LlmProvider) = onIO { settingsRepository.updateLlmProvider(provider) }
 
-    suspend fun updateFieldDisplayConfig(config: Map<String, String>) =
-        onIO { settingsRepository.updateFieldDisplayConfig(config) }
-
     suspend fun update(settings: Settings) {
         onIO {
             settingsRepository.updateTheme(settings.theme)
             settingsRepository.updateLlmProvider(settings.llmProvider)
-            if (settings.fieldDisplayConfig.isNotEmpty()) {
-                settingsRepository.updateFieldDisplayConfig(settings.fieldDisplayConfig)
-            }
         }
     }
 }

@@ -1,0 +1,30 @@
+-- Note type configuration (per-note-type settings)
+
+CREATE TABLE note_type_config (
+    model_name TEXT PRIMARY KEY,
+    default_display_field TEXT,
+    field_font_config TEXT NOT NULL,  -- JSON: Map<String, FontOption>
+    updated_at INTEGER NOT NULL
+);
+
+-- Queries
+
+getConfigByModelName:
+SELECT * FROM note_type_config WHERE model_name = ?;
+
+getAllConfigs:
+SELECT * FROM note_type_config ORDER BY model_name;
+
+upsertConfig:
+INSERT INTO note_type_config (model_name, default_display_field, field_font_config, updated_at)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(model_name) DO UPDATE SET
+    default_display_field = excluded.default_display_field,
+    field_font_config = excluded.field_font_config,
+    updated_at = excluded.updated_at;
+
+deleteConfig:
+DELETE FROM note_type_config WHERE model_name = ?;
+
+deleteAllConfigs:
+DELETE FROM note_type_config;

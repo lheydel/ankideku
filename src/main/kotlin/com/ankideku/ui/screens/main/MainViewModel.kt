@@ -1,8 +1,10 @@
 package com.ankideku.ui.screens.main
 
 import com.ankideku.data.remote.anki.AnkiConnectionMonitor
+import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.domain.usecase.deck.DeckFinder
 import com.ankideku.domain.usecase.history.HistoryFinder
+import com.ankideku.domain.usecase.notetype.NoteTypeConfigFinder
 import com.ankideku.domain.usecase.suggestion.ReviewSuggestionFeature
 import com.ankideku.domain.usecase.session.SessionFinder
 import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
@@ -31,18 +33,22 @@ class MainViewModel(
     private val historyFinder: HistoryFinder,
     private val settingsManager: SettingsManager,
     private val connectionMonitor: AnkiConnectionMonitor,
-) : DeckActions by DeckActionsImpl(ctx, syncDeckFeature, deckFinder, sessionFinder, suggestionFinder),
-    SessionActions by SessionActionsImpl(ctx, sessionOrchestrator, sessionFinder, suggestionFinder),
+    private val noteTypeConfigFinder: NoteTypeConfigFinder,
+    v1Importer: V1DatabaseImporter,  // DEV ONLY: Remove after migration
+) : DeckActions by DeckActionsImpl(ctx, syncDeckFeature, deckFinder),
+    SessionActions by SessionActionsImpl(ctx, sessionOrchestrator, sessionFinder, suggestionFinder, syncDeckFeature, deckFinder),
     ReviewActions by ReviewActionsImpl(ctx, reviewSuggestionFeature),
     HistoryActions by HistoryActionsImpl(ctx, historyFinder),
     SettingsActions by SettingsActionsImpl(ctx, settingsManager),
-    UIActions by UIActionsImpl(ctx, connectionMonitor)
+    UIActions by UIActionsImpl(ctx, connectionMonitor, v1Importer)
 {
     val uiState: StateFlow<MainUiState> = ctx.uiState
 
     init {
         observeAnkiConnection()
         loadSettings()
+        loadNoteTypeConfigs()
+        observeSessions()
     }
 
     private fun observeAnkiConnection() {
@@ -52,6 +58,7 @@ class MainViewModel(
                 if (isConnected) {
                     ctx.update { copy(ankiError = null) }
                     refreshDecks()
+                    loadNoteTypesFromAnki()
                 }
             }
         }
@@ -66,6 +73,68 @@ class MainViewModel(
         ctx.scope.launch {
             val settings = settingsManager.get()
             ctx.update { copy(settings = settings) }
+        }
+    }
+
+    private fun loadNoteTypeConfigs() {
+        // Load initial configs
+        ctx.scope.launch {
+            val configs = noteTypeConfigFinder.getAllConfigs()
+            val configMap = configs.associateBy { it.modelName }
+            val fieldMap = configs
+                .filter { it.defaultDisplayField != null }
+                .associate { it.modelName to it.defaultDisplayField!! }
+            ctx.update {
+                copy(
+                    noteTypeConfigs = configMap,
+                    defaultDisplayFieldMap = fieldMap,
+                )
+            }
+        }
+        // Observe changes
+        ctx.scope.launch {
+            noteTypeConfigFinder.observeAllConfigs().collect { configs ->
+                val configMap = configs.associateBy { it.modelName }
+                val fieldMap = configs
+                    .filter { it.defaultDisplayField != null }
+                    .associate { it.modelName to it.defaultDisplayField!! }
+                ctx.update {
+                    copy(
+                        noteTypeConfigs = configMap,
+                        defaultDisplayFieldMap = fieldMap,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun loadNoteTypesFromAnki() {
+        ctx.scope.launch {
+            val noteTypes = deckFinder.fetchNoteTypes()
+            ctx.update { copy(availableNoteTypes = noteTypes) }
+
+            // Load fields for all note types
+            if (noteTypes.isNotEmpty()) {
+                val fields = deckFinder.fetchAllNoteTypeFields(noteTypes)
+                ctx.update { copy(noteTypeFields = fields) }
+            }
+        }
+    }
+
+    fun saveNoteTypeConfig(config: NoteTypeConfig) {
+        ctx.scope.launch {
+            noteTypeConfigFinder.saveConfig(config)
+            // Immediately update local state to ensure UI reflects changes
+            ctx.update {
+                copy(
+                    noteTypeConfigs = noteTypeConfigs + (config.modelName to config),
+                    defaultDisplayFieldMap = if (config.defaultDisplayField != null) {
+                        defaultDisplayFieldMap + (config.modelName to config.defaultDisplayField)
+                    } else {
+                        defaultDisplayFieldMap - config.modelName
+                    }
+                )
+            }
         }
     }
 

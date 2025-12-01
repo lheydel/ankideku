@@ -28,6 +28,7 @@ import com.ankideku.ui.components.QueuePanel
 import com.ankideku.ui.components.SessionSelector
 import com.ankideku.ui.components.SidebarPanel
 import com.ankideku.ui.screens.settings.SettingsDialog
+import com.ankideku.ui.screens.settings.SettingsTab
 import com.ankideku.ui.theme.AnimationDurations
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.PanelSizes
@@ -88,7 +89,7 @@ fun MainScreen(
                         currentSession = uiState.currentSession,
                         historySearchQuery = uiState.historySearchQuery,
                         historyViewMode = uiState.historyViewMode,
-                        fieldDisplayConfig = uiState.settings.fieldDisplayConfig,
+                        noteTypeConfigs = uiState.noteTypeConfigs,
                         onTabChanged = viewModel::setActiveTab,
                         onHistoryViewModeChanged = viewModel::setHistoryViewMode,
                         onSuggestionClick = viewModel::selectSuggestion,
@@ -110,6 +111,7 @@ fun MainScreen(
                             isActionLoading = uiState.isActionLoading,
                             isProcessing = uiState.isProcessing,
                             historyEntry = uiState.viewingHistoryEntry,
+                            noteTypeConfigs = uiState.noteTypeConfigs,
                             onAccept = viewModel::acceptSuggestion,
                             onReject = viewModel::rejectSuggestion,
                             onSkip = viewModel::skipSuggestion,
@@ -119,6 +121,7 @@ fun MainScreen(
                             onBackToSessions = viewModel::clearSession,
                             onRevertEdits = viewModel::revertEdits,
                             onCloseHistoryView = viewModel::clearHistoryView,
+                            onOpenNoteTypeSettings = viewModel::openNoteTypeSettings,
                             modifier = Modifier.weight(1f),
                         )
                     } else {
@@ -252,11 +255,16 @@ fun MainScreen(
         if (uiState.showSettingsDialog) {
             SettingsDialog(
                 settings = uiState.settings,
-                suggestions = uiState.suggestions,
                 llmHealthStatus = uiState.llmHealthStatus,
                 llmHealthChecking = uiState.llmHealthChecking,
+                availableNoteTypes = uiState.availableNoteTypes,
+                noteTypeConfigs = uiState.noteTypeConfigs,
+                noteTypeFields = uiState.noteTypeFields,
+                initialTab = if (uiState.settingsInitialNoteType != null) SettingsTab.NOTE_TYPES else null,
+                initialNoteType = uiState.settingsInitialNoteType,
                 onDismiss = viewModel::hideSettingsDialog,
                 onSave = viewModel::updateSettings,
+                onSaveNoteTypeConfig = viewModel::saveNoteTypeConfig,
                 onTestConnection = viewModel::testLlmConnection,
             )
         }

@@ -157,4 +157,18 @@ class AnkiConnectClient(
         }
         return request("multi", mapOf("actions" to actions))
     }
+
+    /**
+     * Get all model (note type) names
+     */
+    suspend fun getModelNames(): List<String> {
+        return request("modelNames")
+    }
+
+    /**
+     * Get field names for a specific model (note type)
+     */
+    suspend fun getModelFieldNames(modelName: String): List<String> {
+        return request("modelFieldNames", mapOf("modelName" to modelName))
+    }
 }
