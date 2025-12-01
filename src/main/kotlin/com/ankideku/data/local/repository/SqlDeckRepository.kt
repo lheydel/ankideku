@@ -11,6 +11,7 @@ import com.ankideku.domain.model.DeckId
 import com.ankideku.domain.model.Note
 import com.ankideku.domain.model.NoteId
 import com.ankideku.domain.repository.DeckRepository
+import com.ankideku.domain.repository.DeckStats
 import com.ankideku.util.toJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -95,5 +96,17 @@ class SqlDeckRepository(
                 field_name = name,
             )
         }
+    }
+
+    override fun getDeckStats(deckName: String): DeckStats {
+        val noteCount = database.deckCacheQueries
+            .countNotesForDeckByName(deckName, deckName)
+            .executeAsOne()
+            .toInt()
+        val tokenEstimate = database.deckCacheQueries
+            .sumTokensForDeckByName(deckName, deckName)
+            .executeAsOne()
+            .toInt()
+        return DeckStats(noteCount, tokenEstimate)
     }
 }

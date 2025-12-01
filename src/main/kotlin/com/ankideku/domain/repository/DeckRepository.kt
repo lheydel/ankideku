@@ -18,4 +18,9 @@ interface DeckRepository {
     fun getNotesForDeck(deckId: DeckId): List<Note>
     fun saveNotes(notes: List<Note>)
     fun updateNoteFields(noteId: NoteId, fields: Map<String, String>)
+
+    /** Get the actual note count and token estimate from cached notes for a deck (including sub-decks) */
+    fun getDeckStats(deckName: String): DeckStats
 }
+
+data class DeckStats(val noteCount: Int, val tokenEstimate: Int)

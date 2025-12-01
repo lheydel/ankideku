@@ -48,6 +48,7 @@ fun DeckSelector(
     decks: List<Deck>,
     selectedDeck: Deck?,
     onDeckSelected: (Deck) -> Unit,
+    onOpen: () -> Unit,
     enabled: Boolean,
     colors: AppColorScheme,
     modifier: Modifier = Modifier,
@@ -68,7 +69,10 @@ fun DeckSelector(
                     triggerHeight = it.size.height
                 }
                 .pointerHoverIcon(PointerIcon.Hand)
-                .clickable(enabled = enabled) { expanded = !expanded },
+                .clickable(enabled = enabled) {
+                    if (!expanded) onOpen()
+                    expanded = !expanded
+                },
             shape = InputShape,
             color = colors.surfaceAlt,
             border = BorderStroke(1.dp, if (expanded) colors.accent else colors.border),

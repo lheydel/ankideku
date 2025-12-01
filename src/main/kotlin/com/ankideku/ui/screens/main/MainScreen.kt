@@ -144,6 +144,7 @@ fun MainScreen(
                         forceSyncBeforeStart = uiState.forceSyncBeforeStart,
                         llmProvider = uiState.settings.llmProvider,
                         onDeckSelected = viewModel::selectDeck,
+                        onRefreshDecks = viewModel::refreshDecks,
                         onSyncDeck = viewModel::syncDeck,
                         onStartSession = viewModel::startSession,
                         onCancelSession = viewModel::cancelSession,

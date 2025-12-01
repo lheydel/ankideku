@@ -46,6 +46,7 @@ fun SidebarPanel(
     forceSyncBeforeStart: Boolean,
     llmProvider: LlmProvider,
     onDeckSelected: (Deck) -> Unit,
+    onRefreshDecks: () -> Unit,
     onSyncDeck: () -> Unit,
     onStartSession: (prompt: String) -> Unit,
     onCancelSession: () -> Unit,
@@ -83,6 +84,7 @@ fun SidebarPanel(
                 syncProgress = syncProgress,
                 colors = colors,
                 onDeckSelected = onDeckSelected,
+                onRefreshDecks = onRefreshDecks,
                 onSyncDeck = onSyncDeck,
             )
 
@@ -234,6 +236,7 @@ private fun DeckSelectorSection(
     syncProgress: SyncProgressUi?,
     colors: com.ankideku.ui.theme.AppColorScheme,
     onDeckSelected: (Deck) -> Unit,
+    onRefreshDecks: () -> Unit,
     onSyncDeck: () -> Unit,
 ) {
     Column(
@@ -273,6 +276,7 @@ private fun DeckSelectorSection(
                 decks = decks,
                 selectedDeck = selectedDeck,
                 onDeckSelected = onDeckSelected,
+                onOpen = onRefreshDecks,
                 enabled = !isSyncing && !isProcessing,
                 colors = colors,
                 modifier = Modifier.weight(1f),
@@ -328,7 +332,7 @@ private fun DeckSelectorSection(
             Spacer(Modifier.height(Spacing.sm))
             Text(
                 text = "${selectedDeck.noteCount.formatWithCommas()} cards · ~${selectedDeck.tokenEstimate.formatWithCommas()} input tokens",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = colors.textMuted,
             )
         }
@@ -452,7 +456,7 @@ private fun ChatInputArea(
                         LlmProvider.CLAUDE_CODE -> "Claude Code"
                         LlmProvider.MOCK -> "Mock (Testing)"
                     },
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = colors.textMuted,
                 )
             }

@@ -43,7 +43,6 @@ class MainViewModel(
     init {
         observeAnkiConnection()
         loadSettings()
-        observeDecks()
     }
 
     private fun observeAnkiConnection() {
@@ -52,32 +51,13 @@ class MainViewModel(
                 ctx.update { copy(ankiConnected = isConnected) }
                 if (isConnected) {
                     ctx.update { copy(ankiError = null) }
-                    fetchDecksFromAnki()
+                    refreshDecks()
                 }
             }
         }
         ctx.scope.launch {
             connectionMonitor.lastError.collect { error ->
                 ctx.update { copy(ankiError = error) }
-            }
-        }
-    }
-
-    private fun fetchDecksFromAnki() {
-        ctx.scope.launch {
-            try {
-                val decks = deckFinder.fetchFromAnki()
-                ctx.update { copy(decks = decks) }
-            } catch (e: Exception) {
-                println("Failed to fetch decks: ${e.message}")
-            }
-        }
-    }
-
-    private fun observeDecks() {
-        ctx.scope.launch {
-            deckFinder.observeAll().collect { decks ->
-                ctx.update { copy(decks = decks) }
             }
         }
     }

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 
 interface DeckActions {
     fun selectDeck(deck: Deck)
+    fun refreshDecks()
     fun syncDeck()
     fun cancelSync()
 }
@@ -32,6 +33,17 @@ class DeckActionsImpl(
     override fun selectDeck(deck: Deck) {
         ctx.update { copy(selectedDeck = deck) }
         loadSuggestionsForDeck(deck)
+    }
+
+    override fun refreshDecks() {
+        ctx.scope.launch {
+            try {
+                val decks = deckFinder.fetchFromAnki()
+                ctx.update { copy(decks = decks) }
+            } catch (e: Exception) {
+                // Silently fail - decks will remain as-is
+            }
+        }
     }
 
     override fun syncDeck() {

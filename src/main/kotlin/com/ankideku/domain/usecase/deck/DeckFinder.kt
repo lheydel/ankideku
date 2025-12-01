@@ -19,7 +19,13 @@ class DeckFinder(
         val deckNamesAndIds = ankiClient.getDeckNamesAndIds()
         return deckNamesAndIds.map { (name, id) ->
             val cached = onIO { deckRepository.getDeck(id) }
-            Deck(name = name, id = id, lastSyncTimestamp = cached?.lastSyncTimestamp)
+            Deck(
+                name = name,
+                id = id,
+                lastSyncTimestamp = cached?.lastSyncTimestamp,
+                noteCount = cached?.noteCount ?: 0,
+                tokenEstimate = cached?.tokenEstimate ?: 0,
+            )
         }.sortedBy { it.name }
     }
 }

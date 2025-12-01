@@ -2,6 +2,7 @@ package com.ankideku.domain.usecase.deck
 
 import com.ankideku.data.mapper.toDomain
 import com.ankideku.data.remote.anki.AnkiConnectClient
+import com.ankideku.data.remote.llm.PromptBuilder
 import com.ankideku.domain.model.Deck
 import com.ankideku.domain.model.DeckId
 import com.ankideku.domain.model.Note
@@ -65,16 +66,17 @@ class SyncDeckFeature(
             }
         }
 
-        val totalTokens = allNotes.sumOf { it.estimatedTokens ?: 0 }
-
         emit(SyncProgress.SavingToCache(deckId, allNotes.size))
 
-        transactionService.runInTransaction {
-            saveDeckSync(deckId, rootDeckName, allNotes.size, totalTokens)
+        // Save notes first, then get accurate stats from DB
+        val stats = transactionService.runInTransaction {
             deckRepository.saveNotes(allNotes)
+            val stats = deckRepository.getDeckStats(rootDeckName)
+            saveDeckSync(deckId, rootDeckName, stats.noteCount, stats.tokenEstimate)
+            stats
         }
 
-        emit(SyncProgress.Completed(deckId, noteCount = allNotes.size, tokenEstimate = totalTokens))
+        emit(SyncProgress.Completed(deckId, noteCount = stats.noteCount, tokenEstimate = stats.tokenEstimate))
     }
 
     private suspend fun syncSingleDeck(
@@ -126,9 +128,11 @@ class SyncDeckFeature(
         deckId: DeckId,
     ): List<Note> {
         val noteInfos = fetchWithRetry(noteIds) { ankiClient.notesInfo(it) }
-        return noteInfos.map { noteInfo ->
-            val tokens = TokenEstimator.estimate(noteInfo.fields.values.map { it.value })
-            noteInfo.toDomain(deckId, deckName, tokens)
+        return noteInfos.mapIndexed { index, noteInfo ->
+            val note = noteInfo.toDomain(deckId, deckName)
+            val formattedNote = PromptBuilder.formatNote(note, index)
+            val tokens = TokenEstimator.estimate(formattedNote)
+            note.copy(estimatedTokens = tokens)
         }
     }
 
