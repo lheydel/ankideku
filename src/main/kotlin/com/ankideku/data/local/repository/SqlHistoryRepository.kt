@@ -13,7 +13,7 @@ class SqlHistoryRepository(
     private val database: AnkiDekuDb,
 ) : HistoryRepository {
 
-    override fun saveEntry(entry: HistoryEntry) {
+    override fun saveEntry(entry: HistoryEntry) = database.transaction {
         database.historyQueries.insertHistoryEntry(
             session_id = entry.sessionId,
             note_id = entry.noteId,
@@ -60,16 +60,27 @@ class SqlHistoryRepository(
         if (entities.isEmpty()) return emptyList()
 
         val historyIds = entities.map { it.id }
+        val noteIds = entities.map { it.note_id }
+
         val allFields = database.fieldValueQueries.getFieldsForHistoryEntries(historyIds).executeAsList()
         val fieldsByHistoryId = allFields.groupBy { it.history_id }
 
-        return entities.map { it.toDomain(fieldsByHistoryId[it.id] ?: emptyList()) }
+        // Get model names from cached_note
+        val modelNamesByNoteId = database.deckCacheQueries.getModelNamesForNotes(noteIds).executeAsList()
+            .associate { it.id to it.model_name }
+
+        return entities.map { entity ->
+            val modelName = modelNamesByNoteId[entity.note_id] ?: ""
+            entity.toDomain(fieldsByHistoryId[entity.id] ?: emptyList(), modelName)
+        }
     }
 
     override fun getById(id: Long): HistoryEntry? {
         val entity = database.historyQueries.getHistoryById(id).executeAsOneOrNull() ?: return null
         val fieldValues = database.fieldValueQueries.getFieldsForHistory(entity.id).executeAsList()
-        return entity.toDomain(fieldValues)
+        val modelName = database.deckCacheQueries.getModelNamesForNotes(listOf(entity.note_id)).executeAsList()
+            .firstOrNull()?.model_name ?: ""
+        return entity.toDomain(fieldValues, modelName)
     }
 
     override fun search(query: String, limit: Int): List<HistoryEntry> {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.minimumInteractiveComponentSize
 import androidx.compose.material3.*
@@ -82,6 +83,7 @@ fun SidebarPanel(
                 isProcessing = isProcessing,
                 isConnected = isConnected,
                 syncProgress = syncProgress,
+                currentSession = currentSession,
                 colors = colors,
                 onDeckSelected = onDeckSelected,
                 onRefreshDecks = onRefreshDecks,
@@ -158,7 +160,7 @@ private fun SidebarHeader(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Chat,
+                    imageVector = Icons.AutoMirrored.Filled.Chat,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                     tint = colors.accentStrong,
@@ -198,17 +200,10 @@ private fun SidebarHeader(
                             style = MaterialTheme.typography.labelMedium,
                         )
                     }
-                    IconButton(
-                        onClick = onDeleteSession,
-                        modifier = Modifier.size(32.dp).pointerHoverIcon(PointerIcon.Hand),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Session",
-                            tint = colors.textMuted,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
+                    DeleteSessionButton(
+                        onDelete = onDeleteSession,
+                        modifier = Modifier.size(32.dp),
+                    )
                 }
                 IconButton(
                     onClick = onCloseSidebar,
@@ -234,11 +229,20 @@ private fun DeckSelectorSection(
     isProcessing: Boolean,
     isConnected: Boolean,
     syncProgress: SyncProgressUi?,
+    currentSession: Session?,
     colors: com.ankideku.ui.theme.AppColorScheme,
     onDeckSelected: (Deck) -> Unit,
     onRefreshDecks: () -> Unit,
     onSyncDeck: () -> Unit,
 ) {
+    val hasActiveSession = currentSession != null
+    // When there's an active session, show the session's deck as a readonly display
+    val displayDeck = if (currentSession != null) {
+        Deck(id = currentSession.deckId, name = currentSession.deckName)
+    } else {
+        selectedDeck
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -274,11 +278,10 @@ private fun DeckSelectorSection(
         ) {
             DeckSelector(
                 decks = decks,
-                selectedDeck = selectedDeck,
+                selectedDeck = displayDeck,
                 onDeckSelected = onDeckSelected,
                 onOpen = onRefreshDecks,
-                enabled = !isSyncing && !isProcessing,
-                colors = colors,
+                enabled = !isSyncing && !isProcessing && !hasActiveSession,
                 modifier = Modifier.weight(1f),
             )
             IconButton(
@@ -349,7 +352,7 @@ private fun ChatMessagesArea(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(colors.surfaceAlt),
+            .background(colors.chatBackground),
     ) {
         if (chatMessages.isEmpty()) {
             Column(

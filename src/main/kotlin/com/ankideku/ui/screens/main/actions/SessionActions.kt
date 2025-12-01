@@ -1,12 +1,19 @@
 package com.ankideku.ui.screens.main.actions
 
 import com.ankideku.data.remote.anki.AnkiConnectException
+import com.ankideku.domain.model.Session
+import com.ankideku.domain.model.SessionState
+import com.ankideku.domain.usecase.deck.DeckFinder
+import com.ankideku.domain.usecase.deck.SyncDeckFeature
+import com.ankideku.domain.usecase.deck.SyncProgress
 import com.ankideku.domain.usecase.suggestion.SessionException
 import com.ankideku.domain.usecase.suggestion.SessionEvent
 import com.ankideku.domain.usecase.session.SessionFinder
 import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
 import com.ankideku.domain.usecase.suggestion.SuggestionFinder
+import com.ankideku.ui.screens.main.ChatMessage
 import com.ankideku.ui.screens.main.ChatMessageType
+import com.ankideku.ui.screens.main.SyncProgressUi
 import com.ankideku.ui.screens.main.ToastType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -14,11 +21,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 interface SessionActions {
+    fun observeSessions()
     fun startSession(prompt: String)
     fun cancelSession()
     fun loadSession(sessionId: Long)
     fun deleteSession(sessionId: Long)
     fun clearSession()
+    fun observeSuggestionsForSession(sessionId: Long)
+    fun stopObservingSuggestions()
 }
 
 class SessionActionsImpl(
@@ -26,17 +36,77 @@ class SessionActionsImpl(
     private val sessionOrchestrator: SessionOrchestrator,
     private val sessionFinder: SessionFinder,
     private val suggestionFinder: SuggestionFinder,
+    private val syncDeckFeature: SyncDeckFeature,
+    private val deckFinder: DeckFinder,
 ) : SessionActions {
 
     private var sessionJob: Job? = null
+    private var suggestionsJob: Job? = null
+
+    override fun observeSessions() {
+        ctx.scope.launch {
+            sessionFinder.observeAll().collect { sessions ->
+                ctx.update { copy(sessions = sessions) }
+            }
+        }
+    }
 
     override fun startSession(prompt: String) {
-        val deck = ctx.currentState.selectedDeck ?: return
+        var deck = ctx.currentState.selectedDeck ?: return
         if (prompt.isBlank() || ctx.currentState.isProcessing) return
 
         sessionJob?.cancel()
         sessionJob = ctx.scope.launch {
             ctx.addChatMessage(prompt, ChatMessageType.UserPrompt)
+
+            // Sync first if force sync is enabled OR deck hasn't been synced yet
+            val needsSync = ctx.currentState.forceSyncBeforeStart || deck.lastSyncTimestamp == null
+            if (needsSync) {
+                ctx.addChatMessage("Syncing deck...", ChatMessageType.SystemInfo)
+                ctx.update { copy(isSyncing = true) }
+
+                try {
+                    syncDeckFeature(deck.id).collect { progress ->
+                        val uiProgress = when (progress) {
+                            is SyncProgress.Starting -> SyncProgressUi(
+                                deckName = progress.deckName,
+                                statusText = if (progress.isIncremental) "Incremental sync..." else "Full sync...",
+                            )
+                            is SyncProgress.SyncingSubDeck -> SyncProgressUi(
+                                deckName = progress.subDeckName,
+                                statusText = "Syncing ${progress.subDeckName}",
+                                step = progress.step,
+                                totalSteps = progress.totalSteps,
+                            )
+                            is SyncProgress.SavingToCache -> SyncProgressUi(
+                                deckName = deck.name,
+                                statusText = "Saving ${progress.noteCount} notes...",
+                            )
+                            is SyncProgress.Completed -> null
+                        }
+                        ctx.update { copy(syncProgress = uiProgress) }
+                    }
+
+                    // Reload deck after sync to get updated noteCount
+                    val updatedDeck = deckFinder.getById(deck.id)
+                    if (updatedDeck != null) {
+                        deck = updatedDeck
+                        ctx.update {
+                            copy(
+                                selectedDeck = updatedDeck,
+                                decks = decks.map { d -> if (d.id == deck.id) updatedDeck else d },
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    ctx.addChatMessage("Sync failed: ${e.message}", ChatMessageType.Error)
+                    ctx.update { copy(isSyncing = false, syncProgress = null) }
+                    return@launch
+                } finally {
+                    ctx.update { copy(isSyncing = false, syncProgress = null) }
+                }
+            }
+
             ctx.addChatMessage("Starting session...", ChatMessageType.SystemInfo)
 
             try {
@@ -71,21 +141,70 @@ class SessionActionsImpl(
                     return@launch
                 }
 
+                // Get initial count for chat messages
                 val suggestions = suggestionFinder.observePendingForSession(sessionId).first()
+
+                // Restore chat messages like v1
+                val chatMessages = buildSessionChatMessages(session, suggestions.size)
+
                 ctx.update {
                     copy(
                         currentSession = session,
-                        suggestions = suggestions,
-                        currentSuggestionIndex = 0,
-                        editedFields = emptyMap(),
-                        isEditing = false,
+                        isEditMode = false,
+                        chatMessages = chatMessages,
                     )
                 }
+
+                // Start observing suggestions - this will update the list reactively
+                observeSuggestionsForSession(sessionId)
             } catch (e: Exception) {
                 ctx.showToast("Failed to load session: ${e.message}", ToastType.Error)
             }
         }
     }
+
+    private fun buildSessionChatMessages(session: Session, suggestionsCount: Int): List<ChatMessage> {
+        // System message with session info (matching V1 format)
+        val sessionInfo = buildString {
+            append("Session ${session.id}")
+            append("\nDeck: ${session.deckName}")
+            append("\n${formatNumber(session.progress.totalCards)} cards")
+            append("\nTokens estimate: ${formatNumber(session.progress.inputTokens)} in / ${formatNumber(session.progress.outputTokens)} out")
+        }
+
+        // Contextual tip based on session state
+        val tip = getContextualTip(session.state, suggestionsCount)
+
+        return listOf(
+            ChatMessage(content = sessionInfo, type = ChatMessageType.SystemInfo),
+            ChatMessage(content = session.prompt, type = ChatMessageType.UserPrompt),
+            ChatMessage(content = tip, type = ChatMessageType.SessionResult),
+        )
+    }
+
+    private fun getContextualTip(state: SessionState, suggestionsCount: Int): String {
+        return when (state) {
+            SessionState.Pending, SessionState.Running -> {
+                if (suggestionsCount > 0) "← You can review suggestions as they arrive"
+                else "Processing your request..."
+            }
+            SessionState.Completed -> {
+                if (suggestionsCount > 0) "← Review suggestions in the card view"
+                else "No suggestions found for this deck."
+            }
+            is SessionState.Failed -> "Try again with a different prompt or check the logs."
+            SessionState.Cancelled -> {
+                if (suggestionsCount > 0) "← Review the suggestions found before cancellation"
+                else "Session was cancelled before finding suggestions."
+            }
+            SessionState.Incomplete -> {
+                if (suggestionsCount > 0) "← Session was interrupted. You can review the suggestions found."
+                else "Session was interrupted before finding suggestions."
+            }
+        }
+    }
+
+    private fun formatNumber(n: Int): String = "%,d".format(n)
 
     override fun deleteSession(sessionId: Long) {
         ctx.scope.launch {
@@ -97,13 +216,6 @@ class SessionActionsImpl(
                     clearSession()
                 }
 
-                // Refresh sessions list
-                val deckId = ctx.currentState.selectedDeck?.id
-                if (deckId != null) {
-                    val sessions = sessionFinder.getForDeck(deckId)
-                    ctx.update { copy(sessions = sessions) }
-                }
-
                 ctx.showToast("Session deleted", ToastType.Success)
             } catch (e: Exception) {
                 ctx.showToast("Failed to delete session: ${e.message}", ToastType.Error)
@@ -112,13 +224,16 @@ class SessionActionsImpl(
     }
 
     override fun clearSession() {
+        stopObservingSuggestions()
         ctx.update {
             copy(
                 currentSession = null,
                 suggestions = emptyList(),
                 currentSuggestionIndex = 0,
                 editedFields = emptyMap(),
-                isEditing = false,
+                isEditMode = false,
+                hasManualEdits = false,
+                chatMessages = emptyList(), // Reset to show welcome state
             )
         }
     }
@@ -130,21 +245,18 @@ class SessionActionsImpl(
                     val session = sessionFinder.getById(event.sessionId)
                     ctx.update { copy(currentSession = session) }
                 }
+                // Start observing suggestions - will update reactively as batches complete
+                observeSuggestionsForSession(event.sessionId)
                 ctx.addChatMessage("Processing ${event.noteCount} notes...", ChatMessageType.SystemInfo)
             }
             is SessionEvent.BatchStarted -> {
                 // Could update progress UI here
             }
             is SessionEvent.BatchCompleted -> {
+                // Suggestions are updated via Flow observation - just update session
                 ctx.scope.launch {
                     val session = sessionFinder.getById(event.sessionId)
-                    val suggestions = suggestionFinder.observePendingForSession(event.sessionId).first()
-                    ctx.update {
-                        copy(
-                            currentSession = session,
-                            suggestions = suggestions,
-                        )
-                    }
+                    ctx.update { copy(currentSession = session) }
                 }
             }
             is SessionEvent.BatchFailed -> {
@@ -168,5 +280,51 @@ class SessionActionsImpl(
                 ctx.addChatMessage("Session cancelled.", ChatMessageType.SystemInfo)
             }
         }
+    }
+
+    override fun observeSuggestionsForSession(sessionId: Long) {
+        suggestionsJob?.cancel()
+        suggestionsJob = ctx.scope.launch {
+            suggestionFinder.observePendingForSession(sessionId).collect { suggestions ->
+                val state = ctx.currentState
+
+                // Preserve index position (clamped to list size)
+                // This ensures skip/accept/reject move to the next card naturally
+                val newIndex = if (suggestions.isEmpty()) {
+                    0
+                } else {
+                    state.currentSuggestionIndex.coerceIn(0, suggestions.lastIndex)
+                }
+
+                // Load edits for the new current suggestion (if it changed)
+                val newCurrentSuggestion = suggestions.getOrNull(newIndex)
+                val currentSuggestionChanged = newCurrentSuggestion?.id != state.currentSuggestion?.id
+
+                val editedFields = if (currentSuggestionChanged) {
+                    newCurrentSuggestion?.editedChanges ?: emptyMap()
+                } else {
+                    state.editedFields
+                }
+                val hasEdits = if (currentSuggestionChanged) {
+                    newCurrentSuggestion?.editedChanges?.isNotEmpty() == true
+                } else {
+                    state.hasManualEdits
+                }
+
+                ctx.update {
+                    copy(
+                        suggestions = suggestions,
+                        currentSuggestionIndex = newIndex,
+                        editedFields = editedFields,
+                        hasManualEdits = hasEdits,
+                    )
+                }
+            }
+        }
+    }
+
+    override fun stopObservingSuggestions() {
+        suggestionsJob?.cancel()
+        suggestionsJob = null
     }
 }

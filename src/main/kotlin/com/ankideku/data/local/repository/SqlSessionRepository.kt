@@ -19,7 +19,7 @@ class SqlSessionRepository(
 ) : SessionRepository {
 
     override fun getAll(): Flow<List<Session>> {
-        return database.sessionQueries.getAllSessions()
+        return database.sessionQueries.getAllSessionsWithPendingCount()
             .asFlow()
             .mapToList(Dispatchers.IO)
             .map { entities -> entities.map { it.toDomain() } }
@@ -40,15 +40,21 @@ class SqlSessionRepository(
 
     override fun create(session: Session): SessionId {
         val now = System.currentTimeMillis()
-        database.sessionQueries.insertSession(
-            deck_id = session.deckId,
-            deck_name = session.deckName,
-            prompt = session.prompt,
-            state = session.state.dbString,
-            created_at = now,
-            updated_at = now,
-        )
-        return database.sessionQueries.lastInsertedSessionId().executeAsOne()
+        var sessionId: SessionId = 0
+        database.transaction {
+            database.sessionQueries.insertSession(
+                deck_id = session.deckId,
+                deck_name = session.deckName,
+                prompt = session.prompt,
+                state = session.state.dbString,
+                progress_total_cards = session.progress.totalCards.toLong(),
+                progress_total_batches = session.progress.totalBatches.toLong(),
+                created_at = now,
+                updated_at = now,
+            )
+            sessionId = database.sessionQueries.lastInsertedSessionId().executeAsOne()
+        }
+        return sessionId
     }
 
     override fun updateState(sessionId: SessionId, state: SessionState) {

@@ -1,124 +1,110 @@
 package com.ankideku.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import com.ankideku.util.classpathPainterResource
 import androidx.compose.ui.unit.dp
 import com.ankideku.ui.theme.LocalAppColors
-import com.ankideku.ui.theme.PanelSizes
 import com.ankideku.ui.theme.Spacing
+import com.ankideku.ui.theme.handPointer
 
 @Composable
 fun Header(
     isConnected: Boolean,
-    onThemeToggle: () -> Unit,
     onSettingsClick: () -> Unit,
     onSidebarToggle: () -> Unit,
+    onImportV1: () -> Unit,
     isSidebarVisible: Boolean,
-    isDarkTheme: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalAppColors.current
-    // Glassmorphism-style header with gradient background
-    val gradientBrush = Brush.horizontalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.surface,
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-            colors.accent.copy(alpha = 0.05f),
-        ),
+
+    val background = Brush.horizontalGradient(
+        colors = listOf(colors.appHeaderStart, colors.appHeaderMid, colors.appHeaderEnd),
     )
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(PanelSizes.headerHeight),
-        color = Color.Transparent,
-        tonalElevation = 2.dp,
-        shadowElevation = 4.dp,
+        modifier = modifier.fillMaxWidth(),
+        shadowElevation = 2.dp,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(gradientBrush),
-        ) {
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = Spacing.md),
+                .fillMaxWidth()
+                .background(background)
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Logo and Title
+            // App title and logo
+            Image(
+                painter = classpathPainterResource("icons/icon.png"),
+                contentDescription = "AnkiDeku Logo",
+                modifier = Modifier.size(28.dp),
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                text = "AnkiDeku",
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.textPrimary,
+            )
+
+            Spacer(Modifier.width(Spacing.lg))
+
+            // Connection status
+            ConnectionIndicator(isConnected = isConnected)
+
+            Spacer(Modifier.weight(1f))
+
+            // Action buttons
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f),
-            ) {
-                // App Icon
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp),
-                )
-                Spacer(Modifier.width(Spacing.sm))
-
-                // Title and Subtitle
-                Column {
-                    Text(
-                        text = "AnkiDeku",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "AI-Powered Deck Revision",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Spacer(Modifier.width(Spacing.lg))
-
-                // Connection Status
-                ConnectionIndicator(isConnected = isConnected)
-            }
-
-            // Action Buttons
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Theme Toggle
-                IconButton(onClick = onThemeToggle) {
+                // DEV ONLY: Import V1 Database - Remove after migration
+                IconButton(
+                    onClick = onImportV1,
+                    modifier = Modifier.handPointer(),
+                ) {
                     Icon(
-                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = if (isDarkTheme) "Switch to light mode" else "Switch to dark mode",
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Import V1 Database",
+                        modifier = Modifier.size(20.dp),
                     )
                 }
 
-                // Settings
-                IconButton(onClick = onSettingsClick) {
+                IconButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier.handPointer(),
+                ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
+                        modifier = Modifier.size(20.dp),
                     )
                 }
 
-                // Sidebar Toggle
-                IconButton(onClick = onSidebarToggle) {
+                IconButton(
+                    onClick = onSidebarToggle,
+                    modifier = Modifier.handPointer(),
+                ) {
                     Icon(
                         imageVector = if (isSidebarVisible) Icons.Default.ChatBubble else Icons.Default.ChatBubbleOutline,
                         contentDescription = if (isSidebarVisible) "Hide AI sidebar" else "Show AI sidebar",
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
         }
-        }  // Close Box for glassmorphism
     }
 }
 

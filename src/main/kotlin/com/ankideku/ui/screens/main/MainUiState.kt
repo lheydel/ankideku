@@ -31,10 +31,12 @@ data class MainUiState(
 
     // Comparison view
     val selectedSuggestion: Suggestion? = null,
-    val isEditing: Boolean = false,
+    val isEditMode: Boolean = false,  // Whether user is in edit mode (Edit/Done toggle)
+    val hasManualEdits: Boolean = false,  // Whether edits have been saved to DB
     val editedFields: Map<String, String> = emptyMap(),
     val showOriginal: Boolean = false,
     val isActionLoading: Boolean = false,
+    val viewingHistoryEntry: HistoryEntry? = null,
 
     // Sidebar / Chat
     val chatMessages: List<ChatMessage> = emptyList(),

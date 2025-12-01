@@ -8,6 +8,7 @@ import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.Suggestion
 import com.ankideku.ui.screens.main.DialogState
 import com.ankideku.ui.theme.Spacing
+import com.ankideku.ui.theme.handPointer
 
 /**
  * Renders the appropriate dialog based on the current dialog state.
@@ -60,12 +61,18 @@ fun ConfirmDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.handPointer(),
+            ) {
                 Text(confirmLabel)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.handPointer(),
+            ) {
                 Text("Cancel")
             }
         },
@@ -113,16 +120,25 @@ fun ConflictDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onUseAi) {
+            Button(
+                onClick = onUseAi,
+                modifier = Modifier.handPointer(),
+            ) {
                 Text("Use AI Changes")
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                TextButton(onClick = onUseCurrent) {
+                TextButton(
+                    onClick = onUseCurrent,
+                    modifier = Modifier.handPointer(),
+                ) {
                     Text("Keep Current")
                 }
-                TextButton(onClick = onCancel) {
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.handPointer(),
+                ) {
                     Text("Cancel")
                 }
             }
@@ -144,7 +160,10 @@ fun ErrorDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.handPointer(),
+            ) {
                 Text("OK")
             }
         },

@@ -5,12 +5,13 @@ import com.ankideku.data.local.database.Suggestion as DbSuggestion
 import com.ankideku.domain.model.Suggestion
 import com.ankideku.domain.model.SuggestionStatus
 
-fun DbSuggestion.toDomain(fieldValues: List<Field_value>): Suggestion {
+fun DbSuggestion.toDomain(fieldValues: List<Field_value>, modelName: String): Suggestion {
     val byContext = fieldValues.byContext()
     return Suggestion(
         id = id,
         sessionId = session_id,
         noteId = note_id,
+        modelName = modelName,
         originalFields = (byContext[FieldContext.Original] ?: emptyList()).toNoteFields(),
         changes = (byContext[FieldContext.Changes] ?: emptyList()).toStringMap(),
         reasoning = reasoning,
@@ -18,5 +19,6 @@ fun DbSuggestion.toDomain(fieldValues: List<Field_value>): Suggestion {
         editedChanges = byContext[FieldContext.Edited]?.toStringMap(),
         createdAt = created_at,
         decidedAt = decided_at,
+        skippedAt = skipped_at,
     )
 }

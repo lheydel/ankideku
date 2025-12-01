@@ -13,7 +13,9 @@ interface ReviewActions {
     fun acceptSuggestion()
     fun rejectSuggestion()
     fun skipSuggestion()
+    fun selectSuggestion(index: Int)
     fun editField(fieldName: String, value: String)
+    fun toggleEditMode()
     fun toggleOriginalView()
     fun revertEdits()
 }
@@ -36,7 +38,8 @@ class ReviewActionsImpl(
 
                 when (val result = reviewSuggestionFeature.accept(suggestion.id)) {
                     is ReviewResult.Success -> {
-                        moveToNextSuggestion()
+                        // Flow observation will remove accepted item and update list
+                        resetEditState()
                         ctx.showToast("Changes applied", ToastType.Success)
                     }
                     is ReviewResult.Conflict -> {
@@ -59,7 +62,10 @@ class ReviewActionsImpl(
             ctx.update { copy(isActionLoading = true) }
             try {
                 when (val result = reviewSuggestionFeature.reject(suggestion.id)) {
-                    is ReviewResult.Success -> moveToNextSuggestion()
+                    is ReviewResult.Success -> {
+                        // Flow observation will remove rejected item and update list
+                        resetEditState()
+                    }
                     is ReviewResult.Error -> ctx.showToast("Failed to reject: ${result.message}", ToastType.Error)
                     is ReviewResult.Conflict -> { /* shouldn't happen for reject */ }
                 }
@@ -76,7 +82,10 @@ class ReviewActionsImpl(
             ctx.update { copy(isActionLoading = true) }
             try {
                 when (val result = reviewSuggestionFeature.skip(suggestion.id)) {
-                    is ReviewResult.Success -> moveToNextSuggestion()
+                    is ReviewResult.Success -> {
+                        // Flow observation will move item to end and update list
+                        resetEditState()
+                    }
                     is ReviewResult.Error -> ctx.showToast("Failed to skip: ${result.message}", ToastType.Error)
                     is ReviewResult.Conflict -> { /* shouldn't happen for skip */ }
                 }
@@ -88,10 +97,72 @@ class ReviewActionsImpl(
 
     override fun editField(fieldName: String, value: String) {
         ctx.update {
-            copy(
-                editedFields = editedFields + (fieldName to value),
-                isEditing = true,
-            )
+            copy(editedFields = editedFields + (fieldName to value))
+        }
+    }
+
+    override fun toggleEditMode() {
+        val state = ctx.currentState
+        val suggestion = state.currentSuggestion ?: return
+
+        if (state.isEditMode) {
+            // Exiting edit mode - save edits if any
+            ctx.scope.launch {
+                val editedChanges = state.editedFields.takeIf { it.isNotEmpty() }
+                if (editedChanges != null) {
+                    // Filter to only include actual changes (different from AI suggestion)
+                    val actualEdits = filterActualEdits(editedChanges, suggestion)
+                    if (actualEdits.isNotEmpty()) {
+                        reviewSuggestionFeature.saveEdits(suggestion.id, actualEdits)
+                        ctx.update {
+                            copy(
+                                isEditMode = false,
+                                hasManualEdits = true,
+                                showOriginal = false,
+                            )
+                        }
+                    } else {
+                        // No actual changes - clear edits if previously saved
+                        if (state.hasManualEdits) {
+                            reviewSuggestionFeature.clearEdits(suggestion.id)
+                        }
+                        ctx.update {
+                            copy(
+                                isEditMode = false,
+                                hasManualEdits = false,
+                                editedFields = emptyMap(),
+                            )
+                        }
+                    }
+                } else {
+                    ctx.update { copy(isEditMode = false) }
+                }
+            }
+        } else {
+            // Entering edit mode - initialize editedFields with current values
+            val initialEdits = if (state.hasManualEdits && state.editedFields.isNotEmpty()) {
+                state.editedFields
+            } else {
+                // Start with AI suggestions as base
+                suggestion.changes.toMutableMap()
+            }
+            ctx.update {
+                copy(
+                    isEditMode = true,
+                    editedFields = initialEdits,
+                    showOriginal = false,
+                )
+            }
+        }
+    }
+
+    private fun filterActualEdits(
+        editedChanges: Map<String, String>,
+        suggestion: Suggestion,
+    ): Map<String, String> {
+        return editedChanges.filter { (fieldName, editedValue) ->
+            val aiValue = suggestion.changes[fieldName] ?: suggestion.originalFields[fieldName]?.value
+            editedValue != aiValue
         }
     }
 
@@ -100,22 +171,47 @@ class ReviewActionsImpl(
     }
 
     override fun revertEdits() {
-        ctx.update {
-            copy(
-                editedFields = emptyMap(),
-                isEditing = false,
-            )
+        val suggestion = ctx.currentState.currentSuggestion ?: return
+
+        ctx.scope.launch {
+            if (ctx.currentState.hasManualEdits) {
+                reviewSuggestionFeature.clearEdits(suggestion.id)
+            }
+            ctx.update {
+                copy(
+                    editedFields = emptyMap(),
+                    hasManualEdits = false,
+                    showOriginal = false,
+                )
+            }
         }
     }
 
-    private fun moveToNextSuggestion() {
+    override fun selectSuggestion(index: Int) {
+        val suggestions = ctx.currentState.suggestions
+        if (index in suggestions.indices) {
+            // Load hasManualEdits from the suggestion's editedChanges
+            val suggestion = suggestions[index]
+            val hasEdits = suggestion.editedChanges?.isNotEmpty() == true
+            ctx.update {
+                copy(
+                    currentSuggestionIndex = index,
+                    editedFields = suggestion.editedChanges ?: emptyMap(),
+                    isEditMode = false,
+                    hasManualEdits = hasEdits,
+                    showOriginal = false,
+                    viewingHistoryEntry = null,
+                )
+            }
+        }
+    }
+
+    private fun resetEditState() {
         ctx.update {
-            val newSuggestions = suggestions.filterNot { s -> s.id == currentSuggestion?.id }
             copy(
-                suggestions = newSuggestions,
-                currentSuggestionIndex = 0,
                 editedFields = emptyMap(),
-                isEditing = false,
+                isEditMode = false,
+                hasManualEdits = false,
             )
         }
     }
@@ -144,7 +240,7 @@ class ReviewActionsImpl(
             when (val result = reviewSuggestionFeature.forceAccept(suggestionId)) {
                 is ReviewResult.Success -> {
                     dismissDialog()
-                    moveToNextSuggestion()
+                    resetEditState()
                     ctx.showToast("Changes applied (overwritten)", ToastType.Success)
                 }
                 is ReviewResult.Error -> ctx.showToast("Failed: ${result.message}", ToastType.Error)
@@ -157,7 +253,7 @@ class ReviewActionsImpl(
         ctx.scope.launch {
             reviewSuggestionFeature.skip(suggestionId)
             dismissDialog()
-            moveToNextSuggestion()
+            resetEditState()
         }
     }
 

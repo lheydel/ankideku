@@ -6,9 +6,10 @@ CREATE TABLE suggestion (
     session_id INTEGER NOT NULL REFERENCES session(id) ON DELETE CASCADE,
     note_id INTEGER NOT NULL,
     reasoning TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',  -- pending, accepted, rejected, skipped
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending, accepted, rejected
     created_at INTEGER NOT NULL,
-    decided_at INTEGER
+    decided_at INTEGER,
+    skipped_at INTEGER  -- When set, suggestion moves to end of queue
 );
 
 CREATE INDEX idx_suggestion_session ON suggestion(session_id);
@@ -22,7 +23,8 @@ getSuggestionsForSession:
 SELECT * FROM suggestion WHERE session_id = ? ORDER BY id;
 
 getPendingSuggestionsForSession:
-SELECT * FROM suggestion WHERE session_id = ? AND status = 'pending' ORDER BY id;
+SELECT * FROM suggestion WHERE session_id = ? AND status = 'pending'
+ORDER BY (CASE WHEN skipped_at IS NULL THEN 0 ELSE 1 END), skipped_at, id;
 
 getSuggestionById:
 SELECT * FROM suggestion WHERE id = ?;
@@ -36,6 +38,9 @@ SELECT last_insert_rowid();
 
 updateSuggestionStatus:
 UPDATE suggestion SET status = ?, decided_at = ? WHERE id = ?;
+
+skipSuggestion:
+UPDATE suggestion SET skipped_at = ? WHERE id = ?;
 
 touchSuggestion:
 UPDATE suggestion SET id = id WHERE id = ?;

@@ -24,6 +24,7 @@ import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
 import com.ankideku.domain.usecase.settings.SettingsManager
 import com.ankideku.domain.usecase.suggestion.SuggestionFinder
 import com.ankideku.domain.usecase.deck.SyncDeckFeature
+import com.ankideku.util.getAppDataDir
 import com.ankideku.util.json
 import io.ktor.client.*
 import kotlinx.coroutines.CoroutineScope
@@ -51,7 +52,7 @@ val appModule = module {
 
     // Database
     single {
-        val dbPath = "${getDataPath()}/ankideku.db"
+        val dbPath = "${getAppDataDir().absolutePath}/ankideku.db"
         val dbFile = File(dbPath)
         val dbExists = dbFile.exists()
 
@@ -94,6 +95,9 @@ val appModule = module {
     factory { SessionOrchestrator(get(), get(), get(), get()) }
     factory { ReviewSuggestionFeature(get(), get(), get(), get(), get(), get()) }
 
+    // DEV ONLY: V1 Database Importer - Remove after migration
+    single { V1DatabaseImporter(get(), get(), get(), get()) }
+
     // ViewModels
     single {
         MainViewModel(
@@ -106,21 +110,7 @@ val appModule = module {
             historyFinder = get(),
             settingsManager = get(),
             connectionMonitor = get(),
+            v1Importer = get(),  // DEV ONLY: Remove after migration
         )
     }
-}
-
-/**
- * Get the platform-specific data directory for AnkiDeku.
- * Creates the directory if it doesn't exist.
- */
-private fun getDataPath(): String {
-    val os = System.getProperty("os.name").lowercase()
-    val home = System.getProperty("user.home")
-
-    return when {
-        os.contains("win") -> "$home/AppData/Roaming/AnkiDeku"
-        os.contains("mac") -> "$home/Library/Application Support/AnkiDeku"
-        else -> "$home/.config/AnkiDeku"
-    }.also { File(it).mkdirs() }
 }

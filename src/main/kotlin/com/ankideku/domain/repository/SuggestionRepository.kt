@@ -17,6 +17,7 @@ interface SuggestionRepository {
     fun save(suggestion: Suggestion)
     fun saveAll(suggestions: List<Suggestion>)
     fun updateStatus(suggestionId: SuggestionId, status: SuggestionStatus)
+    fun skip(suggestionId: SuggestionId)
     fun saveEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>)
     fun clearEditedChanges(suggestionId: SuggestionId)
 }

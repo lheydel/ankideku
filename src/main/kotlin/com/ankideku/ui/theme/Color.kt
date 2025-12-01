@@ -27,7 +27,7 @@ object Palette {
     // Amber
     val Amber50 = Color(0xFFFFFBEB)
 
-    // Gray
+    // Gray (neutral)
     val Gray50 = Color(0xFFf9fafb)
     val Gray100 = Color(0xFFf3f4f6)
     val Gray200 = Color(0xFFe5e7eb)
@@ -40,6 +40,18 @@ object Palette {
     val Gray800 = Color(0xFF1f2937)
     val Gray900 = Color(0xFF111827)
 
+    // Slate (cooler, more modern gray with blue undertone)
+    val Slate50 = Color(0xFFf8fafc)
+    val Slate100 = Color(0xFFf1f5f9)
+    val Slate200 = Color(0xFFe2e8f0)
+    val Slate300 = Color(0xFFcbd5e1)
+    val Slate400 = Color(0xFF94a3b8)
+    val Slate500 = Color(0xFF64748b)
+    val Slate600 = Color(0xFF475569)
+    val Slate700 = Color(0xFF334155)
+    val Slate800 = Color(0xFF1e293b)
+    val Slate900 = Color(0xFF0f172a)
+
     // Semantic
     val Success = Color(0xFF4CAF50)
     val Warning = Color(0xFFFFA726)
@@ -47,16 +59,16 @@ object Palette {
     val Info = Color(0xFF42A5F5)
 
     // Material 3 scheme colors
-    val BackgroundLight = Color(0xFFf9fafb)  // Gray-50
-    val BackgroundDark = Color(0xFF111827)   // Gray-900
-    val SurfaceLight = Color.White
-    val SurfaceDark = Color(0xFF1f2937)      // Gray-800
-    val SurfaceVariantLight = Color(0xFFf3f4f6)  // Gray-100
-    val SurfaceVariantDark = Color(0xFF374151)   // Gray-700
-    val OnBackgroundLight = Color(0xFF111827)  // Gray-900
-    val OnBackgroundDark = Color(0xFFf3f4f6)   // Gray-100
-    val OnSurfaceLight = Color(0xFF111827)     // Gray-900
-    val OnSurfaceDark = Color(0xFFf3f4f6)      // Gray-100
+    val BackgroundLight = Color(0xFFe2e8f0)  // Slate-200 (more visible tint)
+    val BackgroundDark = Color(0xFF0f172a)   // Slate-900
+    val SurfaceLight = Color(0xFFf8fafc)     // Slate-50 for cards
+    val SurfaceDark = Color(0xFF1e293b)      // Slate-800
+    val SurfaceVariantLight = Color(0xFFcbd5e1)  // Slate-300
+    val SurfaceVariantDark = Color(0xFF334155)   // Slate-700
+    val OnBackgroundLight = Color(0xFF0f172a)  // Slate-900
+    val OnBackgroundDark = Color(0xFFf1f5f9)   // Slate-100
+    val OnSurfaceLight = Color(0xFF0f172a)     // Slate-900
+    val OnSurfaceDark = Color(0xFFf1f5f9)      // Slate-100
 }
 
 /**
@@ -106,109 +118,169 @@ data class AppColorScheme(
 
     // Diff colors
     val diffAdded: Color,
+    val diffAddedText: Color,
     val diffRemoved: Color,
+    val diffRemovedText: Color,
 
-    // Header gradient
+    // Field row background when changed (V1: bg-yellow-50/30)
+    val fieldChangedBg: Color,
+
+    // Header gradient (for cards/content headers)
     val headerGradientStart: Color,
     val headerGradientEnd: Color,
+
+    // App header bar gradient
+    val appHeaderStart: Color,
+    val appHeaderMid: Color,
+    val appHeaderEnd: Color,
+
+    // Chat area
+    val chatBackground: Color,
+    val assistantBubble: Color,
+    val userBubble: Color,
+    val onUserBubble: Color,
+
+    // Main content gradient (V1: bg-gradient-to-br from-gray-50 to-gray-100)
+    val contentGradientStart: Color,
+    val contentGradientEnd: Color,
 )
 
 val LightAppColors = AppColorScheme(
     // Text
-    textPrimary = Palette.Gray900,
-    textSecondary = Palette.Gray700,
-    textMuted = Palette.Gray500,
+    textPrimary = Palette.Slate900,
+    textSecondary = Palette.Slate600,
+    textMuted = Palette.Slate400,
 
-    // Surfaces
-    surface = Color.White,
-    surfaceAlt = Palette.Gray50,
-    border = Palette.Gray200,
-    borderMuted = Palette.Gray100,
-    divider = Palette.Gray300,
+    // Surfaces - tinted surfaces for modern look
+    surface = Palette.Slate50,           // Subtle tint instead of pure white
+    surfaceAlt = Palette.Slate200,       // More visible depth
+    border = Palette.Slate300,
+    borderMuted = Palette.Slate200,
+    divider = Palette.Slate200,
 
     // Primary (green)
     accent = Palette.Primary,
-    accentMuted = Palette.Primary50,
+    accentMuted = Color(0xFFecfdf5),     // Emerald-50 (richer green tint)
     accentStrong = Palette.Primary600,
-    accentSurface = Palette.Primary50,
+    accentSurface = Color(0xFFecfdf5),   // Emerald-50
     accentOnSurface = Palette.Primary700,
     accentTrack = Palette.Primary200,
     onAccent = Color.White,
 
     // Secondary (blue)
-    secondary = Palette.Info,
-    secondaryMuted = Palette.Blue50,
+    secondary = Color(0xFF3b82f6),       // Blue-500 (more vibrant)
+    secondaryMuted = Color(0xFFeff6ff),  // Blue-50
 
     // Warning (amber)
-    warning = Palette.Warning,
-    warningMuted = Palette.Amber50,
-    warningBorder = Color(0xFFFDE68A),  // Amber-200
-    warningText = Color(0xFF78350F),    // Amber-900
+    warning = Color(0xFFf59e0b),         // Amber-500
+    warningMuted = Color(0xFFFEF3C7),    // Amber-100 (richer)
+    warningBorder = Color(0xFFFCD34D),   // Amber-300
+    warningText = Color(0xFF78350F),     // Amber-900
 
     // Success
-    success = Palette.Success,
-    successMuted = Palette.Success.copy(alpha = 0.1f),
+    success = Color(0xFF10b981),         // Emerald-500 (more modern)
+    successMuted = Color(0xFFd1fae5),    // Emerald-100
 
     // Error
-    error = Palette.Error,
-    errorMuted = Palette.Error.copy(alpha = 0.1f),
+    error = Color(0xFFef4444),           // Red-500
+    errorMuted = Color(0xFFfee2e2),      // Red-100
 
-    // Diff
-    diffAdded = Color(0xFFDCF5DC),
-    diffRemoved = Color(0xFFFDECEC),
+    // Diff - richer colors for better visibility
+    diffAdded = Color(0xFFd1fae5),       // Emerald-100
+    diffAddedText = Color(0xFF065f46),   // Emerald-800
+    diffRemoved = Color(0xFFfee2e2),     // Red-100
+    diffRemovedText = Color(0xFF991b1b), // Red-800
 
-    // Header gradient
-    headerGradientStart = Palette.Primary50,
-    headerGradientEnd = Palette.Blue50,
+    // Field row background
+    fieldChangedBg = Color(0xFFfef9c3).copy(alpha = 0.5f),  // Yellow-100 at 50%
+
+    // Header gradient - subtle emerald to blue
+    headerGradientStart = Color(0xFFecfdf5),  // Emerald-50
+    headerGradientEnd = Color(0xFFeff6ff),    // Blue-50
+
+    // App header bar - clean subtle gradient
+    appHeaderStart = Palette.Slate50,
+    appHeaderMid = Palette.Slate100,
+    appHeaderEnd = Palette.Slate50,
+
+    // Chat area - slate tones
+    chatBackground = Palette.Slate100,
+    assistantBubble = Palette.Slate200,
+    userBubble = Palette.Primary600,        // Darker green for good contrast with white
+    onUserBubble = Color.White,
+
+    // Main content gradient - more visible depth
+    contentGradientStart = Palette.Slate100,
+    contentGradientEnd = Palette.Slate200,
 )
 
 val DarkAppColors = AppColorScheme(
     // Text
-    textPrimary = Palette.Gray100,
-    textSecondary = Palette.Gray300,
-    textMuted = Palette.Gray500,
+    textPrimary = Palette.Slate100,
+    textSecondary = Palette.Slate300,
+    textMuted = Palette.Slate400,
 
-    // Surfaces
-    surface = Palette.Gray800,
-    surfaceAlt = Palette.Gray750,
-    border = Palette.Gray600,
-    borderMuted = Palette.Gray700,
-    divider = Palette.Gray600,
+    // Surfaces - slate tones for consistency
+    surface = Palette.Slate800,
+    surfaceAlt = Palette.Slate700,
+    border = Palette.Slate600,
+    borderMuted = Palette.Slate700,
+    divider = Palette.Slate600,
 
     // Primary (green)
-    accent = Palette.Primary,
-    accentMuted = Palette.Primary.copy(alpha = 0.15f),
-    accentStrong = Palette.Primary,
-    accentSurface = Palette.Primary900.copy(alpha = 0.3f),
-    accentOnSurface = Color(0xFF86efac),  // Primary-300
-    accentTrack = Palette.Primary800,
+    accent = Color(0xFF10b981),          // Emerald-500
+    accentMuted = Color(0xFF10b981).copy(alpha = 0.15f),
+    accentStrong = Color(0xFF34d399),    // Emerald-400
+    accentSurface = Color(0xFF064e3b).copy(alpha = 0.4f),  // Emerald-900
+    accentOnSurface = Color(0xFF6ee7b7), // Emerald-300
+    accentTrack = Color(0xFF064e3b),     // Emerald-900
     onAccent = Color.White,
 
     // Secondary (blue)
-    secondary = Palette.Info,
-    secondaryMuted = Palette.Info.copy(alpha = 0.15f),
+    secondary = Color(0xFF60a5fa),       // Blue-400
+    secondaryMuted = Color(0xFF3b82f6).copy(alpha = 0.15f),
 
     // Warning (amber)
-    warning = Palette.Warning,
-    warningMuted = Palette.Warning.copy(alpha = 0.15f),
+    warning = Color(0xFFfbbf24),         // Amber-400
+    warningMuted = Color(0xFFf59e0b).copy(alpha = 0.15f),
     warningBorder = Color(0xFF92400e).copy(alpha = 0.5f),  // Amber-700
-    warningText = Color(0xFFFDE68A),  // Amber-200
+    warningText = Color(0xFFFDE68A),     // Amber-200
 
     // Success
-    success = Palette.Success,
-    successMuted = Palette.Success.copy(alpha = 0.15f),
+    success = Color(0xFF34d399),         // Emerald-400
+    successMuted = Color(0xFF10b981).copy(alpha = 0.15f),
 
     // Error
-    error = Palette.Error,
-    errorMuted = Palette.Error.copy(alpha = 0.15f),
+    error = Color(0xFFf87171),           // Red-400
+    errorMuted = Color(0xFFef4444).copy(alpha = 0.15f),
 
     // Diff
-    diffAdded = Color(0xFF1a3d1a),
-    diffRemoved = Color(0xFF3d1a1a),
+    diffAdded = Color(0xFF064e3b).copy(alpha = 0.5f),     // Emerald-900
+    diffAddedText = Color(0xFF6ee7b7),                     // Emerald-300
+    diffRemoved = Color(0xFF7f1d1d).copy(alpha = 0.5f),   // Red-900
+    diffRemovedText = Color(0xFFfca5a5),                   // Red-300
+
+    // Field row background
+    fieldChangedBg = Color(0xFF713f12).copy(alpha = 0.25f),  // Yellow-900
 
     // Header gradient
-    headerGradientStart = Palette.Primary900.copy(alpha = 0.3f),
-    headerGradientEnd = Palette.Blue900.copy(alpha = 0.3f),
+    headerGradientStart = Color(0xFF064e3b).copy(alpha = 0.3f),  // Emerald-900
+    headerGradientEnd = Color(0xFF1e3a8a).copy(alpha = 0.3f),    // Blue-900
+
+    // App header bar - subtle gradient in dark theme
+    appHeaderStart = Palette.Slate800,
+    appHeaderMid = Palette.Slate800.copy(alpha = 0.95f),
+    appHeaderEnd = Color(0xFF10b981).copy(alpha = 0.05f),  // Subtle emerald tint
+
+    // Chat area
+    chatBackground = Palette.Slate900,
+    assistantBubble = Palette.Slate700,
+    userBubble = Color(0xFF15803d),         // Emerald-700 - darker for dark mode
+    onUserBubble = Color.White,
+
+    // Main content gradient
+    contentGradientStart = Palette.Slate900,
+    contentGradientEnd = Palette.Slate800,
 )
 
 val LocalAppColors = staticCompositionLocalOf { LightAppColors }

@@ -1,6 +1,7 @@
 package com.ankideku
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
@@ -12,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.ankideku.domain.model.AppTheme
+import com.ankideku.ui.components.Header
 import com.ankideku.ui.screens.main.MainScreen
 import com.ankideku.ui.screens.main.MainViewModel
 import com.ankideku.ui.theme.AnkiDekuTheme
@@ -34,7 +36,19 @@ fun App() {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                MainScreen(viewModel = viewModel)
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Header(
+                        isConnected = uiState.ankiConnected,
+                        onSettingsClick = viewModel::showSettingsDialog,
+                        onSidebarToggle = viewModel::toggleSidebar,
+                        onImportV1 = viewModel::importV1Database,
+                        isSidebarVisible = uiState.isSidebarVisible,
+                    )
+                    MainScreen(
+                        viewModel = viewModel,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }

@@ -2,8 +2,6 @@ package com.ankideku.ui.screens.main.actions
 
 import com.ankideku.domain.model.Deck
 import com.ankideku.domain.usecase.deck.DeckFinder
-import com.ankideku.domain.usecase.session.SessionFinder
-import com.ankideku.domain.usecase.suggestion.SuggestionFinder
 import com.ankideku.domain.usecase.deck.SyncDeckFeature
 import com.ankideku.domain.usecase.deck.SyncException
 import com.ankideku.domain.usecase.deck.SyncProgress
@@ -24,15 +22,12 @@ class DeckActionsImpl(
     private val ctx: ViewModelContext,
     private val syncDeckFeature: SyncDeckFeature,
     private val deckFinder: DeckFinder,
-    private val sessionFinder: SessionFinder,
-    private val suggestionFinder: SuggestionFinder,
 ) : DeckActions {
 
     private var syncJob: Job? = null
 
     override fun selectDeck(deck: Deck) {
         ctx.update { copy(selectedDeck = deck) }
-        loadSuggestionsForDeck(deck)
     }
 
     override fun refreshDecks() {
@@ -103,32 +98,4 @@ class DeckActionsImpl(
         syncJob?.cancel()
     }
 
-    private fun loadSuggestionsForDeck(deck: Deck) {
-        ctx.scope.launch {
-            try {
-                val sessions = sessionFinder.getForDeck(deck.id)
-                val latestSession = sessions.maxByOrNull { it.createdAt }
-
-                ctx.update {
-                    copy(
-                        sessions = sessions,
-                        currentSession = latestSession,
-                    )
-                }
-
-                latestSession?.let { session ->
-                    suggestionFinder.observePendingForSession(session.id).collect { suggestions ->
-                        ctx.update {
-                            copy(
-                                suggestions = suggestions,
-                                currentSuggestionIndex = 0,
-                            )
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                ctx.showToast("Failed to load suggestions: ${e.message}", ToastType.Error)
-            }
-        }
-    }
 }

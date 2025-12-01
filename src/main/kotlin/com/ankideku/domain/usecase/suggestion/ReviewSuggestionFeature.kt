@@ -46,10 +46,12 @@ class ReviewSuggestionFeature(
     }
 
     /**
-     * Skip a suggestion for now (can review later).
+     * Skip a suggestion for now (moves to end of queue).
+     * No history entry is created since the suggestion stays in the queue.
      */
     suspend fun skip(suggestionId: SuggestionId): ReviewResult {
-        return recordDecision(suggestionId, SuggestionStatus.Skipped, ReviewAction.Skip)
+        onIO { suggestionRepository.skip(suggestionId) }
+        return ReviewResult.Success
     }
 
     /**
@@ -157,6 +159,7 @@ class ReviewSuggestionFeature(
         noteId = suggestion.noteId,
         deckId = session.deckId,
         deckName = session.deckName,
+        modelName = suggestion.modelName,
         action = action,
         originalFields = suggestion.originalFields,
         aiChanges = suggestion.changes,

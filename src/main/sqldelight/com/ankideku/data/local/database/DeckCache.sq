@@ -109,3 +109,7 @@ DELETE FROM cached_note WHERE id = ?;
 -- Update deck_name for all notes when deck is renamed
 updateNotesDeckName:
 UPDATE cached_note SET deck_name = ?, updated_at = ? WHERE deck_id = ?;
+
+-- Get model names for a list of note IDs
+getModelNamesForNotes:
+SELECT id, model_name FROM cached_note WHERE id IN ?;

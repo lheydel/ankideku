@@ -30,6 +30,13 @@ CREATE INDEX idx_session_created ON session(created_at DESC);
 getAllSessions:
 SELECT * FROM session ORDER BY created_at DESC;
 
+getAllSessionsWithPendingCount:
+SELECT
+    s.*,
+    (SELECT COUNT(*) FROM suggestion WHERE session_id = s.id AND status = 'pending') AS pending_suggestions_count
+FROM session s
+ORDER BY created_at DESC;
+
 getSessionById:
 SELECT * FROM session WHERE id = ?;
 
@@ -40,8 +47,8 @@ getSessionsForDeck:
 SELECT * FROM session WHERE deck_id = ? ORDER BY created_at DESC;
 
 insertSession:
-INSERT INTO session (deck_id, deck_name, prompt, state, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO session (deck_id, deck_name, prompt, state, progress_total_cards, progress_total_batches, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 lastInsertedSessionId:
 SELECT last_insert_rowid();

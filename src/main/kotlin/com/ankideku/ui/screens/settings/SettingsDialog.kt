@@ -8,25 +8,26 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.ankideku.data.remote.llm.LlmHealthStatus
 import com.ankideku.data.remote.llm.LlmProvider
+import com.ankideku.ui.components.AppDialog
+import com.ankideku.ui.components.AppDropdown
 import com.ankideku.domain.model.AppTheme
 import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.Settings
 import com.ankideku.domain.model.Suggestion
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
-import com.ankideku.ui.theme.InputShape
-import com.ankideku.ui.theme.appInputColors
+import com.ankideku.ui.theme.handPointer
 
 @Composable
 fun SettingsDialog(
@@ -45,10 +46,7 @@ fun SettingsDialog(
     val modelTypes = remember(suggestions, settings.fieldDisplayConfig) {
         val models = mutableMapOf<String, Map<String, NoteField>?>()
         suggestions.forEach { suggestion ->
-            val modelName = suggestion.originalFields.values.firstOrNull()?.let {
-                // Try to infer model name from fields - for now just use a placeholder
-                "Note Type"
-            } ?: "Unknown"
+            val modelName = suggestion.modelName.ifBlank { "Unknown" }
             if (!models.containsKey(modelName)) {
                 models[modelName] = suggestion.originalFields
             }
@@ -62,30 +60,44 @@ fun SettingsDialog(
         models.toList()
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    AppDialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
-                .width(500.dp)
+                .width(560.dp)
                 .heightIn(max = 600.dp),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                // Header
-                Column(
+                // Header with close button
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(Spacing.lg),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    Text(
-                        text = "Settings",
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                    Text(
-                        text = "Configure application settings",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Column {
+                        Text(
+                            text = "Settings",
+                            style = MaterialTheme.typography.headlineSmall,
+                        )
+                        Text(
+                            text = "Configure application settings",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.handPointer(),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 HorizontalDivider()
@@ -107,24 +119,14 @@ fun SettingsDialog(
                         onTestConnection = onTestConnection,
                     )
 
-                    HorizontalDivider()
-
-                    // Theme Selection
-                    Column {
-                        Text(
-                            text = "Theme",
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        Spacer(Modifier.height(Spacing.sm))
-                        ThemeSelector(
-                            selectedTheme = currentSettings.theme,
-                            onThemeSelected = { currentSettings = currentSettings.copy(theme = it) },
-                        )
-                    }
+                    // Theme Section
+                    ThemeSection(
+                        selectedTheme = currentSettings.theme,
+                        onThemeSelected = { currentSettings = currentSettings.copy(theme = it) },
+                    )
 
                     // Field Display Section (if model types available)
                     if (modelTypes.isNotEmpty()) {
-                        HorizontalDivider()
                         FieldDisplaySection(
                             modelTypes = modelTypes,
                             fieldDisplayConfig = currentSettings.fieldDisplayConfig,
@@ -145,8 +147,12 @@ fun SettingsDialog(
                         .fillMaxWidth()
                         .padding(Spacing.lg),
                     horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onDismiss) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.handPointer(),
+                    ) {
                         Text("Cancel")
                     }
                     Spacer(Modifier.width(Spacing.sm))
@@ -155,8 +161,15 @@ fun SettingsDialog(
                             onSave(currentSettings)
                             onDismiss()
                         },
+                        modifier = Modifier.handPointer(),
                     ) {
-                        Text("Save")
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(Spacing.xs))
+                        Text("Save Settings")
                     }
                 }
             }
@@ -173,6 +186,7 @@ private fun AiProviderSection(
     onTestConnection: () -> Unit,
 ) {
     val colors = LocalAppColors.current
+
     Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -186,7 +200,7 @@ private fun AiProviderSection(
             )
             Text(
                 text = "AI Provider",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
             )
         }
 
@@ -205,11 +219,15 @@ private fun AiProviderSection(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Provider selector and status
+                    // Provider dropdown and status
                     Column(modifier = Modifier.weight(1f)) {
-                        LlmProviderSelector(
-                            selectedProvider = selectedProvider,
-                            onProviderSelected = onProviderSelected,
+                        AppDropdown(
+                            items = LlmProvider.entries.toList(),
+                            selectedItem = selectedProvider,
+                            onItemSelected = onProviderSelected,
+                            itemLabel = { providerDisplayName(it) },
+                            enabled = !isChecking,
+                            modifier = Modifier.width(180.dp),
                         )
 
                         Spacer(Modifier.height(Spacing.sm))
@@ -256,6 +274,7 @@ private fun AiProviderSection(
                         // Test button
                         OutlinedButton(
                             onClick = onTestConnection,
+                            modifier = Modifier.handPointer(!isChecking),
                             enabled = !isChecking,
                         ) {
                             if (isChecking) {
@@ -297,7 +316,6 @@ private fun AiProviderSection(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FieldDisplaySection(
     modelTypes: List<Pair<String, Map<String, NoteField>?>>,
@@ -349,40 +367,15 @@ private fun FieldDisplaySection(
 
                         if (fields != null) {
                             val sortedFields = fields.entries.sortedBy { it.value.order }.map { it.key }
-                            val currentField = fieldDisplayConfig[modelName] ?: sortedFields.firstOrNull() ?: ""
-                            var expanded by remember { mutableStateOf(false) }
+                            val currentField = fieldDisplayConfig[modelName] ?: sortedFields.firstOrNull()
 
-                            ExposedDropdownMenuBox(
-                                expanded = expanded,
-                                onExpandedChange = { expanded = it },
-                            ) {
-                                OutlinedTextField(
-                                    value = currentField,
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                                    modifier = Modifier
-                                        .width(180.dp)
-                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                                    textStyle = MaterialTheme.typography.bodySmall,
-                                    colors = appInputColors(),
-                                    shape = InputShape,
-                                )
-                                ExposedDropdownMenu(
-                                    expanded = expanded,
-                                    onDismissRequest = { expanded = false },
-                                ) {
-                                    sortedFields.forEach { fieldName ->
-                                        DropdownMenuItem(
-                                            text = { Text(fieldName) },
-                                            onClick = {
-                                                onFieldChange(modelName, fieldName)
-                                                expanded = false
-                                            },
-                                        )
-                                    }
-                                }
-                            }
+                            AppDropdown(
+                                items = sortedFields,
+                                selectedItem = currentField,
+                                onItemSelected = { onFieldChange(modelName, it) },
+                                itemLabel = { it },
+                                modifier = Modifier.width(180.dp),
+                            )
                         } else {
                             // No sample - show read-only
                             Text(
@@ -399,62 +392,41 @@ private fun FieldDisplaySection(
 }
 
 @Composable
-private fun ThemeSelector(
+private fun ThemeSection(
     selectedTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        AppTheme.entries.forEach { theme ->
-            FilterChip(
-                selected = selectedTheme == theme,
-                onClick = { onThemeSelected(theme) },
-                label = { Text(theme.name) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun LlmProviderSelector(
-    selectedProvider: LlmProvider,
-    onProviderSelected: (LlmProvider) -> Unit,
-) {
     Column {
-        LlmProvider.entries.forEach { provider ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(
-                    selected = selectedProvider == provider,
-                    onClick = { onProviderSelected(provider) },
+        Text(
+            text = "Theme",
+            style = MaterialTheme.typography.titleMedium,
+        )
+
+        Spacer(Modifier.height(Spacing.md))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            AppTheme.entries.forEach { theme ->
+                FilterChip(
+                    selected = selectedTheme == theme,
+                    onClick = { onThemeSelected(theme) },
+                    modifier = Modifier.handPointer(),
+                    label = { Text(themeDisplayName(theme)) },
                 )
-                Spacer(Modifier.width(Spacing.sm))
-                Column {
-                    Text(
-                        text = providerDisplayName(provider),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        text = providerDescription(provider),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
     }
 }
 
-private fun providerDisplayName(provider: LlmProvider): String = when (provider) {
-    LlmProvider.CLAUDE_CODE -> "Claude Code CLI"
-    LlmProvider.MOCK -> "Mock (Testing)"
+private fun themeDisplayName(theme: AppTheme): String = when (theme) {
+    AppTheme.Light -> "Light"
+    AppTheme.Dark -> "Dark"
+    AppTheme.System -> "System"
 }
 
-private fun providerDescription(provider: LlmProvider): String = when (provider) {
-    LlmProvider.CLAUDE_CODE -> "Uses the Claude Code CLI for AI suggestions"
-    LlmProvider.MOCK -> "Returns mock suggestions for testing purposes"
+private fun providerDisplayName(provider: LlmProvider): String = when (provider) {
+    LlmProvider.CLAUDE_CODE -> "Claude Code"
+    LlmProvider.MOCK -> "Mock (Testing)"
 }

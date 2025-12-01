@@ -24,7 +24,6 @@ import com.ankideku.domain.model.AppTheme
 import com.ankideku.ui.components.AppDialogs
 import com.ankideku.ui.components.ComparisonPanel
 import com.ankideku.ui.components.ConnectionBanner
-import com.ankideku.ui.components.Header
 import com.ankideku.ui.components.QueuePanel
 import com.ankideku.ui.components.SessionSelector
 import com.ankideku.ui.components.SidebarPanel
@@ -38,6 +37,7 @@ import org.koin.compose.koinInject
 @Composable
 fun MainScreen(
     viewModel: MainViewModel = koinInject(),
+    modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -56,106 +56,118 @@ fun MainScreen(
         AppTheme.System -> isSystemInDarkTheme()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header
-            Header(
-                isConnected = uiState.ankiConnected,
-                onThemeToggle = viewModel::toggleTheme,
-                onSettingsClick = viewModel::showSettingsDialog,
-                onSidebarToggle = viewModel::toggleSidebar,
-                isSidebarVisible = uiState.isSidebarVisible,
-                isDarkTheme = isDarkTheme,
-            )
-
             // Connection warning banner
             ConnectionBanner(
                 isConnected = uiState.ankiConnected,
                 onRetry = viewModel::retryConnection,
             )
 
-            Row(modifier = Modifier.fillMaxSize().weight(1f)) {
-                // Left: Queue Panel
-                QueuePanel(
-                    suggestions = uiState.suggestions,
-                    currentSuggestionIndex = uiState.currentSuggestionIndex,
-                    historyEntries = uiState.historyEntries,
-                    activeTab = uiState.activeTab,
-                    currentSession = uiState.currentSession,
-                    historySearchQuery = uiState.historySearchQuery,
-                    historyViewMode = uiState.historyViewMode,
-                    onTabChanged = viewModel::setActiveTab,
-                    onHistoryViewModeChanged = viewModel::setHistoryViewMode,
-                    modifier = Modifier.width(PanelSizes.queuePanelWidth),
-                )
+            // Responsive three-panel layout using BoxWithConstraints
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().weight(1f)) {
+                val availableWidth = maxWidth
 
-                // Center: Session Selector or Comparison
-                if (uiState.currentSession != null) {
-                    ComparisonPanel(
-                        suggestion = uiState.currentSuggestion,
-                        session = uiState.currentSession,
-                        suggestions = uiState.suggestions,
-                        currentIndex = uiState.currentSuggestionIndex,
-                        editedFields = uiState.editedFields,
-                        isEditing = uiState.isEditing,
-                        showOriginal = uiState.showOriginal,
-                        isActionLoading = uiState.isActionLoading,
-                        isProcessing = uiState.isProcessing,
-                        onAccept = viewModel::acceptSuggestion,
-                        onReject = viewModel::rejectSuggestion,
-                        onSkip = viewModel::skipSuggestion,
-                        onEditField = viewModel::editField,
-                        onToggleOriginal = viewModel::toggleOriginalView,
-                        onBackToSessions = viewModel::clearSession,
-                        onRevertEdits = viewModel::revertEdits,
-                        modifier = Modifier.weight(1f),
-                    )
+                // Calculate responsive widths based on available space
+                val queueWidth = (availableWidth * PanelSizes.queuePanelWeight)
+                    .coerceIn(PanelSizes.queuePanelMinWidth, PanelSizes.queuePanelMaxWidth)
+                val sidebarWidth = if (uiState.isSidebarVisible) {
+                    (availableWidth * PanelSizes.sidebarWeight)
+                        .coerceIn(PanelSizes.sidebarMinWidth, PanelSizes.sidebarMaxWidth)
                 } else {
-                    SessionSelector(
-                        sessions = uiState.sessions,
-                        onLoadSession = viewModel::loadSession,
-                        onDeleteSession = viewModel::deleteSession,
-                        modifier = Modifier.weight(1f),
-                    )
+                    0.dp
                 }
 
-                // Right: Sidebar (AI Chat) - collapsible, slides from right
-                AnimatedVisibility(
-                    visible = uiState.isSidebarVisible,
-                    enter = slideInHorizontally(
-                        animationSpec = tween(AnimationDurations.slideIn),
-                        initialOffsetX = { it },
-                    ) + fadeIn(animationSpec = tween(AnimationDurations.fadeIn)),
-                    exit = slideOutHorizontally(
-                        animationSpec = tween(AnimationDurations.slideIn),
-                        targetOffsetX = { it },
-                    ) + fadeOut(animationSpec = tween(AnimationDurations.fadeIn)),
-                ) {
-                    SidebarPanel(
-                        decks = uiState.decks,
-                        selectedDeck = uiState.selectedDeck,
-                        chatMessages = uiState.chatMessages,
-                        isConnected = uiState.ankiConnected,
-                        isSyncing = uiState.isSyncing,
-                        syncProgress = uiState.syncProgress,
-                        isProcessing = uiState.isProcessing,
-                        canStartSession = uiState.canStartSession,
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // Left: Queue Panel
+                    QueuePanel(
+                        suggestions = uiState.suggestions,
+                        currentSuggestionIndex = uiState.currentSuggestionIndex,
+                        historyEntries = uiState.historyEntries,
+                        activeTab = uiState.activeTab,
                         currentSession = uiState.currentSession,
-                        forceSyncBeforeStart = uiState.forceSyncBeforeStart,
-                        llmProvider = uiState.settings.llmProvider,
-                        onDeckSelected = viewModel::selectDeck,
-                        onRefreshDecks = viewModel::refreshDecks,
-                        onSyncDeck = viewModel::syncDeck,
-                        onStartSession = viewModel::startSession,
-                        onCancelSession = viewModel::cancelSession,
-                        onNewSession = viewModel::clearSession,
-                        onDeleteSession = {
-                            uiState.currentSession?.id?.let { viewModel.deleteSession(it) }
-                        },
-                        onForceSyncChanged = viewModel::setForceSyncBeforeStart,
-                        onCloseSidebar = viewModel::toggleSidebar,
-                        modifier = Modifier.width(PanelSizes.sidebarWidth),
+                        historySearchQuery = uiState.historySearchQuery,
+                        historyViewMode = uiState.historyViewMode,
+                        fieldDisplayConfig = uiState.settings.fieldDisplayConfig,
+                        onTabChanged = viewModel::setActiveTab,
+                        onHistoryViewModeChanged = viewModel::setHistoryViewMode,
+                        onSuggestionClick = viewModel::selectSuggestion,
+                        onHistoryClick = viewModel::viewHistoryEntry,
+                        modifier = Modifier.width(queueWidth),
                     )
+
+                    // Center: Session Selector or Comparison - fills remaining space
+                    if (uiState.currentSession != null || uiState.viewingHistoryEntry != null) {
+                        ComparisonPanel(
+                            suggestion = uiState.currentSuggestion,
+                            session = uiState.currentSession,
+                            suggestions = uiState.suggestions,
+                            currentIndex = uiState.currentSuggestionIndex,
+                            editedFields = uiState.editedFields,
+                            isEditMode = uiState.isEditMode,
+                            hasManualEdits = uiState.hasManualEdits,
+                            showOriginal = uiState.showOriginal,
+                            isActionLoading = uiState.isActionLoading,
+                            isProcessing = uiState.isProcessing,
+                            historyEntry = uiState.viewingHistoryEntry,
+                            onAccept = viewModel::acceptSuggestion,
+                            onReject = viewModel::rejectSuggestion,
+                            onSkip = viewModel::skipSuggestion,
+                            onEditField = viewModel::editField,
+                            onToggleEditMode = viewModel::toggleEditMode,
+                            onToggleOriginal = viewModel::toggleOriginalView,
+                            onBackToSessions = viewModel::clearSession,
+                            onRevertEdits = viewModel::revertEdits,
+                            onCloseHistoryView = viewModel::clearHistoryView,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        SessionSelector(
+                            sessions = uiState.sessions,
+                            onLoadSession = viewModel::loadSession,
+                            onDeleteSession = viewModel::deleteSession,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+
+                    // Right: Sidebar (AI Chat) - collapsible with slide animation
+                    AnimatedVisibility(
+                        visible = uiState.isSidebarVisible,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(AnimationDurations.slideIn),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(AnimationDurations.fadeIn)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(AnimationDurations.slideIn),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(AnimationDurations.fadeIn)),
+                    ) {
+                        SidebarPanel(
+                            decks = uiState.decks,
+                            selectedDeck = uiState.selectedDeck,
+                            chatMessages = uiState.chatMessages,
+                            isConnected = uiState.ankiConnected,
+                            isSyncing = uiState.isSyncing,
+                            syncProgress = uiState.syncProgress,
+                            isProcessing = uiState.isProcessing,
+                            canStartSession = uiState.canStartSession,
+                            currentSession = uiState.currentSession,
+                            forceSyncBeforeStart = uiState.forceSyncBeforeStart,
+                            llmProvider = uiState.settings.llmProvider,
+                            onDeckSelected = viewModel::selectDeck,
+                            onRefreshDecks = viewModel::refreshDecks,
+                            onSyncDeck = viewModel::syncDeck,
+                            onStartSession = viewModel::startSession,
+                            onCancelSession = viewModel::cancelSession,
+                            onNewSession = viewModel::clearSession,
+                            onDeleteSession = {
+                                uiState.currentSession?.id?.let { viewModel.deleteSession(it) }
+                            },
+                            onForceSyncChanged = viewModel::setForceSyncBeforeStart,
+                            onCloseSidebar = viewModel::toggleSidebar,
+                            modifier = Modifier.width(sidebarWidth),
+                        )
+                    }
                 }
             }
         }

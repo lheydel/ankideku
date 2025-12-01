@@ -42,6 +42,7 @@ data class SessionProgress(
     val processedBatches: Int = 0,
     val totalBatches: Int = 0,
     val suggestionsCount: Int = 0,
+    val pendingSuggestionsCount: Int = 0,
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,
     val failedBatches: Int = 0,

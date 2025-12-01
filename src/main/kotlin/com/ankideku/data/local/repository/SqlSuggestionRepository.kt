@@ -40,7 +40,9 @@ class SqlSuggestionRepository(
         val entity = database.suggestionQueries.getSuggestionById(suggestionId).executeAsOneOrNull()
             ?: return null
         val fields = database.fieldValueQueries.getFieldsForSuggestions(listOf(suggestionId)).executeAsList()
-        return entity.toDomain(fields)
+        val modelName = database.deckCacheQueries.getModelNamesForNotes(listOf(entity.note_id)).executeAsList()
+            .firstOrNull()?.model_name ?: ""
+        return entity.toDomain(fields, modelName)
     }
 
     override fun save(suggestion: Suggestion) {
@@ -77,6 +79,13 @@ class SqlSuggestionRepository(
         )
     }
 
+    override fun skip(suggestionId: SuggestionId) {
+        database.suggestionQueries.skipSuggestion(
+            skipped_at = System.currentTimeMillis(),
+            id = suggestionId,
+        )
+    }
+
     override fun saveEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>) {
         replaceEditedChanges(suggestionId, editedChanges)
         database.suggestionQueries.touchSuggestion(suggestionId)
@@ -91,10 +100,20 @@ class SqlSuggestionRepository(
         if (entities.isEmpty()) return emptyList()
 
         val suggestionIds = entities.map { it.id }
+        val noteIds = entities.map { it.note_id }
+
+        // Get fields for all suggestions
         val allFields = database.fieldValueQueries.getFieldsForSuggestions(suggestionIds).executeAsList()
         val fieldsBySuggestionId = allFields.groupBy { it.suggestion_id }
 
-        return entities.map { it.toDomain(fieldsBySuggestionId[it.id] ?: emptyList()) }
+        // Get model names from cached_note
+        val modelNamesByNoteId = database.deckCacheQueries.getModelNamesForNotes(noteIds).executeAsList()
+            .associate { it.id to it.model_name }
+
+        return entities.map { entity ->
+            val modelName = modelNamesByNoteId[entity.note_id] ?: ""
+            entity.toDomain(fieldsBySuggestionId[entity.id] ?: emptyList(), modelName)
+        }
     }
 
     private fun replaceEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>) {

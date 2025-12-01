@@ -16,12 +16,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -47,10 +47,11 @@ class SessionOrchestrator(
 
     /**
      * Start a new AI processing session for a deck.
+     * Uses channelFlow to support concurrent emissions from parallel batch processing.
      */
-    fun startSession(deckId: DeckId, prompt: String): Flow<SessionEvent> = flow {
+    fun startSession(deckId: DeckId, prompt: String): Flow<SessionEvent> = channelFlow {
         val context = prepareSession(deckId, prompt)
-        emit(SessionEvent.Created(context.sessionId, context.deck.id, context.notes.size))
+        send(SessionEvent.Created(context.sessionId, context.deck.id, context.notes.size))
 
         trackJobForCancellation(context.sessionId)
 
@@ -58,14 +59,14 @@ class SessionOrchestrator(
             onIO { sessionRepository.updateState(context.sessionId, SessionState.Running) }
             val totalSuggestions = processBatches(context)
             onIO { sessionRepository.updateState(context.sessionId, SessionState.Completed) }
-            emit(SessionEvent.Completed(context.sessionId, totalSuggestions))
+            send(SessionEvent.Completed(context.sessionId, totalSuggestions))
         } catch (e: CancellationException) {
             onIO { sessionRepository.updateState(context.sessionId, SessionState.Cancelled) }
-            emit(SessionEvent.Cancelled(context.sessionId))
+            send(SessionEvent.Cancelled(context.sessionId))
             throw e
         } catch (e: Exception) {
             onIO { sessionRepository.updateState(context.sessionId, SessionState.Failed(e.message ?: "Unknown error")) }
-            emit(SessionEvent.Failed(context.sessionId, e.message ?: "Unknown error"))
+            send(SessionEvent.Failed(context.sessionId, e.message ?: "Unknown error"))
         } finally {
             activeJobs.remove(context.sessionId)
         }
@@ -124,7 +125,7 @@ class SessionOrchestrator(
     /**
      * Process all batches in parallel with concurrency limit.
      */
-    private suspend fun FlowCollector<SessionEvent>.processBatches(context: SessionContext): Int {
+    private suspend fun ProducerScope<SessionEvent>.processBatches(context: SessionContext): Int {
         val state = BatchProcessingState(context.notes.size, context.batches.size)
         val semaphore = Semaphore(MAX_CONCURRENT_BATCHES)
 
@@ -144,14 +145,14 @@ class SessionOrchestrator(
     /**
      * Process a single batch of notes.
      */
-    private suspend fun FlowCollector<SessionEvent>.processSingleBatch(
+    private suspend fun ProducerScope<SessionEvent>.processSingleBatch(
         context: SessionContext,
         batchNotes: List<Note>,
         batchIndex: Int,
         state: BatchProcessingState,
     ) {
         currentCoroutineContext().ensureActive()
-        emit(SessionEvent.BatchStarted(context.sessionId, batchIndex + 1, context.batches.size))
+        send(SessionEvent.BatchStarted(context.sessionId, batchIndex + 1, context.batches.size))
 
         try {
             val response = context.llmService.analyzeBatch(batchNotes, context.prompt, context.noteType)
@@ -160,13 +161,13 @@ class SessionOrchestrator(
             state.recordSuccess(batchNotes.size, suggestions.size, response.usage.inputTokens, response.usage.outputTokens)
             persistProgress(context.sessionId, state)
 
-            emit(SessionEvent.BatchCompleted(context.sessionId, batchIndex + 1, suggestions.size))
+            send(SessionEvent.BatchCompleted(context.sessionId, batchIndex + 1, suggestions.size))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             state.recordFailure(batchNotes.size)
             persistProgress(context.sessionId, state)
-            emit(SessionEvent.BatchFailed(context.sessionId, batchIndex + 1, e.message ?: "Unknown error"))
+            send(SessionEvent.BatchFailed(context.sessionId, batchIndex + 1, e.message ?: "Unknown error"))
         }
     }
 
@@ -183,6 +184,7 @@ class SessionOrchestrator(
             Suggestion(
                 sessionId = sessionId,
                 noteId = llmSuggestion.noteId,
+                modelName = note.modelName,
                 originalFields = note.fields,
                 changes = llmSuggestion.changes,
                 reasoning = llmSuggestion.reasoning,

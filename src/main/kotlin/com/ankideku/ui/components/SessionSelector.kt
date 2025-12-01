@@ -26,6 +26,7 @@ import com.ankideku.domain.model.Session
 import com.ankideku.domain.model.SessionState
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
+import com.ankideku.ui.theme.handPointer
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -37,28 +38,38 @@ fun SessionSelector(
     onDeleteSession: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    val colors = LocalAppColors.current
+
+    // V1-style gradient background (diagonal)
+    val gradientBackground = Brush.linearGradient(
+        colors = listOf(colors.contentGradientStart, colors.contentGradientEnd),
+    )
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(Spacing.lg),
+            .background(gradientBackground),
     ) {
-        // Header
-        Text(
-            text = "AI Sessions",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Spacer(Modifier.height(Spacing.xs))
-        Text(
-            text = "Select a previous session to review",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(Spacing.lg),
+        ) {
+            // Header
+            Text(
+                text = "AI Sessions",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = "Select a previous session to review",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
-        Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.lg))
 
-        val colors = LocalAppColors.current
-
-        if (sessions.isEmpty()) {
+            if (sessions.isEmpty()) {
             // Enhanced empty state with gradient background
             Box(
                 modifier = Modifier
@@ -127,6 +138,7 @@ fun SessionSelector(
                 }
             }
         }
+        }
     }
 }
 
@@ -137,7 +149,6 @@ private fun SessionCard(
     onLoad: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    var showDeleteConfirm by remember { mutableStateOf(false) }
     var isHovered by remember { mutableStateOf(false) }
 
     val colors = LocalAppColors.current
@@ -151,8 +162,10 @@ private fun SessionCard(
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale)
+            .handPointer()
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false },
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation),
         border = BorderStroke(1.dp, borderColor),
     ) {
@@ -160,50 +173,66 @@ private fun SessionCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Icon
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.size(48.dp),
+                // Icon with gradient background
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    colors.headerGradientStart,
+                                    colors.headerGradientEnd,
+                                ),
+                            ),
+                            shape = MaterialTheme.shapes.medium,
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            imageVector = Icons.Default.Schedule,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = colors.accent,
+                    )
                 }
 
+                // Deck name centered between icon and status
+                Text(
+                    text = session.deckName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = Spacing.sm),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    SessionStateChip(session.state)
+                    SessionStateChip(session.state, small = false)
                     // Delete button - only visible on hover
                     if (isHovered) {
-                        IconButton(
-                            onClick = { showDeleteConfirm = true },
+                        DeleteSessionButton(
+                            onDelete = onDelete,
                             modifier = Modifier.size(32.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                        }
+                        )
                     }
                 }
             }
 
             Spacer(Modifier.height(Spacing.md))
 
-            Text(
-                text = session.prompt,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // Fixed height for prompt area (2 lines worth)
+            Box(modifier = Modifier.height(40.dp)) {
+                Text(
+                    text = session.prompt,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
             Spacer(Modifier.height(Spacing.xs))
 
@@ -215,9 +244,12 @@ private fun SessionCard(
 
             Spacer(Modifier.height(Spacing.sm))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = "${session.progress.suggestionsCount} suggestions",
+                    text = "${session.progress.pendingSuggestionsCount} pending",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -228,61 +260,16 @@ private fun SessionCard(
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.primary,
                 )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "#${session.id}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                )
             }
         }
     }
 
-    // Delete confirmation dialog
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Session") },
-            text = { Text("Are you sure you want to delete this session? This will permanently remove all suggestions.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDelete()
-                        showDeleteConfirm = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
-                }
-            },
-        )
-    }
-}
-
-@Composable
-private fun SessionStateChip(state: SessionState) {
-    val colors = LocalAppColors.current
-    val (text, color) = when (state) {
-        SessionState.Pending -> "Pending" to MaterialTheme.colorScheme.outline
-        SessionState.Running -> "Running" to colors.accent
-        SessionState.Completed -> "Completed" to colors.success
-        SessionState.Incomplete -> "Incomplete" to colors.warning
-        is SessionState.Failed -> "Failed" to colors.error
-        SessionState.Cancelled -> "Cancelled" to MaterialTheme.colorScheme.outline
-    }
-
-    Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-        )
-    }
 }
 
 private fun formatDateTime(timestamp: Long): String {

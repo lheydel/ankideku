@@ -235,6 +235,88 @@ private fun UnifiedDiff(
 }
 
 /**
+ * Mode for DiffHighlightedText display
+ */
+enum class DiffDisplayMode {
+    /** Show deletions highlighted (for original card) */
+    Original,
+    /** Show additions highlighted (for suggested card) */
+    Suggested,
+}
+
+/**
+ * Displays text with diff highlighting between original and modified versions.
+ * Used in comparison panels.
+ *
+ * - Original mode: Shows deletions in red, hides additions
+ * - Suggested mode: Shows additions in green, hides deletions
+ */
+@Composable
+fun DiffHighlightedText(
+    original: String,
+    modified: String,
+    mode: DiffDisplayMode,
+) {
+    val colors = com.ankideku.ui.theme.LocalAppColors.current
+    val diffs = remember(original, modified) {
+        val dmp = DiffMatchPatch()
+        val diffs = dmp.diffMain(original, modified)
+        dmp.diffCleanupSemantic(diffs)
+        diffs
+    }
+
+    // Capture colors for remember block
+    val diffRemovedBg = colors.diffRemoved
+    val diffRemovedText = colors.diffRemovedText
+    val diffAddedBg = colors.diffAdded
+    val diffAddedText = colors.diffAddedText
+
+    val annotatedString = remember(diffs, mode, diffRemovedBg, diffRemovedText, diffAddedBg, diffAddedText) {
+        buildAnnotatedString {
+            diffs.forEach { diff ->
+                when (diff.operation) {
+                    Operation.DELETE -> {
+                        if (mode == DiffDisplayMode.Original) {
+                            // Show deletions in red on original side
+                            withStyle(SpanStyle(
+                                background = diffRemovedBg,
+                                color = diffRemovedText,
+                            )) {
+                                append(diff.text)
+                            }
+                        }
+                        // Hide deletions on suggested side
+                    }
+                    Operation.INSERT -> {
+                        if (mode == DiffDisplayMode.Suggested) {
+                            // Show additions in green on suggested side
+                            withStyle(SpanStyle(
+                                background = diffAddedBg,
+                                color = diffAddedText,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                            )) {
+                                append(diff.text)
+                            }
+                        }
+                        // Hide additions on original side
+                    }
+                    Operation.EQUAL -> append(diff.text)
+                    null -> append(diff.text)
+                }
+            }
+        }
+    }
+
+    SelectionContainer {
+        Text(
+            text = annotatedString,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textPrimary,
+        )
+    }
+}
+
+/**
  * Simple diff stats for display
  */
 data class DiffStats(

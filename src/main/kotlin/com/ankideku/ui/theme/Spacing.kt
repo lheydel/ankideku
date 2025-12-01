@@ -14,8 +14,18 @@ object Spacing {
 
 object PanelSizes {
     val headerHeight = 81.dp
-    val sidebarWidth = 448.dp
-    val queuePanelWidth = 288.dp
+
+    // Queue panel (left) - responsive constraints
+    val queuePanelMinWidth = 260.dp
+    val queuePanelMaxWidth = 360.dp
+    val queuePanelWeight = 0.22f
+
+    // Sidebar panel (right) - responsive constraints
+    val sidebarMinWidth = 380.dp
+    val sidebarMaxWidth = 520.dp
+    val sidebarWeight = 0.30f
+
+    // Center panel
     val minComparisonWidth = 400.dp
 }
 

@@ -6,6 +6,7 @@ data class HistoryEntry(
     val noteId: NoteId,
     val deckId: DeckId,
     val deckName: String,
+    val modelName: String,  // Note type name, looked up from cached_note
     val action: ReviewAction,
     val originalFields: Map<String, NoteField>,
     val aiChanges: Map<String, String>,
@@ -17,11 +18,10 @@ data class HistoryEntry(
 
 enum class ReviewAction(val dbString: String) {
     Accept("accept"),
-    Reject("reject"),
-    Skip("skip");
+    Reject("reject");
 
     companion object {
         private val byDbString = entries.associateBy { it.dbString }
-        fun fromDbString(value: String): ReviewAction = byDbString[value] ?: Skip
+        fun fromDbString(value: String): ReviewAction = byDbString[value] ?: Reject
     }
 }
