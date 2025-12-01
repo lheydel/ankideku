@@ -44,7 +44,17 @@ class SyncDeckFeature(
         emit(SyncProgress.Starting(deckId, rootDeckName, isIncremental))
 
         if (decksToSync.isEmpty()) {
-            saveDeck(deckId, rootDeckName)
+            onIO {
+                val deck = Deck(
+                    name = rootDeckName,
+                    id = deckId,
+                    parentId = null,
+                    lastSyncTimestamp = System.currentTimeMillis(),
+                    noteCount = 0,
+                    tokenEstimate = 0,
+                )
+                deckRepository.saveDeck(deck)
+            }
             emit(SyncProgress.Completed(deckId, noteCount = 0, tokenEstimate = 0))
             return@flow
         }
@@ -68,15 +78,52 @@ class SyncDeckFeature(
 
         emit(SyncProgress.SavingToCache(deckId, allNotes.size))
 
-        // Save notes first, then get accurate stats from DB
+        // Save notes first, then save all decks with hierarchy
         val stats = transactionService.runInTransaction {
             deckRepository.saveNotes(allNotes)
-            val stats = deckRepository.getDeckStats(rootDeckName)
-            saveDeckSync(deckId, rootDeckName, stats.noteCount, stats.tokenEstimate)
-            stats
+
+            // Save all decks with parent relationships
+            saveAllDecks(decksToSync, deckNamesAndIds)
+
+            // Return aggregated stats for root deck
+            deckRepository.getDeckStats(rootDeckName)
         }
 
         emit(SyncProgress.Completed(deckId, noteCount = stats.noteCount, tokenEstimate = stats.tokenEstimate))
+    }
+
+    private fun saveAllDecks(
+        decksToSync: List<String>,
+        deckNamesAndIds: Map<String, DeckId>,
+    ) {
+        val now = System.currentTimeMillis()
+
+        // Sort by depth (parents first) to ensure parents exist before children
+        val sortedDecks = decksToSync.sortedBy { it.count { c -> c == ':' } }
+
+        for (deckName in sortedDecks) {
+            val deckId = deckNamesAndIds[deckName] ?: continue
+            val parentId = findParentId(deckName, deckNamesAndIds)
+            val directStats = deckRepository.getDirectDeckStats(deckId)
+
+            val deck = Deck(
+                name = deckName,
+                id = deckId,
+                parentId = parentId,
+                lastSyncTimestamp = now,
+                noteCount = directStats.noteCount,
+                tokenEstimate = directStats.tokenEstimate,
+            )
+            deckRepository.saveDeck(deck)
+        }
+    }
+
+    private fun findParentId(deckName: String, deckNamesAndIds: Map<String, DeckId>): DeckId? {
+        val lastSeparator = deckName.lastIndexOf("::")
+        if (lastSeparator == -1) return null
+
+        val parentName = deckName.substring(0, lastSeparator)
+        return deckNamesAndIds[parentName]
     }
 
     private suspend fun syncSingleDeck(
@@ -162,20 +209,6 @@ class SyncDeckFeature(
         }
     }
 
-    private suspend fun saveDeck(deckId: DeckId, deckName: String, noteCount: Int = 0, tokenEstimate: Int = 0) {
-        onIO { saveDeckSync(deckId, deckName, noteCount, tokenEstimate) }
-    }
-
-    private fun saveDeckSync(deckId: DeckId, deckName: String, noteCount: Int = 0, tokenEstimate: Int = 0) {
-        val deck = Deck(
-            name = deckName,
-            id = deckId,
-            lastSyncTimestamp = System.currentTimeMillis(),
-            noteCount = noteCount,
-            tokenEstimate = tokenEstimate,
-        )
-        deckRepository.saveDeck(deck)
-    }
 }
 
 /**

@@ -21,6 +21,9 @@ interface DeckRepository {
 
     /** Get the actual note count and token estimate from cached notes for a deck (including sub-decks) */
     fun getDeckStats(deckName: String): DeckStats
+
+    /** Get note count and token estimate for a deck only (excluding sub-decks) */
+    fun getDirectDeckStats(deckId: DeckId): DeckStats
 }
 
 data class DeckStats(val noteCount: Int, val tokenEstimate: Int)

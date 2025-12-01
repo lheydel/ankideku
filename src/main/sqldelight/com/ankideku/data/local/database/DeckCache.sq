@@ -3,6 +3,7 @@
 CREATE TABLE deck_cache (
     anki_id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
+    parent_id INTEGER REFERENCES deck_cache(anki_id) ON DELETE CASCADE,
     last_sync_timestamp INTEGER,
     note_count INTEGER NOT NULL DEFAULT 0,
     token_estimate INTEGER NOT NULL DEFAULT 0,
@@ -11,6 +12,7 @@ CREATE TABLE deck_cache (
 );
 
 CREATE INDEX idx_deck_cache_name ON deck_cache(name);
+CREATE INDEX idx_deck_cache_parent ON deck_cache(parent_id);
 
 CREATE TABLE cached_note (
     id INTEGER PRIMARY KEY,
@@ -41,14 +43,24 @@ getDeckById:
 SELECT * FROM deck_cache WHERE anki_id = ?;
 
 upsertDeck:
-INSERT INTO deck_cache (anki_id, name, last_sync_timestamp, note_count, token_estimate, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO deck_cache (anki_id, name, parent_id, last_sync_timestamp, note_count, token_estimate, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(anki_id) DO UPDATE SET
     name = excluded.name,
+    parent_id = excluded.parent_id,
     last_sync_timestamp = excluded.last_sync_timestamp,
     note_count = excluded.note_count,
     token_estimate = excluded.token_estimate,
     updated_at = excluded.updated_at;
+
+getRootDecks:
+SELECT * FROM deck_cache WHERE parent_id IS NULL ORDER BY name;
+
+getChildDecks:
+SELECT * FROM deck_cache WHERE parent_id = ? ORDER BY name;
+
+getDecksWithParent:
+SELECT * FROM deck_cache WHERE parent_id IS NOT NULL ORDER BY name;
 
 deleteDeck:
 DELETE FROM deck_cache WHERE anki_id = ?;
@@ -70,13 +82,13 @@ SELECT * FROM cached_note WHERE id = ?;
 getNotesModifiedSince:
 SELECT * FROM cached_note WHERE (deck_name = ? OR deck_name LIKE ? || '::%') AND mod > ?;
 
-countNotesForDeck:
+countNotesForDeckDirect:
 SELECT COUNT(*) FROM cached_note WHERE deck_id = ?;
 
 countNotesForDeckByName:
 SELECT COUNT(*) FROM cached_note WHERE deck_name = ? OR deck_name LIKE ? || '::%';
 
-sumTokensForDeck:
+sumTokensForDeckDirect:
 SELECT COALESCE(SUM(estimated_tokens), 0) FROM cached_note WHERE deck_id = ?;
 
 sumTokensForDeckByName:

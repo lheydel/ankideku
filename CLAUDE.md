@@ -94,6 +94,14 @@ src/main/resources/icons/   # App icons (ico, icns, png)
 - `Setting.sq` - User configuration
 - `FieldValue.sq` - Note field values
 
+**Migrations** are in `src/main/sqldelight/migrations/` (e.g., `001.sqm`, `002.sqm`).
+
+**IMPORTANT: When modifying database schema, BOTH are needed:**
+1. Update the `.sq` file with the new schema → used by `Schema.create()` for NEW users
+2. Create a migration file (next number, e.g., `003.sqm`) → used by `Schema.migrate()` for EXISTING users
+
+New users don't run migrations - they get the schema directly from .sq files. Existing users only run migrations. Both paths must result in the same final schema.
+
 **Storage Location:**
 - Windows: `%APPDATA%/AnkiDeku/ankideku.db`
 - macOS: `~/Library/Application Support/AnkiDeku/ankideku.db`
@@ -130,9 +138,10 @@ src/main/resources/icons/   # App icons (ico, icns, png)
 
 1. **Java 17+ required** - Project uses JVM toolchain 17
 2. **Anki must be running** - App connects to AnkiConnect on port 8765
-3. **SQLDelight codegen** - Run `./gradlew generateMainAnkiDekuDatabaseInterface` after schema changes
+3. **SQLDelight codegen** - Run `./gradlew generateSqlDelightInterface` after schema changes
 4. **Clean Architecture** - Respect layer boundaries (UI -> Domain <- Data)
 5. **NEVER run the app yourself** - Always ask the user to run `./gradlew run` to test changes
+6. **"Memorize"** - When the user asks to "memorize" something, it means update this CLAUDE.md file with the information
 
 ## Temporary note relevant while migrating from V1 to V2
 

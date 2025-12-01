@@ -12,6 +12,7 @@ import com.ankideku.util.parseJson
 fun Deck_cache.toDomain(): Deck = Deck(
     name = name,
     id = anki_id,
+    parentId = parent_id,
     lastSyncTimestamp = last_sync_timestamp,
     noteCount = note_count.toInt(),
     tokenEstimate = token_estimate.toInt(),

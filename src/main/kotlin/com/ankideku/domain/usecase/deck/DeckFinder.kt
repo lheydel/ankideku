@@ -15,6 +15,18 @@ class DeckFinder(
 
     suspend fun getById(id: DeckId): Deck? = onIO { deckRepository.getDeck(id) }
 
+    /**
+     * Get a deck with aggregated stats (including all child decks)
+     */
+    suspend fun getByIdWithAggregatedStats(id: DeckId): Deck? = onIO {
+        val deck = deckRepository.getDeck(id) ?: return@onIO null
+        val stats = deckRepository.getDeckStats(deck.name)
+        deck.copy(
+            noteCount = stats.noteCount,
+            tokenEstimate = stats.tokenEstimate,
+        )
+    }
+
     suspend fun fetchFromAnki(): List<Deck> {
         val deckNamesAndIds = ankiClient.getDeckNamesAndIds()
         return deckNamesAndIds.map { (name, id) ->

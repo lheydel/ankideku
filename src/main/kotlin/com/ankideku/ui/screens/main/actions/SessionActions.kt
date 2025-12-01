@@ -87,8 +87,8 @@ class SessionActionsImpl(
                         ctx.update { copy(syncProgress = uiProgress) }
                     }
 
-                    // Reload deck after sync to get updated noteCount
-                    val updatedDeck = deckFinder.getById(deck.id)
+                    // Reload deck after sync with aggregated stats
+                    val updatedDeck = deckFinder.getByIdWithAggregatedStats(deck.id)
                     if (updatedDeck != null) {
                         deck = updatedDeck
                         ctx.update {

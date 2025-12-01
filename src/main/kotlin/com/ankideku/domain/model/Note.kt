@@ -23,6 +23,7 @@ data class Note(
 data class Deck(
     val name: String,
     val id: DeckId,
+    val parentId: DeckId? = null,
     val lastSyncTimestamp: Long? = null,
     val noteCount: Int = 0,
     val tokenEstimate: Int = 0,

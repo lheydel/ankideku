@@ -27,7 +27,11 @@ class DeckActionsImpl(
     private var syncJob: Job? = null
 
     override fun selectDeck(deck: Deck) {
-        ctx.update { copy(selectedDeck = deck) }
+        ctx.scope.launch {
+            // Fetch deck with aggregated stats for display
+            val deckWithStats = deckFinder.getByIdWithAggregatedStats(deck.id) ?: deck
+            ctx.update { copy(selectedDeck = deckWithStats) }
+        }
     }
 
     override fun refreshDecks() {
@@ -74,8 +78,8 @@ class DeckActionsImpl(
                     ctx.update { copy(syncProgress = uiProgress) }
                 }
 
-                // Reload deck after sync
-                val updatedDeck = deckFinder.getById(deck.id)
+                // Reload deck after sync with aggregated stats
+                val updatedDeck = deckFinder.getByIdWithAggregatedStats(deck.id)
                 ctx.update {
                     copy(
                         selectedDeck = updatedDeck,

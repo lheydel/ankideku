@@ -39,6 +39,7 @@ class SqlDeckRepository(
         database.deckCacheQueries.upsertDeck(
             anki_id = deck.id,
             name = deck.name,
+            parent_id = deck.parentId,
             last_sync_timestamp = deck.lastSyncTimestamp,
             note_count = deck.noteCount.toLong(),
             token_estimate = deck.tokenEstimate.toLong(),
@@ -105,6 +106,18 @@ class SqlDeckRepository(
             .toInt()
         val tokenEstimate = database.deckCacheQueries
             .sumTokensForDeckByName(deckName, deckName)
+            .executeAsOne()
+            .toInt()
+        return DeckStats(noteCount, tokenEstimate)
+    }
+
+    override fun getDirectDeckStats(deckId: DeckId): DeckStats {
+        val noteCount = database.deckCacheQueries
+            .countNotesForDeckDirect(deckId)
+            .executeAsOne()
+            .toInt()
+        val tokenEstimate = database.deckCacheQueries
+            .sumTokensForDeckDirect(deckId)
             .executeAsOne()
             .toInt()
         return DeckStats(noteCount, tokenEstimate)

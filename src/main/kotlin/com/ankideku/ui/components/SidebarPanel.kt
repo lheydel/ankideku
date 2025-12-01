@@ -331,7 +331,7 @@ private fun DeckSelectorSection(
         }
 
         // Cache info
-        if (!isSyncing && selectedDeck != null && selectedDeck.noteCount > 0) {
+        if (!isSyncing && selectedDeck?.lastSyncTimestamp != null) {
             Spacer(Modifier.height(Spacing.sm))
             Text(
                 text = "${selectedDeck.noteCount.formatWithCommas()} cards · ~${selectedDeck.tokenEstimate.formatWithCommas()} input tokens",

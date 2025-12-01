@@ -1,0 +1,5 @@
+-- Migration 2: Add parent_id to deck_cache for subdeck hierarchy
+
+ALTER TABLE deck_cache ADD COLUMN parent_id INTEGER REFERENCES deck_cache(anki_id) ON DELETE CASCADE;
+
+CREATE INDEX idx_deck_cache_parent ON deck_cache(parent_id);
