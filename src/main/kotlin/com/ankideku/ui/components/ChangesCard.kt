@@ -17,66 +17,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.NoteTypeConfig
-import com.ankideku.domain.model.ReviewAction
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
 
 /**
- * Configuration for the changes card header and styling
- */
-sealed class ChangesCardMode {
-    /**
-     * Editable suggestion mode with Edit/Done toggle
-     */
-    data class Suggestion(
-        val isEditMode: Boolean,
-        val hasManualEdits: Boolean,
-        val showOriginal: Boolean,
-        val onToggleEditMode: () -> Unit,
-        val onToggleOriginal: () -> Unit,
-        val onRevertEdits: () -> Unit,
-    ) : ChangesCardMode()
-
-    /**
-     * Read-only history mode showing the action taken
-     */
-    data class History(
-        val action: ReviewAction,
-        val hasUserEdits: Boolean,
-    ) : ChangesCardMode()
-}
-
-/**
- * Unified changes card component used for both suggestion review and history viewing.
- *
- * @param fields Original fields from the note
- * @param changes AI-suggested or applied changes
- * @param editedFields User's manual edits (only used in Suggestion mode)
- * @param userEdits Fields that were edited by user (only used in History mode)
- * @param mode Either Suggestion (editable) or History (read-only)
- * @param onEditField Callback when field is edited (only used in Suggestion mode)
+ * Generic changes card. Shows field changes with diff highlighting.
+ * If onEditField is provided and isEditMode is true, fields are editable.
  */
 @Composable
 fun ChangesCard(
     fields: Map<String, NoteField>,
     changes: Map<String, String>,
+    noteTypeConfig: NoteTypeConfig?,
+    title: String,
+    headerIcon: ImageVector,
+    headerColor: Color,
+    headerBg: Color,
     editedFields: Map<String, String> = emptyMap(),
-    userEdits: Map<String, String>? = null,
-    noteTypeConfig: NoteTypeConfig? = null,
-    mode: ChangesCardMode,
-    onEditField: (String, String) -> Unit = { _, _ -> },
+    isEditMode: Boolean = false,
+    showOriginal: Boolean = false,
+    onEditField: ((String, String) -> Unit)? = null,
+    headerControls: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalAppColors.current
-    var showRevertDialog by remember { mutableStateOf(false) }
-
-    // Determine header styling based on mode
-    val (title, headerColor, headerBg, headerIcon) = when (mode) {
-        is ChangesCardMode.Suggestion -> getSuggestionHeaderStyle(mode, colors)
-        is ChangesCardMode.History -> getHistoryHeaderStyle(mode, colors)
-    }
-
     Card(
         modifier = modifier.fillMaxHeight(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -91,7 +55,6 @@ fun ChangesCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Title with icon
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = headerIcon,
@@ -108,14 +71,7 @@ fun ChangesCard(
                     )
                 }
 
-                // Edit controls (only for Suggestion mode)
-                if (mode is ChangesCardMode.Suggestion) {
-                    SuggestionEditControls(
-                        mode = mode,
-                        headerColor = headerColor,
-                        onShowRevertDialog = { showRevertDialog = true },
-                    )
-                }
+                headerControls?.invoke()
             }
 
             HorizontalDivider(color = headerColor.copy(alpha = 0.3f), thickness = 2.dp)
@@ -128,101 +84,62 @@ fun ChangesCard(
                 val sortedFields = fields.entries.sortedBy { it.value.order }
                 items(sortedFields) { (fieldName, field) ->
                     val aiValue = changes[fieldName] ?: field.value
-                    val isChanged = aiValue != field.value
+                    val editedValue = editedFields[fieldName]
+                    val displayValue = if (showOriginal) aiValue else (editedValue ?: aiValue)
+                    val isChanged = displayValue != field.value
+                    val isEditable = isEditMode && !showOriginal && onEditField != null
 
-                    when (mode) {
-                        is ChangesCardMode.Suggestion -> {
-                            val editedValue = editedFields[fieldName]
-                            val displayValue = if (mode.showOriginal) aiValue else (editedValue ?: aiValue)
-                            val isEditable = mode.isEditMode && !mode.showOriginal
-                            // Consider both AI changes and user edits for highlighting/diff
-                            val displayChanged = displayValue != field.value
-
-                            if (isEditable) {
-                                EditableFieldItem(
-                                    fieldName = fieldName,
-                                    value = displayValue,
-                                    isChanged = displayChanged,
-                                    onEdit = { onEditField(fieldName, it) },
-                                )
-                            } else {
-                                FieldItem(
-                                    fieldName = fieldName,
-                                    value = displayValue,
-                                    isChanged = displayChanged,
-                                    noteTypeConfig = noteTypeConfig,
-                                    style = suggestedFieldStyle(displayChanged),
-                                    diffContent = if (displayChanged && displayValue.isNotEmpty()) {
-                                        { DiffHighlightedText(field.value, displayValue, DiffDisplayMode.Suggested) }
-                                    } else null,
-                                )
-                            }
-                        }
-                        is ChangesCardMode.History -> {
-                            val wasEdited = userEdits?.containsKey(fieldName) == true
-                            HistoryFieldItem(
-                                fieldName = fieldName,
-                                originalValue = field.value,
-                                changedValue = aiValue,
-                                isChanged = isChanged,
-                                wasEdited = wasEdited,
-                                action = mode.action,
-                                noteTypeConfig = noteTypeConfig,
-                            )
-                        }
+                    if (isEditable) {
+                        EditableFieldItem(
+                            fieldName = fieldName,
+                            value = displayValue,
+                            isChanged = isChanged,
+                            onEdit = { onEditField?.invoke(fieldName, it) },
+                        )
+                    } else {
+                        FieldItem(
+                            fieldName = fieldName,
+                            value = displayValue,
+                            isChanged = isChanged,
+                            noteTypeConfig = noteTypeConfig,
+                            style = suggestedFieldStyle(isChanged),
+                            diffContent = if (isChanged && displayValue.isNotEmpty()) {
+                                { DiffHighlightedText(field.value, displayValue, DiffDisplayMode.Suggested) }
+                            } else null,
+                        )
                     }
                 }
             }
         }
     }
-
-    // Revert confirmation dialog (only for Suggestion mode)
-    if (showRevertDialog && mode is ChangesCardMode.Suggestion) {
-        AlertDialog(
-            onDismissRequest = { showRevertDialog = false },
-            title = { Text("Revert Manual Edits") },
-            text = { Text("Are you sure you want to revert all manual edits? This will restore the original AI suggestion and cannot be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        mode.onRevertEdits()
-                        showRevertDialog = false
-                    },
-                    modifier = Modifier.handPointer(),
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Text("Revert")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRevertDialog = false }, modifier = Modifier.handPointer()) {
-                    Text("Cancel")
-                }
-            },
-        )
-    }
 }
 
+/**
+ * Edit controls for the header.
+ */
 @Composable
-private fun SuggestionEditControls(
-    mode: ChangesCardMode.Suggestion,
-    headerColor: Color,
-    onShowRevertDialog: () -> Unit,
+fun SuggestionEditControls(
+    isEditMode: Boolean,
+    hasManualEdits: Boolean,
+    showOriginal: Boolean,
+    onToggleEditMode: () -> Unit,
+    onToggleOriginal: () -> Unit,
+    onRevertEdits: () -> Unit,
 ) {
     val colors = LocalAppColors.current
+    var showRevertDialog by remember { mutableStateOf(false) }
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Toggle AI/Edited - only show when editing OR has manual edits
-        if (mode.isEditMode || mode.hasManualEdits) {
+        if (isEditMode || hasManualEdits) {
             FilterChip(
-                selected = mode.showOriginal,
-                onClick = mode.onToggleOriginal,
+                selected = showOriginal,
+                onClick = onToggleOriginal,
                 label = {
                     Text(
-                        text = if (mode.showOriginal) "Edited" else "AI",
+                        text = if (showOriginal) "Edited" else "AI",
                         style = MaterialTheme.typography.labelMedium,
                     )
                 },
@@ -237,25 +154,23 @@ private fun SuggestionEditControls(
             )
         }
 
-        // Edit/Done button
         FilledTonalButton(
-            onClick = mode.onToggleEditMode,
+            onClick = onToggleEditMode,
             modifier = Modifier.height(28.dp).handPointer(),
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
             colors = ButtonDefaults.filledTonalButtonColors(
-                containerColor = if (mode.isEditMode) colors.accentStrong else colors.surfaceAlt,
-                contentColor = if (mode.isEditMode) colors.onAccent else colors.textPrimary,
+                containerColor = if (isEditMode) colors.accentStrong else colors.surfaceAlt,
+                contentColor = if (isEditMode) colors.onAccent else colors.textPrimary,
             ),
         ) {
             Icon(Icons.Default.Edit, null, Modifier.size(14.dp))
             Spacer(Modifier.width(4.dp))
-            Text(if (mode.isEditMode) "Done" else "Edit", style = MaterialTheme.typography.labelMedium)
+            Text(if (isEditMode) "Done" else "Edit", style = MaterialTheme.typography.labelMedium)
         }
 
-        // Revert button - only show when has manual edits AND not in edit mode
-        if (mode.hasManualEdits && !mode.isEditMode) {
+        if (hasManualEdits && !isEditMode) {
             IconButton(
-                onClick = onShowRevertDialog,
+                onClick = { showRevertDialog = true },
                 modifier = Modifier.size(28.dp).handPointer(),
             ) {
                 Icon(
@@ -267,131 +182,28 @@ private fun SuggestionEditControls(
             }
         }
     }
-}
 
-@Composable
-private fun HistoryFieldItem(
-    fieldName: String,
-    originalValue: String,
-    changedValue: String,
-    isChanged: Boolean,
-    wasEdited: Boolean,
-    action: ReviewAction,
-    noteTypeConfig: NoteTypeConfig?,
-) {
-    val colors = LocalAppColors.current
-
-    val bgColor = when {
-        action == ReviewAction.Reject && isChanged -> colors.errorMuted.copy(alpha = 0.3f)
-        wasEdited -> colors.warningMuted.copy(alpha = 0.3f)
-        isChanged -> colors.successMuted.copy(alpha = 0.3f)
-        else -> Color.Transparent
-    }
-
-    val labelColor = when {
-        action == ReviewAction.Reject && isChanged -> colors.error
-        wasEdited -> colors.warning
-        isChanged -> colors.success
-        else -> colors.textMuted
-    }
-
-    val badge = if (isChanged) {
-        when {
-            action == ReviewAction.Reject -> "Rejected"
-            wasEdited -> "Edited"
-            else -> "Changed"
-        }
-    } else null
-
-    val icon = when {
-        action == ReviewAction.Reject && isChanged -> Icons.Default.Close
-        wasEdited -> Icons.Default.Edit
-        isChanged -> Icons.Default.Check
-        else -> Icons.Default.Remove
-    }
-
-    FieldItem(
-        fieldName = fieldName,
-        value = changedValue,
-        isChanged = isChanged,
-        noteTypeConfig = noteTypeConfig,
-        style = FieldItemStyle(
-            icon = icon,
-            iconTint = labelColor,
-            labelColor = labelColor,
-            badge = badge,
-            badgeColor = labelColor,
-        ),
-        modifier = Modifier.background(bgColor),
-        diffContent = if (isChanged && changedValue.isNotEmpty()) {
-            { DiffHighlightedText(originalValue, changedValue, DiffDisplayMode.Suggested) }
-        } else null,
-    )
-}
-
-private data class HeaderStyle(
-    val title: String,
-    val color: Color,
-    val background: Color,
-    val icon: ImageVector,
-)
-
-@Composable
-private fun getSuggestionHeaderStyle(
-    mode: ChangesCardMode.Suggestion,
-    colors: com.ankideku.ui.theme.AppColorScheme,
-): HeaderStyle {
-    return when {
-        mode.isEditMode && mode.showOriginal -> HeaderStyle(
-            "AI Suggested",
-            colors.secondary,
-            colors.secondaryMuted,
-            Icons.Default.SmartToy,
-        )
-        mode.isEditMode -> HeaderStyle(
-            "Editing...",
-            colors.warning,
-            colors.warningMuted,
-            Icons.Default.Edit,
-        )
-        mode.hasManualEdits -> HeaderStyle(
-            "Manually Edited",
-            colors.warning,
-            colors.warningMuted,
-            Icons.Default.Edit,
-        )
-        else -> HeaderStyle(
-            "Suggested Card",
-            colors.accent,
-            colors.accentMuted,
-            Icons.Default.AutoAwesome,
+    if (showRevertDialog) {
+        AlertDialog(
+            onDismissRequest = { showRevertDialog = false },
+            title = { Text("Revert Manual Edits") },
+            text = { Text("Are you sure you want to revert all manual edits?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRevertEdits()
+                        showRevertDialog = false
+                    },
+                    modifier = Modifier.handPointer(),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Revert") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRevertDialog = false }, modifier = Modifier.handPointer()) {
+                    Text("Cancel")
+                }
+            },
         )
     }
 }
 
-@Composable
-private fun getHistoryHeaderStyle(
-    mode: ChangesCardMode.History,
-    colors: com.ankideku.ui.theme.AppColorScheme,
-): HeaderStyle {
-    return when {
-        mode.action == ReviewAction.Reject -> HeaderStyle(
-            "Rejected Changes",
-            colors.error,
-            colors.errorMuted,
-            Icons.Default.Close,
-        )
-        mode.hasUserEdits -> HeaderStyle(
-            "Applied with Edits",
-            colors.warning,
-            colors.warningMuted,
-            Icons.Default.Edit,
-        )
-        else -> HeaderStyle(
-            "Applied Changes",
-            colors.success,
-            colors.successMuted,
-            Icons.Default.Check,
-        )
-    }
-}

@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.AnnotatedString
@@ -22,11 +23,14 @@ import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.HistoryEntry
 import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.NoteTypeConfig
+import com.ankideku.domain.model.ReviewAction
 import com.ankideku.domain.model.Session
 import com.ankideku.domain.model.Suggestion
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
+import kotlin.collections.component1
+import kotlin.collections.component2
 
 @Composable
 fun ComparisonPanel(
@@ -51,7 +55,7 @@ fun ComparisonPanel(
     onBackToSessions: () -> Unit,
     onRevertEdits: () -> Unit,
     onCloseHistoryView: () -> Unit,
-    onOpenNoteTypeSettings: (String) -> Unit = {},
+    onOpenNoteTypeSettings: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboard.current
@@ -62,7 +66,6 @@ fun ComparisonPanel(
         scope.launch { clipboard.setClipEntry(ClipEntry(AnnotatedString(text))) }
     }
 
-    // V1-style gradient background (diagonal)
     val gradientBackground = Brush.linearGradient(
         colors = listOf(colors.contentGradientStart, colors.contentGradientEnd),
     )
@@ -77,206 +80,180 @@ fun ComparisonPanel(
                 .fillMaxSize()
                 .padding(Spacing.md),
         ) {
-            if (historyEntry != null) {
-                HistoryContent(
-                    entry = historyEntry,
-                    noteTypeConfigs = noteTypeConfigs,
-                    onClose = onCloseHistoryView,
-                    onCopy = copyToClipboard,
-                )
-            } else {
-                SuggestionContent(
-                    suggestion = suggestion,
-                    session = session,
-                    suggestions = suggestions,
-                    currentIndex = currentIndex,
-                    editedFields = editedFields,
-                    isEditMode = isEditMode,
-                    hasManualEdits = hasManualEdits,
-                    showOriginal = showOriginal,
-                    isActionLoading = isActionLoading,
-                    isProcessing = isProcessing,
-                    noteTypeConfig = noteTypeConfigs[suggestion?.modelName ?: ""],
-                    onAccept = onAccept,
-                    onReject = onReject,
-                    onSkip = onSkip,
-                    onEditField = onEditField,
-                    onToggleEditMode = onToggleEditMode,
-                    onToggleOriginal = onToggleOriginal,
-                    onBackToSessions = onBackToSessions,
-                    onRevertEdits = onRevertEdits,
-                    onCopy = copyToClipboard,
-                    onOpenNoteTypeSettings = onOpenNoteTypeSettings,
-                )
+            when {
+                historyEntry != null -> {
+                    val noteTypeConfig = noteTypeConfigs[historyEntry.modelName]
+                    val changes = historyEntry.appliedChanges ?: historyEntry.aiChanges
+                    val accepted = historyEntry.action == ReviewAction.Accept
+
+                    ComparisonContent(
+                        deckName = historyEntry.deckName,
+                        modelName = historyEntry.modelName,
+                        reasoning = historyEntry.reasoning,
+                        originalFields = historyEntry.originalFields,
+                        changes = changes,
+                        noteTypeConfig = noteTypeConfig,
+                        breadcrumb = { HistoryBreadcrumb(onClose = onCloseHistoryView) },
+                        onCopy = { copyToClipboard(buildHistoryCopyText(historyEntry)) },
+                        onOpenNoteTypeSettings = { onOpenNoteTypeSettings(historyEntry.modelName) },
+                        trailingBadge = {
+                            ActionBadge(action = historyEntry.action, color = if (accepted) colors.success else colors.error)
+                        },
+                        changesHeaderStyle = getHistoryHeaderStyle(accepted),
+                    )
+                }
+
+                suggestion == null -> {
+                    Breadcrumb(text = "Back to Sessions", onClick = onBackToSessions)
+                    Spacer(Modifier.height(Spacing.sm))
+                    EmptyState(
+                        isProcessing = isProcessing,
+                        processedCards = session?.progress?.processedCards ?: 0,
+                        totalCards = session?.progress?.totalCards ?: 0,
+                    )
+                }
+
+                else -> {
+                    val noteTypeConfig = noteTypeConfigs[suggestion.modelName]
+
+                    ComparisonContent(
+                        deckName = session?.deckName ?: "Unknown Deck",
+                        modelName = suggestion.modelName,
+                        reasoning = suggestion.reasoning,
+                        originalFields = suggestion.originalFields,
+                        changes = suggestion.changes,
+                        noteTypeConfig = noteTypeConfig,
+                        breadcrumb = { Breadcrumb(text = "Back to Sessions", onClick = onBackToSessions) },
+                        onCopy = { copyToClipboard(buildSuggestionCopyText(suggestion, editedFields)) },
+                        onOpenNoteTypeSettings = { onOpenNoteTypeSettings(suggestion.modelName) },
+                        trailingBadge = {
+                            Surface(color = colors.accentMuted, shape = RoundedCornerShape(50)) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Default.ContentPaste, null, Modifier.size(16.dp), tint = colors.accentStrong)
+                                    Spacer(Modifier.width(Spacing.sm))
+                                    Text(
+                                        text = "${currentIndex + 1} / ${suggestions.size}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary,
+                                    )
+                                }
+                            }
+                        },
+                        changesHeaderStyle = getSuggestionHeaderStyle(isEditMode, hasManualEdits, showOriginal),
+                        editedFields = editedFields,
+                        isEditMode = isEditMode,
+                        showOriginal = showOriginal,
+                        onEditField = onEditField,
+                        changesHeaderControls = {
+                            SuggestionEditControls(
+                                isEditMode = isEditMode,
+                                hasManualEdits = hasManualEdits,
+                                showOriginal = showOriginal,
+                                onToggleEditMode = onToggleEditMode,
+                                onToggleOriginal = onToggleOriginal,
+                                onRevertEdits = onRevertEdits,
+                            )
+                        },
+                        actionButtons = {
+                            ActionButtons(
+                                onAccept = onAccept,
+                                onReject = onReject,
+                                onSkip = onSkip,
+                                hasManualEdits = hasManualEdits,
+                                isEditMode = isEditMode,
+                                showOriginal = showOriginal,
+                                isLoading = isActionLoading,
+                            )
+                        },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ColumnScope.HistoryContent(
-    entry: HistoryEntry,
-    noteTypeConfigs: Map<String, NoteTypeConfig>,
-    onClose: () -> Unit,
-    onCopy: (String) -> Unit,
-) {
-    HistoryBreadcrumb(onClose = onClose)
-    Spacer(Modifier.height(Spacing.sm))
-
-    HistoryHeaderCard(entry = entry, onCopy = onCopy)
-    Spacer(Modifier.height(Spacing.md))
-
-    if (!entry.reasoning.isNullOrBlank()) {
-        ReasoningCard(reasoning = entry.reasoning)
-        Spacer(Modifier.height(Spacing.md))
-    }
-
-    // Two-column comparison
-    ComparisonRow(
-        originalFields = entry.originalFields,
-        changes = entry.appliedChanges ?: entry.aiChanges,
-        noteTypeConfig = noteTypeConfigs[entry.modelName],
-        modifier = Modifier.weight(1f),
-    ) {
-        // Changes card (right column) - History mode
-        ChangesCard(
-            fields = entry.originalFields,
-            changes = entry.appliedChanges ?: entry.aiChanges,
-            userEdits = entry.userEdits,
-            noteTypeConfig = noteTypeConfigs[entry.modelName],
-            mode = ChangesCardMode.History(
-                action = entry.action,
-                hasUserEdits = !entry.userEdits.isNullOrEmpty(),
-            ),
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun ColumnScope.SuggestionContent(
-    suggestion: Suggestion?,
-    session: Session?,
-    suggestions: List<Suggestion>,
-    currentIndex: Int,
-    editedFields: Map<String, String>,
-    isEditMode: Boolean,
-    hasManualEdits: Boolean,
-    showOriginal: Boolean,
-    isActionLoading: Boolean,
-    isProcessing: Boolean,
-    noteTypeConfig: NoteTypeConfig?,
-    onAccept: () -> Unit,
-    onReject: () -> Unit,
-    onSkip: () -> Unit,
-    onEditField: (String, String) -> Unit,
-    onToggleEditMode: () -> Unit,
-    onToggleOriginal: () -> Unit,
-    onBackToSessions: () -> Unit,
-    onRevertEdits: () -> Unit,
-    onCopy: (String) -> Unit,
-    onOpenNoteTypeSettings: (String) -> Unit,
-) {
-    Breadcrumb(text = "Back to Sessions", onClick = onBackToSessions)
-    Spacer(Modifier.height(Spacing.sm))
-
-    if (suggestion == null) {
-        EmptyState(
-            isProcessing = isProcessing,
-            processedCards = session?.progress?.processedCards ?: 0,
-            totalCards = session?.progress?.totalCards ?: 0,
-        )
-    } else {
-        SuggestionHeaderCard(
-            deckName = session?.deckName ?: "Unknown Deck",
-            modelName = suggestion.modelName,
-            currentIndex = currentIndex,
-            totalSuggestions = suggestions.size,
-            suggestion = suggestion,
-            editedFields = editedFields,
-            onCopy = onCopy,
-            onOpenNoteTypeSettings = onOpenNoteTypeSettings,
-        )
-        Spacer(Modifier.height(Spacing.md))
-
-        ReasoningCard(reasoning = suggestion.reasoning)
-        Spacer(Modifier.height(Spacing.md))
-
-        // Two-column comparison
-        ComparisonRow(
-            originalFields = suggestion.originalFields,
-            changes = suggestion.changes.plus(editedFields),
-            noteTypeConfig = noteTypeConfig,
-            modifier = Modifier.weight(1f),
-        ) {
-            // Changes card (right column) - Suggestion mode
-            ChangesCard(
-                fields = suggestion.originalFields,
-                changes = suggestion.changes,
-                editedFields = editedFields,
-                noteTypeConfig = noteTypeConfig,
-                mode = ChangesCardMode.Suggestion(
-                    isEditMode = isEditMode,
-                    hasManualEdits = hasManualEdits,
-                    showOriginal = showOriginal,
-                    onToggleEditMode = onToggleEditMode,
-                    onToggleOriginal = onToggleOriginal,
-                    onRevertEdits = onRevertEdits,
-                ),
-                onEditField = onEditField,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.md))
-
-        ActionButtons(
-            onAccept = onAccept,
-            onReject = onReject,
-            onSkip = onSkip,
-            hasManualEdits = hasManualEdits,
-            isEditMode = isEditMode,
-            showOriginal = showOriginal,
-            isLoading = isActionLoading,
-        )
-    }
-}
-
-/**
- * Two-column comparison layout with Original card on left
- */
-@Composable
-private fun ComparisonRow(
+private fun ColumnScope.ComparisonContent(
+    deckName: String,
+    modelName: String,
+    reasoning: String?,
     originalFields: Map<String, NoteField>,
     changes: Map<String, String>,
     noteTypeConfig: NoteTypeConfig?,
-    modifier: Modifier = Modifier,
-    changesCard: @Composable RowScope.() -> Unit,
+    breadcrumb: @Composable () -> Unit,
+    onCopy: () -> Unit,
+    onOpenNoteTypeSettings: () -> Unit,
+    trailingBadge: @Composable () -> Unit,
+    changesHeaderStyle: HeaderStyle,
+    editedFields: Map<String, String> = emptyMap(),
+    isEditMode: Boolean = false,
+    showOriginal: Boolean = false,
+    onEditField: ((String, String) -> Unit)? = null,
+    changesHeaderControls: (@Composable () -> Unit)? = null,
+    actionButtons: (@Composable () -> Unit)? = null,
 ) {
+    breadcrumb()
+    Spacer(Modifier.height(Spacing.sm))
+
+    ComparisonHeaderCard(
+        deckName = deckName,
+        modelName = modelName,
+        onCopy = onCopy,
+        onOpenNoteTypeSettings = onOpenNoteTypeSettings,
+        trailingBadge = trailingBadge,
+    )
+    Spacer(Modifier.height(Spacing.md))
+
+    if (!reasoning.isNullOrBlank()) {
+        ReasoningCard(reasoning = reasoning)
+        Spacer(Modifier.height(Spacing.md))
+    }
+
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.weight(1f).fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         OriginalCard(
             fields = originalFields,
-            changes = changes,
+            changes = changes.plus(editedFields),
             noteTypeConfig = noteTypeConfig,
             modifier = Modifier.weight(1f),
         )
-        changesCard()
+
+        ChangesCard(
+            fields = originalFields,
+            changes = changes,
+            noteTypeConfig = noteTypeConfig,
+            title = changesHeaderStyle.title,
+            headerIcon = changesHeaderStyle.icon,
+            headerColor = changesHeaderStyle.color,
+            headerBg = changesHeaderStyle.background,
+            editedFields = editedFields,
+            isEditMode = isEditMode,
+            showOriginal = showOriginal,
+            onEditField = onEditField,
+            headerControls = changesHeaderControls,
+            modifier = Modifier.weight(1f),
+        )
+    }
+
+    if (actionButtons != null) {
+        Spacer(Modifier.height(Spacing.md))
+        actionButtons()
     }
 }
 
 @Composable
-private fun SuggestionHeaderCard(
+private fun ComparisonHeaderCard(
     deckName: String,
     modelName: String,
-    currentIndex: Int,
-    totalSuggestions: Int,
-    suggestion: Suggestion,
-    editedFields: Map<String, String>,
-    onCopy: (String) -> Unit,
-    onOpenNoteTypeSettings: (String) -> Unit,
+    onCopy: () -> Unit,
+    onOpenNoteTypeSettings: () -> Unit,
+    trailingBadge: @Composable () -> Unit,
 ) {
     val colors = LocalAppColors.current
     val gradientBrush = Brush.horizontalGradient(
@@ -307,41 +284,17 @@ private fun SuggestionHeaderCard(
                     fontWeight = FontWeight.SemiBold,
                 )
 
-                // Separator
                 if (modelName.isNotBlank()) {
-                    Text(
-                        text = "|",
-                        color = colors.textMuted,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Text("|", color = colors.textMuted, style = MaterialTheme.typography.bodyMedium)
 
-                    // Note type with settings button
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Description,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = colors.secondary,
-                        )
-                        Text(
-                            text = modelName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = colors.textSecondary,
-                        )
-                        IconButton(
-                            onClick = { onOpenNoteTypeSettings(modelName) },
-                            modifier = Modifier.size(24.dp).handPointer(),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Configure note type",
-                                modifier = Modifier.size(14.dp),
-                                tint = colors.textMuted,
-                            )
+                        Icon(Icons.Default.Description, null, Modifier.size(16.dp), tint = colors.secondary)
+                        Text(modelName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = colors.textSecondary)
+                        IconButton(onClick = onOpenNoteTypeSettings, modifier = Modifier.size(24.dp).handPointer()) {
+                            Icon(Icons.Default.Settings, "Configure note type", Modifier.size(14.dp), tint = colors.textMuted)
                         }
                     }
                 }
@@ -352,53 +305,52 @@ private fun SuggestionHeaderCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OutlinedButton(
-                    onClick = { onCopy(buildCopyText(suggestion, editedFields)) },
+                    onClick = onCopy,
                     modifier = Modifier.handPointer(),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     Icon(Icons.Default.ContentCopy, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(Spacing.sm))
-                    Text("Copy Suggestion", style = MaterialTheme.typography.labelMedium)
+                    Text("Copy", style = MaterialTheme.typography.labelMedium)
                 }
-
-                Surface(
-                    color = colors.accentMuted,
-                    shape = RoundedCornerShape(50),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Default.ContentPaste, null, Modifier.size(16.dp), tint = colors.accentStrong)
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(
-                            text = "${currentIndex + 1} / $totalSuggestions",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary,
-                        )
-                    }
-                }
+                trailingBadge()
             }
         }
     }
 }
 
-private fun buildCopyText(suggestion: Suggestion, editedFields: Map<String, String>): String {
-    return buildString {
-        appendLine("## AI Reasoning")
-        appendLine(suggestion.reasoning)
-        appendLine()
-        appendLine("## Original Card")
-        suggestion.originalFields.forEach { (name, field) ->
-            appendLine("**$name:** ${field.value}")
-        }
-        appendLine()
-        appendLine("## Suggested Changes")
-        suggestion.changes.forEach { (name, value) ->
-            appendLine("**$name:** ${editedFields[name] ?: value}")
-        }
-    }
+private fun buildSuggestionCopyText(suggestion: Suggestion, editedFields: Map<String, String>): String {
+    return buildCopyText(
+        reasoning = suggestion.reasoning,
+        originalFields = suggestion.originalFields,
+        changes = suggestion.changes,
+        editedFields = editedFields,
+    )
+}
+
+private fun buildHistoryCopyText(entry: HistoryEntry): String {
+    return buildCopyText(
+        reasoning = entry.reasoning.orEmpty(),
+        originalFields = entry.originalFields,
+        changes = entry.appliedChanges ?: entry.aiChanges,
+        editedFields = emptyMap(),
+    )
+}
+
+private fun buildCopyText(
+    reasoning: String,
+    originalFields: Map<String, NoteField>,
+    changes: Map<String, String>,
+    editedFields: Map<String, String>,
+) = buildString {
+    appendLine("## AI Reasoning")
+    appendLine(reasoning)
+    appendLine()
+    appendLine("## Original Card")
+    originalFields.forEach { (name, field) -> appendLine("**$name:** ${field.value}") }
+    appendLine()
+    appendLine("## Changes")
+    changes.forEach { (name, value) -> appendLine("**$name:** ${editedFields[name] ?: value}") }
 }
 
 @Composable
@@ -418,22 +370,13 @@ private fun OriginalCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(colors.surfaceAlt, MaterialTheme.colorScheme.surface),
-                        ),
-                    )
+                    .background(Brush.horizontalGradient(listOf(colors.surfaceAlt, MaterialTheme.colorScheme.surface)))
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Default.History, null, Modifier.size(18.dp), tint = colors.textMuted)
                 Spacer(Modifier.width(Spacing.sm))
-                Text(
-                    text = "Original Card",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary,
-                )
+                Text("Original Card", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
             }
 
             HorizontalDivider(color = colors.divider)
@@ -462,3 +405,31 @@ private fun OriginalCard(
         }
     }
 }
+
+@Composable
+fun getSuggestionHeaderStyle(isEditMode: Boolean, hasManualEdits: Boolean, showOriginal: Boolean): HeaderStyle {
+    val colors = LocalAppColors.current
+    return when {
+        isEditMode && showOriginal -> HeaderStyle("AI Suggested", colors.secondary, colors.secondaryMuted, Icons.Default.SmartToy)
+        isEditMode -> HeaderStyle("Editing...", colors.warning, colors.warningMuted, Icons.Default.Edit)
+        hasManualEdits -> HeaderStyle("Manually Edited", colors.warning, colors.warningMuted, Icons.Default.Edit)
+        else -> HeaderStyle("Suggested Card", colors.accent, colors.accentMuted, Icons.Default.AutoAwesome)
+    }
+}
+
+@Composable
+fun getHistoryHeaderStyle(accepted: Boolean): HeaderStyle {
+    val colors = LocalAppColors.current
+    return if (accepted) {
+        HeaderStyle("Applied Changes", colors.success, colors.successMuted, Icons.Default.Check)
+    } else {
+        HeaderStyle("Rejected Changes", colors.error, colors.errorMuted, Icons.Default.Close)
+    }
+}
+
+data class HeaderStyle(
+    val title: String,
+    val color: Color,
+    val background: Color,
+    val icon: ImageVector,
+)
