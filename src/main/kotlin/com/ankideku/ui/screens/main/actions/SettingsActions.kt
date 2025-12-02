@@ -35,15 +35,24 @@ class SettingsActionsImpl(
     }
 
     override fun updateSettings(settings: Settings) {
+        val previousProvider = ctx.uiState.value.settings.llmProvider
+        val providerChanged = previousProvider != settings.llmProvider
+
         ctx.scope.launch {
             settingsManager.update(settings)
             // Clear LLM instance if provider changed
-            LlmServiceFactory.clearInstance()
+            if (providerChanged) {
+                LlmServiceFactory.clearInstance()
+            }
             ctx.update {
                 copy(
                     settings = settings,
-                    llmHealthStatus = null, // Reset health status when settings change
+                    llmHealthStatus = if (providerChanged) null else llmHealthStatus,
                 )
+            }
+            // Trigger health check after settings are saved if provider changed
+            if (providerChanged) {
+                testLlmConnection()
             }
         }
     }

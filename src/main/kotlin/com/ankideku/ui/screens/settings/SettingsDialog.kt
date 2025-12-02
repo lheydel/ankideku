@@ -281,7 +281,7 @@ private fun AiProviderSection(
                         AppDropdown(
                             items = LlmProvider.entries.toList(),
                             selectedItem = selectedProvider,
-                            onItemSelected = onProviderSelected,
+                            onItemSelected = { onProviderSelected(it) },
                             itemLabel = { providerDisplayName(it) },
                             enabled = !isChecking,
                             modifier = Modifier.width(180.dp),
