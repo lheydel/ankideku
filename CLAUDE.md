@@ -142,9 +142,3 @@ New users don't run migrations - they get the schema directly from .sq files. Ex
 4. **Clean Architecture** - Respect layer boundaries (UI -> Domain <- Data)
 5. **NEVER run the app yourself** - Always ask the user to run `./gradlew run` to test changes
 6. **"Memorize"** - When the user asks to "memorize" something, it means update this CLAUDE.md file with the information
-
-## Temporary note relevant while migrating from V1 to V2
-
-- When user mentions "V1" or "version 1", they are referring to the original AnkiDeku application built with TypeScript/React and Express. "V2" or "version 2" refers to the new Kotlin Compose Desktop rewrite.
-- NEVER mention "V1" or "V2" in user-facing text, documentation or codebase. This is only for internal understanding between you and the user.
-- "V1" and "V2" terms are only temporary. The new Kotlin Compose Desktop application will simply be called "AnkiDeku" going forward and V1 will be completely forgotten.
