@@ -1,9 +1,8 @@
 package com.ankideku.data.remote.anki
 
 import com.ankideku.util.json
-import com.ankideku.util.serializeToJsonElement
+import com.ankideku.util.toJsonElement
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -41,7 +40,7 @@ class AnkiConnectClient(
                 put("action", action)
                 put("version", version)
                 if (params.isNotEmpty()) {
-                    put("params", params.serializeToJsonElement())
+                    put("params", params.toJsonElement())
                 }
             }
 

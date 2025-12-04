@@ -62,7 +62,7 @@ class SqlDeckRepository(
         if (noteEntities.isEmpty()) return emptyList()
 
         val noteIds = noteEntities.map { it.id }
-        val allFields = database.fieldValueQueries.getFieldsForNotes(noteIds, FieldContext.Fields.dbValue).executeAsList()
+        val allFields = database.fieldValueQueries.getFieldsForNotes(noteIds, FieldContext.NOTE_FIELDS.dbValue).executeAsList()
         val fieldsByNoteId = allFields.groupBy { it.note_id }
 
         return noteEntities.map { it.toDomain(fieldsByNoteId[it.id] ?: emptyList()) }
@@ -93,7 +93,7 @@ class SqlDeckRepository(
             database.fieldValueQueries.updateNoteField(
                 field_value = value,
                 note_id = noteId,
-                context = FieldContext.Fields.dbValue,
+                context = FieldContext.NOTE_FIELDS.dbValue,
                 field_name = name,
             )
         }

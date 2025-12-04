@@ -4,8 +4,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 
 val json = Json {
     ignoreUnknownKeys = true          // equivalent to FAIL_ON_UNKNOWN_PROPERTIES = false
@@ -22,14 +22,14 @@ inline fun <reified T> T.toJson(): String {
     return json.encodeToString(this)
 }
 
-fun Any?.serializeToJsonElement(): JsonElement = when (this) {
+fun Any?.toJsonElement(): JsonElement = when (this) {
     null -> JsonNull
     is String -> JsonPrimitive(this)
     is Number -> JsonPrimitive(this)
     is Boolean -> JsonPrimitive(this)
-    is List<*> -> JsonArray(map { it.serializeToJsonElement() })
-    is Map<*, *> -> buildJsonObject {
-        forEach { (k, v) -> put(k.toString(), v.serializeToJsonElement()) }
-    }
-    else -> JsonPrimitive(toString())
+    is JsonElement -> this
+    is Iterable<*> -> JsonArray(map { it.toJsonElement() })
+    is Array<*> -> JsonArray(map { it.toJsonElement() })
+    is Map<*, *> -> JsonObject(entries.associate { (key, value) -> key.toString() to value.toJsonElement() })
+    else -> throw IllegalArgumentException("Unsupported type for JSON conversion: ${this::class.simpleName}")
 }

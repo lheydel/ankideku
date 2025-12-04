@@ -12,7 +12,7 @@ object AnySerializer : KSerializer<Any?> {
 
     override fun serialize(encoder: Encoder, value: Any?) {
         val jsonEncoder = encoder as JsonEncoder
-        jsonEncoder.encodeJsonElement(value.serializeToJsonElement())
+        jsonEncoder.encodeJsonElement(value.toJsonElement())
     }
 
     override fun deserialize(decoder: Decoder): Any? {

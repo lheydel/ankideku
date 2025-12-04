@@ -62,8 +62,8 @@ class SqlSuggestionRepository(
                 )
                 val suggestionId = database.suggestionQueries.lastInsertedSuggestionId().executeAsOne()
                 val owner = FieldOwner.Suggestion(suggestionId)
-                database.fieldValueQueries.insertFields(owner, FieldContext.Original, suggestion.originalFields)
-                database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.Changes, suggestion.changes)
+                database.fieldValueQueries.insertFields(owner, FieldContext.SUGG_ORIGINAL, suggestion.originalFields)
+                database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.SUGG_CHANGES, suggestion.changes)
             }
         }
     }
@@ -92,7 +92,7 @@ class SqlSuggestionRepository(
     }
 
     override fun clearEditedChanges(suggestionId: SuggestionId) {
-        database.fieldValueQueries.deleteFieldsForSuggestionByContext(suggestionId, FieldContext.Edited.dbValue)
+        database.fieldValueQueries.deleteFieldsForSuggestionByContext(suggestionId, FieldContext.SUGG_EDITED.dbValue)
         database.suggestionQueries.touchSuggestion(suggestionId)
     }
 
@@ -118,7 +118,7 @@ class SqlSuggestionRepository(
 
     private fun replaceEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>) {
         val owner = FieldOwner.Suggestion(suggestionId)
-        database.fieldValueQueries.deleteFieldsForSuggestionByContext(suggestionId, FieldContext.Edited.dbValue)
-        database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.Edited, editedChanges)
+        database.fieldValueQueries.deleteFieldsForSuggestionByContext(suggestionId, FieldContext.SUGG_EDITED.dbValue)
+        database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.SUGG_EDITED, editedChanges)
     }
 }

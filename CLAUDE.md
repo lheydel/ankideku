@@ -142,3 +142,4 @@ New users don't run migrations - they get the schema directly from .sq files. Ex
 4. **Clean Architecture** - Respect layer boundaries (UI -> Domain <- Data)
 5. **NEVER run the app yourself** - Always ask the user to run `./gradlew run` to test changes
 6. **"Memorize"** - When the user asks to "memorize" something, it means update this CLAUDE.md file with the information
+7. **No automatic backward compatibility** - Always ask the user before adding backward compatibility code (aliases, shims, re-exports, etc.). Many cases in this project don't need it.

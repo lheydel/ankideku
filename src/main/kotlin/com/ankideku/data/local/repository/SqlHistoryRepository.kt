@@ -26,13 +26,13 @@ class SqlHistoryRepository(
         val historyId = database.historyQueries.lastInsertedHistoryId().executeAsOne()
         val owner = FieldOwner.History(historyId)
 
-        database.fieldValueQueries.insertFields(owner, FieldContext.Original, entry.originalFields)
-        database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.AiChanges, entry.aiChanges)
+        database.fieldValueQueries.insertFields(owner, FieldContext.HIST_ORIGINAL, entry.originalFields)
+        database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.HIST_AI_CHANGES, entry.aiChanges)
         entry.appliedChanges?.let {
-            database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.Applied, it)
+            database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.HIST_APPLIED, it)
         }
         entry.userEdits?.let {
-            database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.UserEdits, it)
+            database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.HIST_EDITED, it)
         }
     }
 

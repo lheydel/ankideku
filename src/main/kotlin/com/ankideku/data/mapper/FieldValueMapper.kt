@@ -6,15 +6,16 @@ import com.ankideku.domain.model.NoteField
 
 enum class FieldContext(val dbValue: String) {
     // Note fields
-    Fields("fields"),
+    NOTE_FIELDS("fields"),
     // Suggestion contexts
-    Original("original"),
-    Changes("changes"),
-    Edited("edited"),
+    SUGG_ORIGINAL("original"),
+    SUGG_CHANGES("changes"),
+    SUGG_EDITED("edited"),
     // History contexts
-    AiChanges("ai_changes"),
-    Applied("applied"),
-    UserEdits("user_edits");
+    HIST_ORIGINAL("original"),
+    HIST_AI_CHANGES("ai_changes"),
+    HIST_APPLIED("applied"),
+    HIST_EDITED("user_edits");
 
     companion object {
         private val byDbValue = entries.associateBy { it.dbValue }
@@ -53,7 +54,7 @@ fun FieldValueQueries.insertNoteFields(
 ) {
     val owner = FieldOwner.Note(noteId)
     for (field in fields.values) {
-        insertField(owner, FieldContext.Fields, field.name, field.value, field.order.toLong())
+        insertField(owner, FieldContext.NOTE_FIELDS, field.name, field.value, field.order.toLong())
     }
 }
 
