@@ -6,4 +6,9 @@ package com.ankideku.domain.sel.ast
  * SEL uses a JSON-based format where every operation is an object with exactly
  * one key (the operator) and its arguments as the value.
  */
-sealed interface SelNode
+sealed interface SelNode {
+    /**
+     * Serializes this node to its JSON representation.
+     */
+    fun toJson(): String
+}

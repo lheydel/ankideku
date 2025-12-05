@@ -1,0 +1,42 @@
+-- SEL query presets for saved/reusable queries
+
+CREATE TABLE sel_preset (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    target TEXT NOT NULL,
+    query_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_sel_preset_target ON sel_preset(target);
+
+-- Queries
+
+getAll:
+SELECT * FROM sel_preset ORDER BY updated_at DESC;
+
+getByTarget:
+SELECT * FROM sel_preset WHERE target = ? ORDER BY name;
+
+getById:
+SELECT * FROM sel_preset WHERE id = ?;
+
+insert:
+INSERT INTO sel_preset (name, description, target, query_json, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+update:
+UPDATE sel_preset
+SET name = ?, description = ?, query_json = ?, updated_at = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM sel_preset WHERE id = ?;
+
+deleteAll:
+DELETE FROM sel_preset;

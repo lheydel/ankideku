@@ -6,4 +6,6 @@ package com.ankideku.domain.sel.ast
  */
 class SelArray(
     private val values: List<SelNode> = emptyList()
-) : SelNode, List<SelNode> by values
+) : SelNode, List<SelNode> by values {
+    override fun toJson(): String = "[${values.joinToString(",") { it.toJson() }}]"
+}

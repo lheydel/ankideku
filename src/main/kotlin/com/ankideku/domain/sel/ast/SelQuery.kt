@@ -47,7 +47,23 @@ data class SelQuery(
     val result: SelNode? = null,
     val orderBy: List<SelOrderClause>? = null,
     val limit: Int? = null
-) : SelNode
+) : SelNode {
+    override fun toJson(): String = buildString {
+        append("{\"target\":\"${target.name}\"")
+        append(",\"where\":${where.toJson()}")
+        alias?.let { append(",\"alias\":\"$it\"") }
+        result?.let { append(",\"result\":${it.toJson()}") }
+        orderBy?.takeIf { it.isNotEmpty() }?.let { clauses ->
+            append(",\"orderBy\":[")
+            append(clauses.joinToString(",") { clause ->
+                "{\"field\":\"${clause.field}\",\"direction\":\"${clause.direction}\"}"
+            })
+            append("]")
+        }
+        limit?.let { append(",\"limit\":$it") }
+        append("}")
+    }
+}
 
 /**
  * Defines ordering for query results.

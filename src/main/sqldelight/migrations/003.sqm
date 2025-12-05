@@ -1,0 +1,13 @@
+-- Migration 3: Add sel_preset table for saved SEL queries
+
+CREATE TABLE sel_preset (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    target TEXT NOT NULL,
+    query_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_sel_preset_target ON sel_preset(target);

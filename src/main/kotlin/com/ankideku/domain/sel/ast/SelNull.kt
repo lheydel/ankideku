@@ -5,4 +5,5 @@ package com.ankideku.domain.sel.ast
  */
 data object SelNull : SelPrimitive<Any?> {
     override val value: Any? = null
+    override fun toJson(): String = "null"
 }

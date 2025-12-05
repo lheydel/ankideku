@@ -6,6 +6,14 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import java.io.File
 
 /**
+ * Result of database creation containing both the driver and database instance.
+ */
+data class DatabaseWithDriver(
+    val driver: SqlDriver,
+    val database: AnkiDekuDb,
+)
+
+/**
  * Database factory and management
  */
 object DatabaseFactory {
@@ -41,6 +49,19 @@ object DatabaseFactory {
 
         val driver = JdbcSqliteDriver("jdbc:sqlite:$dbPath")
         return create(driver)
+    }
+
+    /**
+     * Create the database with a file-based SQLite driver, returning both driver and database.
+     * Use this when you need access to the raw SqlDriver for custom queries.
+     */
+    fun createWithFileAndDriver(dbPath: String): DatabaseWithDriver {
+        // Ensure parent directory exists
+        File(dbPath).parentFile?.mkdirs()
+
+        val driver = JdbcSqliteDriver("jdbc:sqlite:$dbPath")
+        val database = create(driver)
+        return DatabaseWithDriver(driver, database)
     }
 
     /**

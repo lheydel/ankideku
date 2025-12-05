@@ -24,4 +24,9 @@ typealias SelOperatorKey = String
 data class SelOperation(
     val operator: SelOperatorKey,
     val arguments: SelArray
-) : SelNode
+) : SelNode {
+    override fun toJson(): String = when (arguments.size) {
+        1 -> "{\"$operator\":${arguments[0].toJson()}}"
+        else -> "{\"$operator\":${arguments.toJson()}}"
+    }
+}
