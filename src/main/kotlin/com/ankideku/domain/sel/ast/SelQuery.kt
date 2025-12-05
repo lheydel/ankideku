@@ -50,9 +50,9 @@ data class SelQuery(
 ) : SelNode {
     override fun toJson(): String = buildString {
         append("{\"target\":\"${target.name}\"")
-        append(",\"where\":${where.toJson()}")
         alias?.let { append(",\"alias\":\"$it\"") }
         result?.let { append(",\"result\":${it.toJson()}") }
+        append(",\"where\":${where.toJson()}")
         orderBy?.takeIf { it.isNotEmpty() }?.let { clauses ->
             append(",\"orderBy\":[")
             append(clauses.joinToString(",") { clause ->

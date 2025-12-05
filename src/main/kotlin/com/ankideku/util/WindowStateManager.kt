@@ -36,17 +36,18 @@ object WindowStateManager {
 
 
     /**
-     * Get the window state file path
+     * Get the window state file path for a specific window key
      */
-    private fun getStateFile(): File {
-        return File(getAppDataDir(), STATE_FILE_NAME)
+    private fun getStateFile(key: String = "main"): File {
+        val fileName = if (key == "main") STATE_FILE_NAME else "window-state-$key.json"
+        return File(getAppDataDir(), fileName)
     }
 
     /**
      * Load saved window state, or return null if not available
      */
-    fun load(): WindowState? {
-        val stateFile = getStateFile()
+    fun load(key: String = "main"): WindowState? {
+        val stateFile = getStateFile(key)
         if (!stateFile.exists()) {
             return null
         }
@@ -70,7 +71,7 @@ object WindowStateManager {
     /**
      * Save the current window state to file
      */
-    fun save(state: WindowState) {
+    fun save(state: WindowState, key: String = "main") {
         // Don't save position when maximized (it's not meaningful)
         val saved = SavedWindowState(
             x = state.position.x.value.toInt(),
@@ -81,7 +82,7 @@ object WindowStateManager {
         )
 
         try {
-            val stateFile = getStateFile()
+            val stateFile = getStateFile(key)
             stateFile.writeText(json.encodeToString(SavedWindowState.serializer(), saved))
         } catch (e: Exception) {
             // Silently fail - window state persistence is not critical
@@ -93,10 +94,11 @@ object WindowStateManager {
      * Create a WindowState with saved values or sensible defaults
      */
     fun loadOrDefault(
+        key: String = "main",
         defaultWidth: Int = 1600,
         defaultHeight: Int = 1000
     ): WindowState {
-        return load() ?: WindowState(
+        return load(key) ?: WindowState(
             position = WindowPosition.PlatformDefault,
             size = DpSize(defaultWidth.dp, defaultHeight.dp),
             placement = WindowPlacement.Floating

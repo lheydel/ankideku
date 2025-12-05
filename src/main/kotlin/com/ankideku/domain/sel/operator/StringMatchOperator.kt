@@ -9,9 +9,9 @@ import com.ankideku.domain.sel.ast.SelArray
  * String matching operators (contains, startsWith, endsWith).
  */
 object StringMatchOperators : List<StringMatchOperator> by listOf(
-    StringMatchOperator("contains", StringMatchOperator.containsPattern),
-    StringMatchOperator("startsWith", StringMatchOperator.startsWithPattern),
-    StringMatchOperator("endsWith", StringMatchOperator.endsWithPattern),
+    StringMatchOperator("contains", StringMatchOperator.containsPattern, "Contains", "Check if string contains substring"),
+    StringMatchOperator("startsWith", StringMatchOperator.startsWithPattern, "Starts With", "Check if string starts with prefix"),
+    StringMatchOperator("endsWith", StringMatchOperator.endsWithPattern, "Ends With", "Check if string ends with suffix"),
 )
 
 /**
@@ -19,11 +19,22 @@ object StringMatchOperators : List<StringMatchOperator> by listOf(
  *
  * @param key The operator key ("contains", "startsWith", "endsWith")
  * @param sqlPattern Function to create SQL LIKE pattern from needle
+ * @param displayName Human-readable name for UI
+ * @param description Brief description of the operation
  */
 class StringMatchOperator(
     override val key: String,
     private val sqlPattern: (SqlFragment) -> SqlFragment,
+    displayName: String,
+    description: String,
 ) : SelOperator {
+
+    override val metadata = SelOperatorMetadata(
+        displayName = displayName,
+        category = SelOperatorCategory.String,
+        description = description,
+        signature = SelOperatorSignature.binary(SelType.String, SelType.Boolean),
+    )
 
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 2, key, jsonPath)

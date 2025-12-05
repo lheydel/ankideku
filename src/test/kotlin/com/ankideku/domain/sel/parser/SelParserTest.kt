@@ -9,7 +9,6 @@ import com.ankideku.domain.sel.ast.SelOperation
 import com.ankideku.domain.sel.ast.SelParser
 import com.ankideku.domain.sel.ast.SelQuery
 import com.ankideku.domain.sel.ast.SelOrderDirection
-import com.ankideku.domain.sel.ast.SelRef
 import com.ankideku.domain.sel.ast.SelString
 import com.ankideku.domain.sel.model.EntityType
 import kotlin.test.*
@@ -191,32 +190,6 @@ class SelParserTest {
         assertIs<SelOperation>(node)
         assertEquals("and", node.operator)
         assertEquals(2, node.arguments.size)
-    }
-
-    // ==================== Ref Parsing ====================
-
-    @Test
-    fun `parse ref operator`() {
-        val node = SelParser.parse("""{ "ref": ["n", "id"] }""")
-        assertIs<SelRef>(node)
-        assertEquals("n", node.scope)
-        assertEquals("id", node.property)
-    }
-
-    @Test
-    fun `fail on invalid ref - missing arguments`() {
-        val exception = assertFailsWith<SelParseException> {
-            SelParser.parse("""{ "ref": ["n"] }""")
-        }
-        assertTrue(exception.message!!.contains("2 arguments"))
-    }
-
-    @Test
-    fun `fail on invalid ref - not an array`() {
-        val exception = assertFailsWith<SelParseException> {
-            SelParser.parse("""{ "ref": "n" }""")
-        }
-        assertTrue(exception.message!!.contains("2 arguments"))
     }
 
     // ==================== Error Cases ====================
@@ -429,18 +402,17 @@ class SelParserTest {
     }
 
     @Test
-    fun `parse inline subquery (without query wrapper)`() {
-        // When a query object appears directly (not wrapped in { "query": {...} })
-        // the parser should detect and parse it as a SelQuery
-        val node = SelParser.parse("""
+    fun `parseQuery parses query object directly`() {
+        // parseQuery handles query objects directly (without { "query": {...} } wrapper)
+        val query = SelParser.parseQuery("""
         {
             "target": "Suggestion",
             "where": { "==": [{ "prop": "status" }, "pending"] }
         }
         """.trimIndent())
 
-        assertIs<SelQuery>(node)
-        assertEquals(EntityType.Suggestion, node.target)
+        assertEquals(EntityType.Suggestion, query.target)
+        assertIs<SelOperation>(query.where)
     }
 
     // ==================== Real-World Query Examples ====================

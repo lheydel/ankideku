@@ -9,8 +9,8 @@ import com.ankideku.domain.sel.model.SqlFragment
  * Empty check operators (isEmpty, isNotEmpty).
  */
 object EmptyCheckOperators : List<EmptyCheckOperator> by listOf(
-    EmptyCheckOperator("isEmpty", expectEmpty = true),
-    EmptyCheckOperator("isNotEmpty", expectEmpty = false),
+    EmptyCheckOperator("isEmpty", expectEmpty = true, "Is Empty", "Check if value is null or empty string"),
+    EmptyCheckOperator("isNotEmpty", expectEmpty = false, "Is Not Empty", "Check if value is not null and not empty"),
 )
 
 /**
@@ -18,11 +18,22 @@ object EmptyCheckOperators : List<EmptyCheckOperator> by listOf(
  *
  * @param key The operator key ("isEmpty" or "isNotEmpty")
  * @param expectEmpty If true, returns true when value is empty
+ * @param displayName Human-readable name for UI
+ * @param description Brief description of the operation
  */
 class EmptyCheckOperator(
     override val key: String,
     private val expectEmpty: Boolean,
+    displayName: String,
+    description: String,
 ) : SelOperator {
+
+    override val metadata = SelOperatorMetadata(
+        displayName = displayName,
+        category = SelOperatorCategory.Predicate,
+        description = description,
+        signature = SelOperatorSignature.unary(SelType.Any, SelType.Boolean),
+    )
 
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 1, key, jsonPath)

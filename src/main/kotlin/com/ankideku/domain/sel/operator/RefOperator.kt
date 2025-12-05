@@ -38,6 +38,13 @@ import com.ankideku.domain.sel.schema.SelEntityRegistry
 object RefOperator : SelOperator {
     override val key = "ref"
 
+    override val metadata = SelOperatorMetadata(
+        displayName = "Reference",
+        category = SelOperatorCategory.Internal,
+        description = "Reference a property from a parent scope",
+        signature = SelOperatorSignature.binary(SelType.String, SelType.Any),
+    )
+
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 2, key, jsonPath)
 

@@ -56,4 +56,34 @@ abstract class MathOperator : SelOperator {
         val params = allFragments.flatMap { it.params }
         return SqlFragment("($combined)", params)
     }
+
+    companion object {
+        /** Helper to create metadata for arithmetic operators */
+        fun arithmeticMetadata(displayName: String, description: String, minArgs: Int, maxArgs: Int) =
+            SelOperatorMetadata(
+                displayName = displayName,
+                category = SelOperatorCategory.Math,
+                description = description,
+                signature = SelOperatorSignature(
+                    minArgs = minArgs,
+                    maxArgs = maxArgs,
+                    argTypes = listOf(SelType.Number),
+                    returnType = SelType.Number,
+                ),
+            )
+
+        /** Helper to create metadata for aggregate operators */
+        fun aggregateMetadata(displayName: String, description: String, maxArgs: Int = 1) =
+            SelOperatorMetadata(
+                displayName = displayName,
+                category = SelOperatorCategory.Aggregate,
+                description = description,
+                signature = SelOperatorSignature(
+                    minArgs = 1,
+                    maxArgs = maxArgs,
+                    argTypes = listOf(SelType.Any),
+                    returnType = SelType.Number,
+                ),
+            )
+    }
 }

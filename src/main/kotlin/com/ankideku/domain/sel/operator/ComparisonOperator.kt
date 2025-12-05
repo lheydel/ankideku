@@ -6,12 +6,12 @@ import com.ankideku.domain.sel.model.SqlFragment
 import com.ankideku.domain.sel.ast.SelArray
 
 object ComparisonOperators : List<ComparisonOperator> by listOf(
-    ComparisonOperator("==", "="),
-    ComparisonOperator("!=", "<>"),
-    ComparisonOperator("<", "<"),
-    ComparisonOperator("<=", "<="),
-    ComparisonOperator(">", ">"),
-    ComparisonOperator(">=", ">="),
+    ComparisonOperator("==", "=", "Equals", "Check if two values are equal"),
+    ComparisonOperator("!=", "<>", "Not Equals", "Check if two values are different"),
+    ComparisonOperator("<", "<", "Less Than", "Check if left is less than right"),
+    ComparisonOperator("<=", "<=", "At Most", "Check if left is less than or equal to right"),
+    ComparisonOperator(">", ">", "Greater Than", "Check if left is greater than right"),
+    ComparisonOperator(">=", ">=", "At Least", "Check if left is greater than or equal to right"),
 )
 
 /**
@@ -19,11 +19,22 @@ object ComparisonOperators : List<ComparisonOperator> by listOf(
  *
  * @param key The operator key ("==", "!=", "<", "<=", ">", ">=")
  * @param sqlOperator The corresponding sql operator
+ * @param displayName Human-readable name for UI
+ * @param description Brief description of the operation
  */
 class ComparisonOperator(
     override val key: String,
     val sqlOperator: String,
+    displayName: String,
+    description: String,
 ) : SelOperator {
+
+    override val metadata = SelOperatorMetadata(
+        displayName = displayName,
+        category = SelOperatorCategory.Comparison,
+        description = description,
+        signature = SelOperatorSignature.binary(SelType.Any, SelType.Boolean),
+    )
 
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 2, key, jsonPath)

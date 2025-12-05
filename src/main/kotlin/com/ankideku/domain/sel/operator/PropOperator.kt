@@ -20,6 +20,13 @@ import com.ankideku.domain.sel.model.SqlFragment
 object PropOperator : SelOperator {
     override val key = "prop"
 
+    override val metadata = SelOperatorMetadata(
+        displayName = "Property",
+        category = SelOperatorCategory.Internal,
+        description = "Access a top-level property of the entity",
+        signature = SelOperatorSignature.unary(SelType.String, SelType.Any),
+    )
+
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 1, key, jsonPath)
 

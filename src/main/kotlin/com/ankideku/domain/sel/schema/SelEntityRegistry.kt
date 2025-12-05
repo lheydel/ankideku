@@ -2,6 +2,7 @@ package com.ankideku.domain.sel.schema
 
 import com.ankideku.data.mapper.FieldContext
 import com.ankideku.domain.sel.model.EntityType
+import com.ankideku.domain.sel.operator.SelType
 
 /**
  * Registry of all entity schemas.
@@ -48,21 +49,24 @@ val NoteSchema = EntitySchema(
     sqlTable = "cached_note",
     sqlAlias = "note",
     properties = listOf(
-        EntityProperty("id", "id", PropertyType.Long),
-        EntityProperty("deckId", "deck_id", PropertyType.Long),
-        EntityProperty("deckName", "deck_name", PropertyType.String),
-        EntityProperty("modelName", "model_name", PropertyType.String),
-        EntityProperty("tags", "tags", PropertyType.String),
-        EntityProperty("mod", "mod", PropertyType.Long),
-        EntityProperty("estimatedTokens", "estimated_tokens", PropertyType.Int),
-        EntityProperty("createdAt", "created_at", PropertyType.Timestamp),
-        EntityProperty("updatedAt", "updated_at", PropertyType.Timestamp),
+        EntityProperty("id", "id", SelType.Number, "ID"),
+        EntityProperty("deckId", "deck_id", SelType.Number),
+        EntityProperty("deckName", "deck_name", SelType.String, "Deck"),
+        EntityProperty("modelName", "model_name", SelType.String, "Note Type"),
+        EntityProperty("tags", "tags", SelType.String),
+        EntityProperty("mod", "mod", SelType.Number, "Last Modification Date"),
+        EntityProperty("estimatedTokens", "estimated_tokens", SelType.Number, "Estimated Tokens"),
+        EntityProperty("createdAt", "created_at", SelType.Number),
+        EntityProperty("updatedAt", "updated_at", SelType.Number),
     ),
     fieldContexts = listOf(
         SelFieldContext("fields", FieldContext.NOTE_FIELDS.dbValue),
     ),
     relations = emptyList(),
     fieldValueFkColumn = "note_id",
+    scopes = listOf(
+        EntityScope("deck", "Deck", "deckId", ScopeType.Deck),
+    ),
 )
 
 val SuggestionSchema = EntitySchema(
@@ -70,14 +74,14 @@ val SuggestionSchema = EntitySchema(
     sqlTable = "suggestion",
     sqlAlias = "sugg",
     properties = listOf(
-        EntityProperty("id", "id", PropertyType.Long),
-        EntityProperty("noteId", "note_id", PropertyType.Long),
-        EntityProperty("sessionId", "session_id", PropertyType.Long),
-        EntityProperty("reasoning", "reasoning", PropertyType.String),
-        EntityProperty("status", "status", PropertyType.String),
-        EntityProperty("createdAt", "created_at", PropertyType.Timestamp),
-        EntityProperty("decidedAt", "decided_at", PropertyType.Timestamp),
-        EntityProperty("skippedAt", "skipped_at", PropertyType.Timestamp),
+        EntityProperty("id", "id", SelType.Number, "ID"),
+        EntityProperty("noteId", "note_id", SelType.Number, "Note ID"),
+        EntityProperty("sessionId", "session_id", SelType.Number),
+        EntityProperty("reasoning", "reasoning", SelType.String, "Reasoning"),
+        EntityProperty("status", "status", SelType.String, "Status"),
+        EntityProperty("createdAt", "created_at", SelType.Number, "Creation Date"),
+        EntityProperty("decidedAt", "decided_at", SelType.Number, "Review Date"),
+        EntityProperty("skippedAt", "skipped_at", SelType.Number),
     ),
     fieldContexts = listOf(
         SelFieldContext("original", FieldContext.SUGG_ORIGINAL.dbValue),
@@ -89,6 +93,9 @@ val SuggestionSchema = EntitySchema(
         EntityRelation(EntityType.Session, "sessionId", "id"),
     ),
     fieldValueFkColumn = "suggestion_id",
+    scopes = listOf(
+        EntityScope("session", "Session", "sessionId", ScopeType.Session),
+    ),
 )
 
 val SessionSchema = EntitySchema(
@@ -96,10 +103,10 @@ val SessionSchema = EntitySchema(
     sqlTable = "session",
     sqlAlias = "sess",
     properties = listOf(
-        EntityProperty("id", "id", PropertyType.String),
-        EntityProperty("deckId", "deck_id", PropertyType.Long),
-        EntityProperty("status", "status", PropertyType.String),
-        EntityProperty("createdAt", "created_at", PropertyType.Timestamp),
+        EntityProperty("id", "id", SelType.String),
+        EntityProperty("deckId", "deck_id", SelType.Number),
+        EntityProperty("status", "status", SelType.String),
+        EntityProperty("createdAt", "created_at", SelType.Number),
     ),
     fieldContexts = emptyList(),
     relations = emptyList(),
@@ -110,15 +117,15 @@ val HistoryEntrySchema = EntitySchema(
     sqlTable = "history_entry",
     sqlAlias = "hist",
     properties = listOf(
-        EntityProperty("id", "id", PropertyType.Long),
-        EntityProperty("noteId", "note_id", PropertyType.Long),
-        EntityProperty("suggestionId", "suggestion_id", PropertyType.Long),
-        EntityProperty("sessionId", "session_id", PropertyType.Long),
-        EntityProperty("deckId", "deck_id", PropertyType.Long),
-        EntityProperty("deckName", "deck_name", PropertyType.String),
-        EntityProperty("action", "action", PropertyType.String),
-        EntityProperty("reasoning", "reasoning", PropertyType.String),
-        EntityProperty("timestamp", "timestamp", PropertyType.Timestamp),
+        EntityProperty("id", "id", SelType.Number, "ID"),
+        EntityProperty("noteId", "note_id", SelType.Number, "Note ID"),
+        EntityProperty("suggestionId", "suggestion_id", SelType.Number, "Suggestion ID"),
+        EntityProperty("sessionId", "session_id", SelType.Number),
+        EntityProperty("deckId", "deck_id", SelType.Number),
+        EntityProperty("deckName", "deck_name", SelType.String, "Deck"),
+        EntityProperty("action", "action", SelType.String),
+        EntityProperty("reasoning", "reasoning", SelType.String, "Reasoning"),
+        EntityProperty("timestamp", "timestamp", SelType.Number),
     ),
     fieldContexts = listOf(
         SelFieldContext("original", FieldContext.HIST_ORIGINAL.dbValue),
@@ -131,4 +138,8 @@ val HistoryEntrySchema = EntitySchema(
         EntityRelation(EntityType.Suggestion, "suggestionId", "id"),
     ),
     fieldValueFkColumn = "history_id",
+    scopes = listOf(
+        EntityScope("session", "Session", "sessionId", ScopeType.Session),
+        EntityScope("deck", "Deck", "deckId", ScopeType.Deck),
+    ),
 )

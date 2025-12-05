@@ -15,6 +15,13 @@ import com.ankideku.domain.sel.model.SqlFragment
 object LenOperator : SelOperator {
     override val key = "len"
 
+    override val metadata = SelOperatorMetadata(
+        displayName = "Length",
+        category = SelOperatorCategory.String,
+        description = "Get the length of a string",
+        signature = SelOperatorSignature.unary(SelType.String, SelType.Number),
+    )
+
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 1, key, jsonPath)
         val inner = evaluator.eval(args[0], context, jsonPath, 0)

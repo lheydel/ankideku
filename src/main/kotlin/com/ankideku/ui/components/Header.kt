@@ -7,14 +7,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import com.ankideku.util.classpathPainterResource
 import androidx.compose.ui.unit.dp
+import com.ankideku.ui.components.sel.SelBuilderWindow
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
@@ -29,6 +31,18 @@ fun Header(
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalAppColors.current
+    var showSelWindow by remember { mutableStateOf(false) }
+
+    // SEL Builder Window
+    if (showSelWindow) {
+        SelBuilderWindow(
+            onClose = { showSelWindow = false },
+            onConfirm = { query ->
+                println("SEL Query: ${query.toJson()}")
+                showSelWindow = false
+            },
+        )
+    }
 
     val background = Brush.horizontalGradient(
         colors = listOf(colors.appHeaderStart, colors.appHeaderMid, colors.appHeaderEnd),
@@ -70,6 +84,18 @@ fun Header(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Search button (SEL query builder)
+                IconButton(
+                    onClick = { showSelWindow = true },
+                    modifier = Modifier.handPointer(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+
                 // DEV ONLY: Import V1 Database - Remove after migration
                 IconButton(
                     onClick = onImportV1,

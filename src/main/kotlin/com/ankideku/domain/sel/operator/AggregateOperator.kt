@@ -6,10 +6,10 @@ import com.ankideku.domain.sel.model.SqlFragment
 import com.ankideku.domain.sel.ast.SelArray
 
 object AggregateOperators : List<AggregateOperator> by listOf(
-    AggregateOperator("count", "COUNT", maxArguments = 1),
-    AggregateOperator("avg", "AVG", maxArguments = 1),
-    AggregateOperator("min", "MIN"),
-    AggregateOperator("max", "MAX"),
+    AggregateOperator("count", "COUNT", "Count", "Count the number of values", maxArguments = 1),
+    AggregateOperator("avg", "AVG", "Average", "Calculate the average of values", maxArguments = 1),
+    AggregateOperator("min", "MIN", "Minimum", "Get the minimum value"),
+    AggregateOperator("max", "MAX", "Maximum", "Get the maximum value"),
 )
 
 /**
@@ -17,14 +17,20 @@ object AggregateOperators : List<AggregateOperator> by listOf(
  *
  * @param key The operator key (e.g., "avg", "min", "max")
  * @param sqlFunction The SQL function name to use
+ * @param displayName Human-readable name for UI
+ * @param description Brief description of the operation
  * @param maxArguments Maximum number of arguments (default unlimited)
  */
 class AggregateOperator(
     override val key: String,
     private val sqlFunction: String,
+    displayName: String,
+    description: String,
     override val maxArguments: Int = Int.MAX_VALUE,
 ) : MathOperator() {
     override val minArguments: Int = 1
+
+    override val metadata = MathOperator.aggregateMetadata(displayName, description, maxArguments)
 
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireMinArgs(args, minArguments, key, jsonPath)

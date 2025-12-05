@@ -43,6 +43,13 @@ import com.ankideku.domain.sel.model.SqlFragment
 object ExistsOperator : SelOperator {
     override val key = "exists"
 
+    override val metadata = SelOperatorMetadata(
+        displayName = "Exists",
+        category = SelOperatorCategory.Internal,
+        description = "Check if a subquery returns any rows",
+        signature = SelOperatorSignature.unary(SelType.Any, SelType.Boolean),
+    )
+
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 1, key, jsonPath)
 

@@ -9,8 +9,8 @@ import com.ankideku.domain.sel.model.SqlFragment
  * Null check operators (isNull, isNotNull).
  */
 object NullCheckOperators : List<NullCheckOperator> by listOf(
-    NullCheckOperator("isNull", expectNull = true),
-    NullCheckOperator("isNotNull", expectNull = false),
+    NullCheckOperator("isNull", expectNull = true, "Is Null", "Check if value is null"),
+    NullCheckOperator("isNotNull", expectNull = false, "Is Not Null", "Check if value is not null"),
 )
 
 /**
@@ -18,11 +18,22 @@ object NullCheckOperators : List<NullCheckOperator> by listOf(
  *
  * @param key The operator key ("isNull" or "isNotNull")
  * @param expectNull If true, returns true when value is null
+ * @param displayName Human-readable name for UI
+ * @param description Brief description of the operation
  */
 class NullCheckOperator(
     override val key: String,
     private val expectNull: Boolean,
+    displayName: String,
+    description: String,
 ) : SelOperator {
+
+    override val metadata = SelOperatorMetadata(
+        displayName = displayName,
+        category = SelOperatorCategory.Predicate,
+        description = description,
+        signature = SelOperatorSignature.unary(SelType.Any, SelType.Boolean),
+    )
 
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 1, key, jsonPath)

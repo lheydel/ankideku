@@ -39,6 +39,13 @@ import com.ankideku.domain.sel.schema.SelEntityRegistry
 object QueryOperator : SelOperator {
     override val key = "query"
 
+    override val metadata = SelOperatorMetadata(
+        displayName = "Subquery",
+        category = SelOperatorCategory.Internal,
+        description = "Execute a nested subquery",
+        signature = SelOperatorSignature.unary(SelType.Any, SelType.Any),
+    )
+
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 1, key, jsonPath)
 

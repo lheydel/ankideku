@@ -15,6 +15,13 @@ import com.ankideku.domain.sel.model.SqlFragment
 object NotOperator : SelOperator {
     override val key = "not"
 
+    override val metadata = SelOperatorMetadata(
+        displayName = "Not",
+        category = SelOperatorCategory.Logic,
+        description = "Negate a condition",
+        signature = SelOperatorSignature.unary(SelType.Boolean, SelType.Boolean),
+    )
+
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 1, key, jsonPath)
         val inner = evaluator.eval(args[0], context, jsonPath, 0)

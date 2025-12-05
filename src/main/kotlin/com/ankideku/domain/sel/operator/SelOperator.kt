@@ -23,6 +23,12 @@ interface SelOperator {
     val key: SelOperatorKey
 
     /**
+     * Metadata for this operator (display name, category, type signature).
+     * Used by the UI to display operator information and filter valid operators.
+     */
+    val metadata: SelOperatorMetadata
+
+    /**
      * Generate SQL for this operator with the given arguments.
      *
      * @param evaluator The evaluator to use for evaluating sub-expressions

@@ -25,6 +25,18 @@ import com.ankideku.domain.sel.ast.SelString
 object FieldOperator : SelOperator {
     override val key = "field"
 
+    override val metadata = SelOperatorMetadata(
+        displayName = "Field",
+        category = SelOperatorCategory.Internal,
+        description = "Access a field value from the entity",
+        signature = SelOperatorSignature(
+            minArgs = 2,
+            maxArgs = 2,
+            argTypes = listOf(SelType.String, SelType.String),
+            returnType = SelType.String,
+        ),
+    )
+
     override fun toSql(evaluator: SelSqlEvaluator, args: SelArray, context: SelSqlContext, jsonPath: String): SqlFragment {
         requireArgs(args, 2, key, jsonPath)
 

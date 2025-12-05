@@ -26,6 +26,49 @@ object SelOperatorRegistry : Map<SelOperatorKey, SelOperator> by operators {
         operators.forEach { register(it) }
     }
 
+    /**
+     * Get metadata for an operator by key.
+     */
+    fun getMetadata(key: SelOperatorKey): SelOperatorMetadata? = operators[key]?.metadata
+
+    /**
+     * Get all operators in a specific category.
+     */
+    fun byCategory(category: SelOperatorCategory): List<SelOperator> =
+        operators.values.filter { it.metadata.category == category }
+
+    /**
+     * Get all user-facing operators (excludes Internal category).
+     */
+    val userOperators: List<SelOperator> by lazy {
+        operators.values.filter { it.metadata.category != SelOperatorCategory.Internal }
+    }
+
+    /**
+     * Get all user-facing operators grouped by category.
+     */
+    val userOperatorsByCategory: Map<SelOperatorCategory, List<SelOperator>> by lazy {
+        userOperators.groupBy { it.metadata.category }
+    }
+
+    /**
+     * Get operators that return a specific type.
+     */
+    fun returningType(type: SelType): List<SelOperator> =
+        userOperators.filter {
+            it.metadata.signature.returnType == type || it.metadata.signature.returnType == SelType.Any
+        }
+
+    /**
+     * Get operators that accept a specific argument type.
+     */
+    fun acceptingType(type: SelType): List<SelOperator> =
+        userOperators.filter { op ->
+            op.metadata.signature.argTypes.any { argType ->
+                argType == type || argType == SelType.Any
+            }
+        }
+
     init {
         // Field access operators
         register(FieldOperator)
