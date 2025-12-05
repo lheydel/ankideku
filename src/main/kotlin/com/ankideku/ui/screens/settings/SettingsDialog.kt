@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -51,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import com.ankideku.data.remote.llm.LlmHealthStatus
 import com.ankideku.data.remote.llm.LlmProvider
 import com.ankideku.domain.model.AppTheme
@@ -91,75 +89,68 @@ fun SettingsDialog(
 
     AppDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .widthIn(min = 600.dp, max = 900.dp)
+            .heightIn(min = 500.dp, max = 750.dp),
     ) {
-        Surface(
-            modifier = Modifier
-                .widthIn(min = 600.dp, max = 900.dp)
-                .heightIn(min = 500.dp, max = 750.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = colors.surface,
-            shadowElevation = 8.dp,
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Header
-                SettingsHeader(onDismiss = onDismiss)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Header
+            SettingsHeader(onDismiss = onDismiss)
 
-                HorizontalDivider(color = colors.divider)
+            HorizontalDivider(color = colors.divider)
 
-                // Tabs
-                TabRow(
-                    selectedTabIndex = selectedTab.ordinal,
-                    containerColor = colors.surface,
-                    contentColor = colors.textPrimary,
-                    divider = {},
-                ) {
-                    SettingsTab.entries.forEach { tab ->
-                        Tab(
-                            selected = selectedTab == tab,
-                            onClick = { selectedTab = tab },
-                            modifier = Modifier.handPointer(),
-                            text = {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        imageVector = when (tab) {
-                                            SettingsTab.GENERAL -> Icons.Default.Settings
-                                            SettingsTab.NOTE_TYPES -> Icons.Default.Description
-                                        },
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Text(tab.label)
-                                }
-                            },
-                        )
-                    }
+            // Tabs
+            TabRow(
+                selectedTabIndex = selectedTab.ordinal,
+                containerColor = colors.surface,
+                contentColor = colors.textPrimary,
+                divider = {},
+            ) {
+                SettingsTab.entries.forEach { tab ->
+                    Tab(
+                        selected = selectedTab == tab,
+                        onClick = { selectedTab = tab },
+                        modifier = Modifier.handPointer(),
+                        text = {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = when (tab) {
+                                        SettingsTab.GENERAL -> Icons.Default.Settings
+                                        SettingsTab.NOTE_TYPES -> Icons.Default.Description
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text(tab.label)
+                            }
+                        },
+                    )
                 }
+            }
 
-                HorizontalDivider(color = colors.divider)
+            HorizontalDivider(color = colors.divider)
 
-                // Content
-                Box(modifier = Modifier.weight(1f)) {
-                    when (selectedTab) {
-                        SettingsTab.GENERAL -> GeneralTabContent(
-                            settings = settings,
-                            onSettingsChange = onSave, // Auto-save on change
-                            llmHealthStatus = llmHealthStatus,
-                            llmHealthChecking = llmHealthChecking,
-                            onTestConnection = onTestConnection,
-                        )
-                        SettingsTab.NOTE_TYPES -> NoteTypesTabContent(
-                            availableNoteTypes = availableNoteTypes,
-                            noteTypeConfigs = noteTypeConfigs,
-                            noteTypeFields = noteTypeFields,
-                            selectedNoteType = selectedNoteType,
-                            onNoteTypeSelected = { selectedNoteType = it },
-                            onSaveConfig = onSaveNoteTypeConfig,
-                        )
-                    }
+            // Content
+            Box(modifier = Modifier.weight(1f)) {
+                when (selectedTab) {
+                    SettingsTab.GENERAL -> GeneralTabContent(
+                        settings = settings,
+                        onSettingsChange = onSave, // Auto-save on change
+                        llmHealthStatus = llmHealthStatus,
+                        llmHealthChecking = llmHealthChecking,
+                        onTestConnection = onTestConnection,
+                    )
+                    SettingsTab.NOTE_TYPES -> NoteTypesTabContent(
+                        availableNoteTypes = availableNoteTypes,
+                        noteTypeConfigs = noteTypeConfigs,
+                        noteTypeFields = noteTypeFields,
+                        selectedNoteType = selectedNoteType,
+                        onNoteTypeSelected = { selectedNoteType = it },
+                        onSaveConfig = onSaveNoteTypeConfig,
+                    )
                 }
             }
         }

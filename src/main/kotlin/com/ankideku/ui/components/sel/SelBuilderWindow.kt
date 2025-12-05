@@ -1,49 +1,68 @@
 package com.ankideku.ui.components.sel
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
-import com.ankideku.domain.model.Deck
-import com.ankideku.domain.model.Session
-import com.ankideku.domain.sel.ast.SelOrderClause
-import com.ankideku.domain.sel.ast.SelOrderDirection
+import com.ankideku.domain.model.SelPreset
+import com.ankideku.domain.repository.SelPresetRepository
 import com.ankideku.domain.sel.ast.SelQuery
 import com.ankideku.domain.sel.model.EntityType
-import com.ankideku.domain.sel.schema.EntityScope
-import com.ankideku.domain.sel.schema.ScopeType
-import com.ankideku.domain.sel.schema.SelEntityRegistry
 import com.ankideku.domain.usecase.deck.DeckFinder
 import com.ankideku.domain.usecase.session.SessionFinder
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import com.ankideku.ui.components.AppDropdown
-import com.ankideku.ui.components.AppTextInput
-import com.ankideku.ui.components.sel.state.BreadcrumbEntry
+import com.ankideku.ui.components.sel.common.SavePresetDialog
+import com.ankideku.ui.components.sel.header.BreadcrumbBar
+import com.ankideku.ui.components.sel.header.RootQueryHeader
+import com.ankideku.ui.components.sel.header.SubqueryHeader
 import com.ankideku.ui.components.sel.state.ScopeValue
 import com.ankideku.ui.components.sel.state.SelBuilderState
-import com.ankideku.ui.components.sel.state.SubqueryResultType
-import com.ankideku.ui.components.sel.state.SubqueryState
-import com.ankideku.ui.theme.*
+import com.ankideku.ui.theme.AnkiDekuTheme
+import com.ankideku.ui.theme.LocalAppColors
+import com.ankideku.ui.theme.Spacing
 import com.ankideku.util.WindowStateManager
 import com.ankideku.util.classpathPainterResource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+
+private const val WINDOW_STATE_KEY = "search-builder"
 
 /**
  * Separate window for building SEL queries.
@@ -53,8 +72,6 @@ import org.koin.compose.koinInject
  * @param initialTarget Initial entity type to query
  * @param lockedScopes Scopes that are pre-filled and cannot be changed by the user
  */
-private const val WINDOW_STATE_KEY = "search-builder"
-
 @OptIn(FlowPreview::class)
 @Composable
 fun SelBuilderWindow(
@@ -119,14 +136,19 @@ private fun SelBuilderContent(
 ) {
     val colors = LocalAppColors.current
     val state = remember { SelBuilderState(initialTarget, lockedScopes) }
+    val scope = rememberCoroutineScope()
 
     // Inject finders for scope data
     val deckFinder: DeckFinder = koinInject()
     val sessionFinder: SessionFinder = koinInject()
+    val presetRepository: SelPresetRepository = koinInject()
 
     // Observe scope data
     val decks by deckFinder.observeAll().collectAsState(initial = emptyList())
     val sessions by sessionFinder.observeAll().collectAsState(initial = emptyList())
+
+    // Observe presets for current target
+    val presets by presetRepository.getByTarget(state.target).collectAsState(initial = emptyList())
 
     // Fetch note type fields for field selector
     var noteTypeFields by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
@@ -134,6 +156,9 @@ private fun SelBuilderContent(
         val noteTypes = deckFinder.fetchNoteTypes()
         noteTypeFields = deckFinder.fetchAllNoteTypeFields(noteTypes)
     }
+
+    // Save preset dialog state
+    var showSaveDialog by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -145,11 +170,10 @@ private fun SelBuilderContent(
                 .padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            // Header
-            Text(
-                "Search Builder",
-                style = MaterialTheme.typography.titleLarge,
-                color = colors.textPrimary,
+            // Header with preset selector
+            HeaderRow(
+                state = state,
+                presets = presets,
             )
 
             // Breadcrumb navigation (when in subquery)
@@ -196,355 +220,121 @@ private fun SelBuilderContent(
             )
 
             // Action buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
-            ) {
-                TextButton(onClick = { state.reset() }) {
-                    Text("Reset")
-                }
-                OutlinedButton(onClick = onClose) {
-                    Text("Cancel")
-                }
-                Button(
-                    onClick = { onConfirm(state.toSelQuery()) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.accent,
-                    ),
-                ) {
-                    Text("Search")
-                }
-            }
-        }
-    }
-}
-
-/**
- * Scope selector dropdown that shows options from the database.
- * Locked scopes are shown as read-only chips.
- */
-@Composable
-private fun ScopeSelector(
-    scope: EntityScope,
-    state: SelBuilderState,
-    decks: List<Deck>,
-    sessions: List<Session>,
-) {
-    val colors = LocalAppColors.current
-    val scopeValue = state.scopes[scope.key]
-    val isLocked = scopeValue?.locked == true
-
-    Text(
-        "${scope.displayName}:",
-        style = MaterialTheme.typography.bodyMedium,
-        color = colors.textMuted,
-    )
-
-    if (isLocked) {
-        // Show locked scope as read-only chip
-        Surface(
-            shape = InputShape,
-            color = colors.surfaceAlt,
-            border = BorderStroke(1.dp, colors.border),
-        ) {
-            Text(
-                text = scopeValue.displayLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textPrimary,
-                modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            ActionButtonRow(
+                state = state,
+                isInSubquery = isInSubquery,
+                onShowSaveDialog = { showSaveDialog = true },
+                onReset = { state.reset() },
+                onClose = onClose,
+                onConfirm = { onConfirm(state.toSelQuery()) },
             )
-        }
-    } else {
-        // Show scope selector dropdown
-        when (scope.type) {
-            ScopeType.Deck -> {
-                val selectedDeck = decks.find { it.id == (scopeValue?.value as? Long) }
-                AppDropdown(
-                    items = listOf(null) + decks,
-                    selectedItem = selectedDeck,
-                    onItemSelected = { deck ->
-                        state.scopes = if (deck != null) {
-                            state.scopes + (scope.key to ScopeValue(deck.id, deck.name))
-                        } else {
-                            state.scopes - scope.key
+
+            // Save preset dialog
+            if (showSaveDialog) {
+                SavePresetDialog(
+                    onDismiss = { showSaveDialog = false },
+                    onSave = { name, description ->
+                        scope.launch(Dispatchers.IO) {
+                            presetRepository.save(
+                                SelPreset(
+                                    name = name,
+                                    description = description.takeIf { it.isNotBlank() },
+                                    target = state.target,
+                                    queryJson = state.toJson(),
+                                )
+                            )
                         }
+                        showSaveDialog = false
                     },
-                    itemLabel = { it?.name ?: "All" },
-                    modifier = Modifier.width(180.dp),
-                )
-            }
-            ScopeType.Session -> {
-                val selectedSession = sessions.find { it.id == (scopeValue?.value as? Long) }
-                AppDropdown(
-                    items = listOf(null) + sessions,
-                    selectedItem = selectedSession,
-                    onItemSelected = { session ->
-                        state.scopes = if (session != null) {
-                            state.scopes + (scope.key to ScopeValue(session.id, "Session #${session.id}"))
-                        } else {
-                            state.scopes - scope.key
-                        }
-                    },
-                    itemLabel = { it?.let { s -> "Session #${s.id}" } ?: "All" },
-                    modifier = Modifier.width(180.dp),
                 )
             }
         }
     }
 }
 
-/**
- * Header for root query showing target entity and scope selectors.
- */
 @Composable
-private fun RootQueryHeader(
+private fun HeaderRow(
     state: SelBuilderState,
-    decks: List<Deck>,
-    sessions: List<Session>,
+    presets: List<SelPreset>,
 ) {
     val colors = LocalAppColors.current
 
     Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(
-            "Search in:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.textMuted,
-        )
-        AppDropdown(
-            items = listOf(EntityType.Note, EntityType.Suggestion),
-            selectedItem = state.target,
-            onItemSelected = { state.target = it },
-            itemLabel = { it.name },
-            modifier = Modifier.width(180.dp),
+            "Search Builder",
+            style = MaterialTheme.typography.titleLarge,
+            color = colors.textPrimary,
         )
 
-        // Scope selectors based on current target entity
-        val schema = SelEntityRegistry[state.target]
-        schema.scopes.forEach { scope ->
-            ScopeSelector(
-                scope = scope,
-                state = state,
-                decks = decks,
-                sessions = sessions,
-            )
+        // Preset selector (only at root level)
+        if (state.navigationStack.isEmpty() && presets.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Load preset:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textMuted,
+                )
+                AppDropdown(
+                    items = presets,
+                    selectedItem = null,
+                    onItemSelected = { preset ->
+                        state.loadFromJson(preset.queryJson)
+                    },
+                    itemLabel = { it.name },
+                    placeholder = "Select...",
+                    modifier = Modifier.width(180.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionButtonRow(
+    state: SelBuilderState,
+    isInSubquery: Boolean,
+    onShowSaveDialog: () -> Unit,
+    onReset: () -> Unit,
+    onClose: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Left side: Save preset (only at root level)
+        if (!isInSubquery) {
+            OutlinedButton(onClick = onShowSaveDialog) {
+                Text("Save as Preset")
+            }
         }
 
         Spacer(Modifier.weight(1f))
 
-        // Order by
-        val currentOrderField = state.orderBy.firstOrNull()?.field
-        val currentOrderDir = state.orderBy.firstOrNull()?.direction ?: SelOrderDirection.Asc
-        val selectedOrderProp = schema.visibleProperties.find { it.selKey == currentOrderField }
-
-        Text(
-            "Order:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.textMuted,
-        )
-        AppDropdown(
-            items = listOf(null) + schema.visibleProperties,
-            selectedItem = selectedOrderProp,
-            onItemSelected = { prop ->
-                state.orderBy = if (prop != null) {
-                    listOf(SelOrderClause(prop.selKey, currentOrderDir))
-                } else {
-                    emptyList()
-                }
-            },
-            itemLabel = { it?.displayName ?: "None" },
-            modifier = Modifier.width(120.dp),
-        )
-        if (currentOrderField != null) {
-            AppDropdown(
-                items = SelOrderDirection.entries.toList(),
-                selectedItem = currentOrderDir,
-                onItemSelected = { dir ->
-                    state.orderBy = listOf(SelOrderClause(currentOrderField, dir))
-                },
-                itemLabel = { it.name },
-                modifier = Modifier.width(80.dp),
-            )
+        // Right side: Reset, Cancel, Search
+        TextButton(onClick = onReset) {
+            Text("Reset")
         }
-
-        // Limit input
-        Text(
-            "Limit:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.textMuted,
-        )
-        AppTextInput(
-            value = state.limit?.toString() ?: "",
-            onValueChange = { state.limit = it.replace(Regex("[^0-9]"), "").toIntOrNull() },
-            placeholder = "∞",
-            modifier = Modifier.width(80.dp),
-        )
-    }
-}
-
-/**
- * Header for subquery showing result type, target, and limit.
- * Wrapped in a colored surface to visually distinguish from root query.
- */
-@Composable
-private fun SubqueryHeader(
-    subquery: SubqueryState,
-) {
-    val colors = LocalAppColors.current
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = InputShape,
-        color = colors.secondary.copy(alpha = 0.1f),
-        border = BorderStroke(1.dp, colors.secondary.copy(alpha = 0.3f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            // Result type dropdown
-            Text(
-                "Return:",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.secondary,
-            )
-            AppDropdown(
-                items = SubqueryResultType.entries.toList(),
-                selectedItem = subquery.resultType,
-                onItemSelected = { subquery.resultType = it },
-                itemLabel = { it.displayName },
-                modifier = Modifier.width(140.dp),
-            )
-
-            // Target entity dropdown
-            Text(
-                "from:",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.secondary,
-            )
-            AppDropdown(
-                items = listOf(EntityType.Note, EntityType.Suggestion, EntityType.HistoryEntry),
-                selectedItem = subquery.target,
-                onItemSelected = { subquery.target = it },
-                itemLabel = { it.name },
-                modifier = Modifier.width(140.dp),
-            )
-
-            // Result property (for scalar result type)
-            if (subquery.resultType == SubqueryResultType.ScalarProperty) {
-                Text(
-                    "property:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.secondary,
-                )
-                AppTextInput(
-                    value = subquery.resultProperty,
-                    onValueChange = { subquery.resultProperty = it },
-                    placeholder = "property name",
-                    modifier = Modifier.width(140.dp),
-                )
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            // Order by
-            val schema = SelEntityRegistry[subquery.target]
-            val currentOrderField = subquery.orderBy.firstOrNull()?.field
-            val currentOrderDir = subquery.orderBy.firstOrNull()?.direction ?: SelOrderDirection.Asc
-            val selectedOrderProp = schema.visibleProperties.find { it.selKey == currentOrderField }
-
-            Text(
-                "Order:",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.secondary,
-            )
-            AppDropdown(
-                items = listOf(null) + schema.visibleProperties,
-                selectedItem = selectedOrderProp,
-                onItemSelected = { prop ->
-                    subquery.orderBy = if (prop != null) {
-                        listOf(SelOrderClause(prop.selKey, currentOrderDir))
-                    } else {
-                        emptyList()
-                    }
-                },
-                itemLabel = { it?.displayName ?: "None" },
-                modifier = Modifier.width(120.dp),
-            )
-            if (currentOrderField != null) {
-                AppDropdown(
-                    items = SelOrderDirection.entries.toList(),
-                    selectedItem = currentOrderDir,
-                    onItemSelected = { dir ->
-                        subquery.orderBy = listOf(SelOrderClause(currentOrderField, dir))
-                    },
-                    itemLabel = { it.name },
-                    modifier = Modifier.width(80.dp),
-                )
-            }
-
-            // Limit input
-            Text(
-                "Limit:",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.secondary,
-            )
-            AppTextInput(
-                value = subquery.limit?.toString() ?: "",
-                onValueChange = { subquery.limit = it.replace(Regex("[^0-9]"), "").toIntOrNull() },
-                placeholder = "∞",
-                modifier = Modifier.width(80.dp),
-            )
+        OutlinedButton(onClick = onClose) {
+            Text("Cancel")
         }
-    }
-}
-
-/**
- * Breadcrumb navigation bar showing path to current subquery.
- */
-@Composable
-private fun BreadcrumbBar(
-    breadcrumbs: List<BreadcrumbEntry>,
-    onNavigate: (Int) -> Unit,
-) {
-    val colors = LocalAppColors.current
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = InputShape,
-        color = colors.surfaceAlt,
-        border = BorderStroke(1.dp, colors.border),
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
+        Button(
+            onClick = onConfirm,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.accent,
+            ),
         ) {
-            breadcrumbs.forEachIndexed { index, entry ->
-                if (index > 0) {
-                    Icon(
-                        Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = colors.textMuted,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-
-                val isLast = index == breadcrumbs.lastIndex
-                Text(
-                    text = entry.label,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = if (isLast) FontWeight.Medium else FontWeight.Normal,
-                    color = if (isLast) colors.textPrimary else colors.accent,
-                    modifier = if (!isLast) {
-                        Modifier
-                            .pointerHoverIcon(PointerIcon.Hand)
-                            .clickable { onNavigate(index) }
-                    } else Modifier,
-                )
-            }
+            Text("Search")
         }
     }
 }

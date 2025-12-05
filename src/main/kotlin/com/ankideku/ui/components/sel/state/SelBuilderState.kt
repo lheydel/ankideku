@@ -8,6 +8,8 @@ import com.ankideku.domain.sel.ast.*
 import com.ankideku.domain.sel.model.EntityType
 import com.ankideku.domain.sel.schema.ScopeType
 import com.ankideku.domain.sel.schema.SelEntityRegistry
+import com.ankideku.util.json
+import kotlinx.serialization.json.*
 
 /**
  * Scope value with optional lock state.
@@ -205,5 +207,219 @@ class SelBuilderState(
         copy.rootGroup = rootGroup.copy()
         copy.orderBy = orderBy
         copy.limit = limit
+    }
+
+    /**
+     * Load state from a JSON query string.
+     * Parses the query and populates the builder state.
+     *
+     * Currently loads: target, alias, orderBy, limit, and basic conditions.
+     * Complex nested expressions are converted to a default empty state.
+     */
+    fun loadFromJson(queryJson: String) {
+        try {
+            val root = json.parseToJsonElement(queryJson)
+            if (root !is JsonObject) return
+
+            // Load target
+            root["target"]?.jsonPrimitive?.contentOrNull?.let { targetStr ->
+                target = try {
+                    EntityType.valueOf(targetStr)
+                } catch (_: Exception) {
+                    target
+                }
+            }
+
+            // Load alias
+            alias = root["alias"]?.jsonPrimitive?.contentOrNull ?: "root"
+
+            // Load limit
+            limit = root["limit"]?.jsonPrimitive?.intOrNull
+
+            // Load orderBy
+            root["orderBy"]?.jsonArray?.let { orderByArray ->
+                orderBy = orderByArray.mapNotNull { clause ->
+                    val clauseObj = clause as? JsonObject ?: return@mapNotNull null
+                    val field = clauseObj["field"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                    val direction = clauseObj["direction"]?.jsonPrimitive?.contentOrNull?.let {
+                        try { SelOrderDirection.valueOf(it) } catch (_: Exception) { SelOrderDirection.Asc }
+                    } ?: SelOrderDirection.Asc
+                    SelOrderClause(field, direction)
+                }
+            }
+
+            // Load where clause - attempt to convert to UI state
+            root["where"]?.let { whereElement ->
+                rootGroup = parseWhereToGroup(whereElement) ?: ConditionGroupState()
+            }
+
+            // Clear navigation stack (we're loading a root query)
+            navigationStack = emptyList()
+
+        } catch (_: Exception) {
+            // If parsing fails, just reset to default
+            reset()
+        }
+    }
+
+    /**
+     * Attempt to parse a where clause JSON element into a ConditionGroupState.
+     * Returns null if the structure is too complex to represent.
+     */
+    private fun parseWhereToGroup(element: JsonElement): ConditionGroupState? {
+        if (element !is JsonObject) return null
+        if (element.keys.size != 1) return null
+
+        val operator = element.keys.first()
+        val args = element[operator]
+
+        // Check if it's an AND/OR group
+        if (operator == "and" || operator == "or") {
+            val argsArray = args as? JsonArray ?: return null
+            val items = argsArray.mapNotNull { parseWhereItem(it) }
+            if (items.isEmpty()) return null
+
+            return ConditionGroupState(initialJoinOperator = operator).also { group ->
+                group.items = items
+            }
+        }
+
+        // Single condition - wrap in a group
+        val condition = parseCondition(element) ?: return null
+        return ConditionGroupState().also { group ->
+            group.items = listOf(GroupItem.Condition(condition))
+        }
+    }
+
+    /**
+     * Parse a where item - could be a condition or nested group.
+     */
+    private fun parseWhereItem(element: JsonElement): GroupItem? {
+        if (element !is JsonObject) return null
+        if (element.keys.size != 1) return null
+
+        val operator = element.keys.first()
+
+        // Check if it's a nested AND/OR group
+        if (operator == "and" || operator == "or") {
+            val group = parseWhereToGroup(element) ?: return null
+            return GroupItem.NestedGroup(group)
+        }
+
+        // Otherwise it's a condition
+        val condition = parseCondition(element) ?: return null
+        return GroupItem.Condition(condition)
+    }
+
+    /**
+     * Parse a single condition from JSON.
+     */
+    private fun parseCondition(obj: JsonObject): ConditionState? {
+        if (obj.keys.size != 1) return null
+        val operator = obj.keys.first()
+        val args = obj[operator]
+
+        // Skip and/or (they're groups, not conditions)
+        if (operator == "and" || operator == "or") return null
+
+        val condition = ConditionState(initialOperator = operator)
+
+        // Parse arguments
+        val argsList = when (args) {
+            is JsonArray -> args.mapNotNull { parseOperand(it) }
+            else -> listOfNotNull(parseOperand(args))
+        }
+
+        if (argsList.isEmpty()) return null
+        condition.operands = argsList
+
+        return condition
+    }
+
+    /**
+     * Parse an operand from JSON.
+     */
+    private fun parseOperand(element: JsonElement?): OperandState? {
+        if (element == null) return null
+
+        return when (element) {
+            is JsonPrimitive -> {
+                // Literal value
+                OperandState(
+                    initialType = OperandType.Value,
+                    initialValue = element.contentOrNull ?: element.toString(),
+                )
+            }
+            is JsonObject -> {
+                if (element.keys.size != 1) return null
+                val op = element.keys.first()
+                val args = element[op]
+
+                when (op) {
+                    "field" -> parseFieldOperand(args)
+                    "prop" -> parsePropOperand(args)
+                    "ref" -> parseRefOperand(args)
+                    else -> {
+                        // Expression operand
+                        val exprArgs = when (args) {
+                            is JsonArray -> args.mapNotNull { parseOperand(it) }
+                            else -> listOfNotNull(parseOperand(args))
+                        }
+                        OperandState(initialType = OperandType.Expression).also { operand ->
+                            operand.expression = ExpressionState(initialOperator = op).also { expr ->
+                                expr.operands = exprArgs
+                            }
+                        }
+                    }
+                }
+            }
+            else -> null
+        }
+    }
+
+    private fun parseFieldOperand(args: JsonElement?): OperandState? {
+        return when (args) {
+            is JsonPrimitive -> {
+                OperandState(
+                    initialType = OperandType.Field,
+                    initialFieldName = args.contentOrNull ?: "",
+                )
+            }
+            is JsonArray -> {
+                val name = args.getOrNull(0)?.jsonPrimitive?.contentOrNull ?: ""
+                val context = args.getOrNull(1)?.jsonPrimitive?.contentOrNull
+                OperandState(
+                    initialType = OperandType.Field,
+                    initialFieldName = name,
+                    initialFieldContext = context,
+                )
+            }
+            else -> null
+        }
+    }
+
+    private fun parsePropOperand(args: JsonElement?): OperandState? {
+        val propName = when (args) {
+            is JsonPrimitive -> args.contentOrNull
+            is JsonArray -> args.getOrNull(0)?.jsonPrimitive?.contentOrNull
+            else -> null
+        } ?: return null
+
+        return OperandState(
+            initialType = OperandType.Property,
+            initialPropertyName = propName,
+        )
+    }
+
+    private fun parseRefOperand(args: JsonElement?): OperandState? {
+        val argsArray = args as? JsonArray ?: return null
+        val scope = argsArray.getOrNull(0)?.jsonPrimitive?.contentOrNull ?: return null
+        val propName = argsArray.getOrNull(1)?.jsonPrimitive?.contentOrNull ?: return null
+
+        return OperandState(
+            initialType = OperandType.Property,
+            initialPropertyName = propName,
+            initialPropertyScope = scope,
+        )
     }
 }

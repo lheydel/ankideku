@@ -1,4 +1,4 @@
-package com.ankideku.ui.components.sel
+package com.ankideku.ui.components.sel.condition
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import com.ankideku.domain.sel.model.EntityType
 import com.ankideku.domain.sel.operator.SelOperatorRegistry
 import com.ankideku.domain.sel.operator.SelType
+import com.ankideku.ui.components.sel.operand.AddButton
+import com.ankideku.ui.components.sel.operand.OperandChip
+import com.ankideku.ui.components.sel.operand.OperandEditor
 import com.ankideku.ui.components.sel.state.*
 import com.ankideku.ui.theme.*
 

@@ -1,4 +1,4 @@
-package com.ankideku.ui.components.sel
+package com.ankideku.ui.components.sel.condition
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
