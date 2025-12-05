@@ -12,13 +12,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.SessionProgress
 import com.ankideku.ui.theme.AppColorScheme
 import com.ankideku.ui.theme.Spacing
+import com.ankideku.ui.components.DestructiveButton
+import com.ankideku.ui.components.AppButtonVariant
 
 @Composable
 fun ProcessingIndicator(
@@ -70,12 +70,9 @@ fun ProcessingIndicator(
             }
 
             // Cancel button
-            TextButton(
+            DestructiveButton(
                 onClick = onCancel,
-                modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = colors.error,
-                ),
+                variant = AppButtonVariant.Text,
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 Text("Cancel", style = MaterialTheme.typography.labelSmall)

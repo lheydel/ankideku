@@ -14,10 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.text.AnnotatedString
-import kotlinx.coroutines.launch
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.HistoryEntry
@@ -29,6 +27,8 @@ import com.ankideku.domain.model.Suggestion
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
 import kotlin.collections.component1
 import kotlin.collections.component2
 
@@ -58,12 +58,10 @@ fun ComparisonPanel(
     onOpenNoteTypeSettings: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
     val colors = LocalAppColors.current
 
     val copyToClipboard: (String) -> Unit = { text ->
-        scope.launch { clipboard.setClipEntry(ClipEntry(AnnotatedString(text))) }
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
     }
 
     val gradientBackground = Brush.linearGradient(
@@ -304,9 +302,9 @@ private fun ComparisonHeaderCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedButton(
+                AppButton(
                     onClick = onCopy,
-                    modifier = Modifier.handPointer(),
+                    variant = AppButtonVariant.Outlined,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     Icon(Icons.Default.ContentCopy, null, Modifier.size(16.dp))

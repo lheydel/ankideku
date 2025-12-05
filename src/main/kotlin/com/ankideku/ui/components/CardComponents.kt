@@ -20,7 +20,9 @@ import com.ankideku.domain.model.ReviewAction
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.clickableWithPointer
-import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
+import com.ankideku.ui.components.DestructiveButton
 
 /**
  * Breadcrumb navigation for going back to sessions
@@ -311,22 +313,21 @@ fun ActionButtons(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            OutlinedButton(
+            DestructiveButton(
                 onClick = onReject,
-                modifier = Modifier.weight(1f).handPointer(!isDisabled),
+                modifier = Modifier.weight(1f),
+                variant = AppButtonVariant.Outlined,
                 enabled = !isDisabled,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
             ) {
                 Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(Spacing.xs))
                 Text("Reject")
             }
 
-            OutlinedButton(
+            AppButton(
                 onClick = onSkip,
-                modifier = Modifier.weight(1f).handPointer(!isDisabled),
+                modifier = Modifier.weight(1f),
+                variant = AppButtonVariant.Outlined,
                 enabled = !isDisabled,
             ) {
                 Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -336,9 +337,9 @@ fun ActionButtons(
         }
 
         // Right side: Accept
-        Button(
+        AppButton(
             onClick = onAccept,
-            modifier = Modifier.weight(0.8f).handPointer(!isDisabled),
+            modifier = Modifier.weight(0.8f),
             enabled = !isDisabled,
             contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = 12.dp),
         ) {

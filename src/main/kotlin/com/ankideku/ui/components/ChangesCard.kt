@@ -20,6 +20,9 @@ import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
+import com.ankideku.ui.components.DestructiveButton
 
 /**
  * Generic changes card. Shows field changes with diff highlighting.
@@ -154,9 +157,10 @@ fun SuggestionEditControls(
             )
         }
 
-        FilledTonalButton(
+        AppButton(
             onClick = onToggleEditMode,
-            modifier = Modifier.height(28.dp).handPointer(),
+            modifier = Modifier.height(28.dp),
+            variant = AppButtonVariant.Tonal,
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
             colors = ButtonDefaults.filledTonalButtonColors(
                 containerColor = if (isEditMode) colors.accentStrong else colors.surfaceAlt,
@@ -189,17 +193,19 @@ fun SuggestionEditControls(
             title = { Text("Revert Manual Edits") },
             text = { Text("Are you sure you want to revert all manual edits?") },
             confirmButton = {
-                TextButton(
+                DestructiveButton(
                     onClick = {
                         onRevertEdits()
                         showRevertDialog = false
                     },
-                    modifier = Modifier.handPointer(),
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    variant = AppButtonVariant.Text,
                 ) { Text("Revert") }
             },
             dismissButton = {
-                TextButton(onClick = { showRevertDialog = false }, modifier = Modifier.handPointer()) {
+                AppButton(
+                    onClick = { showRevertDialog = false },
+                    variant = AppButtonVariant.Text,
+                ) {
                     Text("Cancel")
                 }
             },

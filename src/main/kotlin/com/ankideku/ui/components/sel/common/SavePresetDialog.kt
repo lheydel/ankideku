@@ -15,6 +15,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.ankideku.ui.components.AppAlertDialog
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
 import com.ankideku.ui.components.AppTextInput
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
@@ -35,18 +37,15 @@ internal fun SavePresetDialog(
         onDismissRequest = onDismiss,
         title = "Save Preset",
         confirmButton = {
-            Button(
                 onClick = { onSave(name, description) },
                 enabled = name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = colors.accent,
-                ),
+            AccentButton(
             ) {
                 Text("Save")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            AppButton(onClick = onDismiss, variant = AppButtonVariant.Text) {
                 Text("Cancel")
             }
         },

@@ -8,7 +8,8 @@ import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.Suggestion
 import com.ankideku.ui.screens.main.DialogState
 import com.ankideku.ui.theme.Spacing
-import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
 
 /**
  * Renders the appropriate dialog based on the current dialog state.
@@ -61,17 +62,17 @@ fun ConfirmDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(
+            AppButton(
                 onClick = onConfirm,
-                modifier = Modifier.handPointer(),
+                variant = AppButtonVariant.Text,
             ) {
                 Text(confirmLabel)
             }
         },
         dismissButton = {
-            TextButton(
+            AppButton(
                 onClick = onDismiss,
-                modifier = Modifier.handPointer(),
+                variant = AppButtonVariant.Text,
             ) {
                 Text("Cancel")
             }
@@ -120,24 +121,21 @@ fun ConflictDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = onUseAi,
-                modifier = Modifier.handPointer(),
-            ) {
+            AppButton(onClick = onUseAi) {
                 Text("Use AI Changes")
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                TextButton(
+                AppButton(
                     onClick = onUseCurrent,
-                    modifier = Modifier.handPointer(),
+                    variant = AppButtonVariant.Text,
                 ) {
                     Text("Keep Current")
                 }
-                TextButton(
+                AppButton(
                     onClick = onCancel,
-                    modifier = Modifier.handPointer(),
+                    variant = AppButtonVariant.Text,
                 ) {
                     Text("Cancel")
                 }
@@ -160,9 +158,9 @@ fun ErrorDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(
+            AppButton(
                 onClick = onDismiss,
-                modifier = Modifier.handPointer(),
+                variant = AppButtonVariant.Text,
             ) {
                 Text("OK")
             }

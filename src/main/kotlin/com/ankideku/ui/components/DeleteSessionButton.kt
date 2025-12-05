@@ -8,6 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
+import com.ankideku.ui.components.DestructiveButton
 
 /**
  * Reusable delete session button with confirmation dialog.
@@ -37,23 +40,20 @@ fun DeleteSessionButton(
             title = { Text("Delete Session") },
             text = { Text("Are you sure you want to delete this session? This will permanently remove all suggestions.") },
             confirmButton = {
-                TextButton(
+                DestructiveButton(
                     onClick = {
                         onDelete()
                         showDeleteConfirm = false
                     },
-                    modifier = Modifier.handPointer(),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
+                    variant = AppButtonVariant.Text,
                 ) {
                     Text("Delete")
                 }
             },
             dismissButton = {
-                TextButton(
+                AppButton(
                     onClick = { showDeleteConfirm = false },
-                    modifier = Modifier.handPointer(),
+                    variant = AppButtonVariant.Text,
                 ) {
                     Text("Cancel")
                 }

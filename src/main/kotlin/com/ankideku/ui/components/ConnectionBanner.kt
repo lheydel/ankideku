@@ -11,7 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ankideku.ui.theme.Spacing
-import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
 
 @Composable
 fun ConnectionBanner(
@@ -47,9 +48,9 @@ fun ConnectionBanner(
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(
+                AppButton(
                     onClick = onRetry,
-                    modifier = Modifier.handPointer(),
+                    variant = AppButtonVariant.Text,
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     ),

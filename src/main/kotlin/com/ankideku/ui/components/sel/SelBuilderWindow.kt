@@ -41,6 +41,8 @@ import com.ankideku.domain.sel.model.EntityType
 import com.ankideku.domain.usecase.deck.DeckFinder
 import com.ankideku.domain.usecase.session.SessionFinder
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
 import com.ankideku.ui.components.AppDropdown
 import com.ankideku.ui.components.sel.common.SavePresetDialog
 import com.ankideku.ui.components.sel.header.BreadcrumbBar
@@ -314,26 +316,21 @@ private fun ActionButtonRow(
     ) {
         // Left side: Save preset (only at root level)
         if (!isInSubquery) {
-            OutlinedButton(onClick = onShowSaveDialog) {
                 Text("Save as Preset")
+            AppButton(onClick = onShowSaveDialog, variant = AppButtonVariant.Outlined) {
             }
         }
 
         Spacer(Modifier.weight(1f))
 
         // Right side: Reset, Cancel, Search
-        TextButton(onClick = onReset) {
+        AppButton(onClick = onReset, variant = AppButtonVariant.Text) {
             Text("Reset")
         }
-        OutlinedButton(onClick = onClose) {
+        AppButton(onClick = onClose, variant = AppButtonVariant.Outlined) {
             Text("Cancel")
         }
-        Button(
-            onClick = onConfirm,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colors.accent,
-            ),
-        ) {
+        AccentButton(onClick = onConfirm) {
             Text("Search")
         }
     }
