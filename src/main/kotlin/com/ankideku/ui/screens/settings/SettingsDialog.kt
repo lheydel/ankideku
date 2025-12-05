@@ -29,11 +29,11 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -61,6 +61,8 @@ import com.ankideku.ui.components.AppDropdown
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
 
 enum class SettingsTab(val label: String) {
     GENERAL("General"),
@@ -316,9 +318,9 @@ private fun AiProviderSection(
                                 .background(dotColor)
                         )
 
-                        OutlinedButton(
+                        AppButton(
                             onClick = onTestConnection,
-                            modifier = Modifier.handPointer(!isChecking),
+                            variant = AppButtonVariant.Outlined,
                             enabled = !isChecking,
                         ) {
                             if (isChecking) {
@@ -385,6 +387,18 @@ private fun ThemeSection(
                     onClick = { onThemeSelected(theme) },
                     modifier = Modifier.handPointer(),
                     label = { Text(themeDisplayName(theme)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = colors.surfaceAlt,
+                        labelColor = colors.textSecondary,
+                        selectedContainerColor = colors.accentMuted,
+                        selectedLabelColor = colors.accent,
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        borderColor = colors.border,
+                        selectedBorderColor = colors.accent,
+                        enabled = true,
+                        selected = selectedTheme == theme,
+                    ),
                 )
             }
         }

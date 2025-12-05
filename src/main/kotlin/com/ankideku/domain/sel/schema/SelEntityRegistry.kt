@@ -84,7 +84,7 @@ val SuggestionSchema = EntitySchema(
         EntityProperty("skippedAt", "skipped_at", SelType.Number),
     ),
     fieldContexts = listOf(
-        SelFieldContext("original", FieldContext.SUGG_ORIGINAL.dbValue),
+        SelFieldContext("original", FieldContext.ORIGINAL.dbValue),
         SelFieldContext("changes", FieldContext.SUGG_CHANGES.dbValue),
         SelFieldContext("edited", FieldContext.SUGG_EDITED.dbValue),
     ),
@@ -128,7 +128,7 @@ val HistoryEntrySchema = EntitySchema(
         EntityProperty("timestamp", "timestamp", SelType.Number),
     ),
     fieldContexts = listOf(
-        SelFieldContext("original", FieldContext.HIST_ORIGINAL.dbValue),
+        SelFieldContext("original", FieldContext.ORIGINAL.dbValue),
         SelFieldContext("aiChanges", FieldContext.HIST_AI_CHANGES.dbValue),
         SelFieldContext("applied", FieldContext.HIST_APPLIED.dbValue),
         SelFieldContext("userEdits", FieldContext.HIST_EDITED.dbValue),

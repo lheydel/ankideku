@@ -62,7 +62,7 @@ class SqlSuggestionRepository(
                 )
                 val suggestionId = database.suggestionQueries.lastInsertedSuggestionId().executeAsOne()
                 val owner = FieldOwner.Suggestion(suggestionId)
-                database.fieldValueQueries.insertFields(owner, FieldContext.SUGG_ORIGINAL, suggestion.originalFields)
+                database.fieldValueQueries.insertFields(owner, FieldContext.ORIGINAL, suggestion.originalFields)
                 database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.SUGG_CHANGES, suggestion.changes)
             }
         }

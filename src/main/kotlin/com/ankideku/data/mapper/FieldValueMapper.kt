@@ -7,12 +7,12 @@ import com.ankideku.domain.model.NoteField
 enum class FieldContext(val dbValue: String) {
     // Note fields
     NOTE_FIELDS("fields"),
+    // Shared (used by both suggestion and history for original fields)
+    ORIGINAL("original"),
     // Suggestion contexts
-    SUGG_ORIGINAL("original"),
     SUGG_CHANGES("changes"),
     SUGG_EDITED("edited"),
     // History contexts
-    HIST_ORIGINAL("original"),
     HIST_AI_CHANGES("ai_changes"),
     HIST_APPLIED("applied"),
     HIST_EDITED("user_edits");

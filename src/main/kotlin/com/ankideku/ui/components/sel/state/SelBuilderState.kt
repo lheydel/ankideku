@@ -322,6 +322,40 @@ class SelBuilderState(
         // Skip and/or (they're groups, not conditions)
         if (operator == "and" || operator == "or") return null
 
+        // Handle exists/not(exists) - these are subquery conditions that serialize
+        // as the subquery result type, not as an operator with operands
+        if (operator == "exists") {
+            val subqueryOperand = parseExistsSubquery(args, negated = false)
+            if (subqueryOperand != null) {
+                // Create a condition with "==" true, where the operand is the subquery
+                // The subquery's resultType handles the exists wrapper
+                return ConditionState(initialOperator = "==").also { cond ->
+                    cond.operands = listOf(
+                        subqueryOperand,
+                        OperandState(initialType = OperandType.Value, initialValue = "true")
+                    )
+                }
+            }
+        }
+
+        if (operator == "not") {
+            // Check if it's not(exists(...))
+            val argsArray = args as? JsonArray
+            val innerElement = argsArray?.getOrNull(0) as? JsonObject
+            if (innerElement?.keys?.firstOrNull() == "exists") {
+                val existsArgs = innerElement["exists"]
+                val subqueryOperand = parseExistsSubquery(existsArgs, negated = true)
+                if (subqueryOperand != null) {
+                    return ConditionState(initialOperator = "==").also { cond ->
+                        cond.operands = listOf(
+                            subqueryOperand,
+                            OperandState(initialType = OperandType.Value, initialValue = "true")
+                        )
+                    }
+                }
+            }
+        }
+
         val condition = ConditionState(initialOperator = operator)
 
         // Parse arguments
@@ -359,6 +393,9 @@ class SelBuilderState(
                     "field" -> parseFieldOperand(args)
                     "prop" -> parsePropOperand(args)
                     "ref" -> parseRefOperand(args)
+                    "exists" -> parseExistsSubquery(args, negated = false)
+                    "not" -> parseNotOperand(args)
+                    "query" -> parseQuerySubquery(args)
                     else -> {
                         // Expression operand
                         val exprArgs = when (args) {
@@ -421,5 +458,150 @@ class SelBuilderState(
             initialPropertyName = propName,
             initialPropertyScope = scope,
         )
+    }
+
+    /**
+     * Parse not(...) - check if it's not(exists(...)) for NotExists subquery,
+     * otherwise treat as regular expression.
+     */
+    private fun parseNotOperand(args: JsonElement?): OperandState? {
+        val argsArray = args as? JsonArray ?: return null
+        val innerElement = argsArray.getOrNull(0) as? JsonObject ?: return null
+
+        // Check if it's not(exists(...))
+        if (innerElement.keys.firstOrNull() == "exists") {
+            val existsArgs = innerElement["exists"]
+            return parseExistsSubquery(existsArgs, negated = true)
+        }
+
+        // Otherwise treat as regular not expression
+        val exprArgs = argsArray.mapNotNull { parseOperand(it) }
+        return OperandState(initialType = OperandType.Expression).also { operand ->
+            operand.expression = ExpressionState(initialOperator = "not").also { expr ->
+                expr.operands = exprArgs
+            }
+        }
+    }
+
+    /**
+     * Parse exists(query(...)) into a Subquery operand.
+     *
+     * JSON structure: { "exists": { "query": { "target": ..., "where": ... } } }
+     * So args is { "query": {...} }
+     */
+    private fun parseExistsSubquery(args: JsonElement?, negated: Boolean): OperandState? {
+        // args can be either:
+        // - JsonObject: { "query": {...} } (raw JSON structure)
+        // - JsonArray: [{ "query": {...} }] (SelArray structure)
+        val queryWrapper = when (args) {
+            is JsonObject -> args
+            is JsonArray -> args.getOrNull(0) as? JsonObject ?: return null
+            else -> return null
+        }
+
+        // Should have "query" key
+        if (queryWrapper.keys.firstOrNull() != "query") return null
+
+        // The query value can be:
+        // - JsonObject: the query directly (raw JSON)
+        // - JsonArray: [queryObj] (SelArray structure)
+        val queryObj = when (val queryValue = queryWrapper["query"]) {
+            is JsonObject -> queryValue
+            is JsonArray -> queryValue.getOrNull(0) as? JsonObject ?: return null
+            else -> return null
+        }
+
+        val subquery = parseSubqueryObject(queryObj) ?: return null
+        subquery.resultType = if (negated) SubqueryResultType.NotExists else SubqueryResultType.Exists
+
+        return OperandState(initialType = OperandType.Subquery).also { operand ->
+            operand.subquery = subquery
+        }
+    }
+
+    /**
+     * Parse query(...) directly - for ScalarProperty or Count result types.
+     *
+     * JSON structure: { "query": { "target": ..., "where": ..., "result": ... } }
+     */
+    private fun parseQuerySubquery(args: JsonElement?): OperandState? {
+        // args can be either:
+        // - JsonObject: the query directly (raw JSON)
+        // - JsonArray: [queryObj] (SelArray structure)
+        val queryObj = when (args) {
+            is JsonObject -> args
+            is JsonArray -> args.getOrNull(0) as? JsonObject ?: return null
+            else -> return null
+        }
+
+        val subquery = parseSubqueryObject(queryObj) ?: return null
+
+        return OperandState(initialType = OperandType.Subquery).also { operand ->
+            operand.subquery = subquery
+        }
+    }
+
+    /**
+     * Parse the inner query object into a SubqueryState.
+     */
+    private fun parseSubqueryObject(queryObj: JsonObject): SubqueryState? {
+        // Parse target
+        val targetStr = queryObj["target"]?.jsonPrimitive?.contentOrNull ?: return null
+        val target = try {
+            EntityType.valueOf(targetStr)
+        } catch (_: Exception) {
+            return null
+        }
+
+        // Parse alias
+        val alias = queryObj["alias"]?.jsonPrimitive?.contentOrNull
+
+        val subquery = SubqueryState(
+            initialTarget = target,
+            initialAlias = alias,
+        )
+
+        // Parse limit
+        subquery.limit = queryObj["limit"]?.jsonPrimitive?.intOrNull
+
+        // Parse orderBy
+        queryObj["orderBy"]?.jsonArray?.let { orderByArray ->
+            subquery.orderBy = orderByArray.mapNotNull { clause ->
+                val clauseObj = clause as? JsonObject ?: return@mapNotNull null
+                val field = clauseObj["field"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                val direction = clauseObj["direction"]?.jsonPrimitive?.contentOrNull?.let {
+                    try { SelOrderDirection.valueOf(it) } catch (_: Exception) { SelOrderDirection.Asc }
+                } ?: SelOrderDirection.Asc
+                SelOrderClause(field, direction)
+            }
+        }
+
+        // Parse result to determine resultType
+        queryObj["result"]?.let { resultElement ->
+            if (resultElement is JsonObject && resultElement.keys.size == 1) {
+                val resultOp = resultElement.keys.first()
+                when (resultOp) {
+                    "count" -> {
+                        subquery.resultType = SubqueryResultType.Count
+                    }
+                    "prop" -> {
+                        subquery.resultType = SubqueryResultType.ScalarProperty
+                        val propArgs = resultElement["prop"]
+                        subquery.resultProperty = when (propArgs) {
+                            is JsonPrimitive -> propArgs.contentOrNull ?: ""
+                            is JsonArray -> propArgs.getOrNull(0)?.jsonPrimitive?.contentOrNull ?: ""
+                            else -> ""
+                        }
+                    }
+                }
+            }
+        }
+
+        // Parse where clause
+        queryObj["where"]?.let { whereElement ->
+            subquery.rootGroup = parseWhereToGroup(whereElement) ?: ConditionGroupState()
+        }
+
+        return subquery
     }
 }

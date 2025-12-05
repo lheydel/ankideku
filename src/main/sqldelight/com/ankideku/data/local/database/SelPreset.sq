@@ -23,6 +23,9 @@ SELECT * FROM sel_preset WHERE target = ? ORDER BY name;
 getById:
 SELECT * FROM sel_preset WHERE id = ?;
 
+getByName:
+SELECT * FROM sel_preset WHERE name = ?;
+
 insert:
 INSERT INTO sel_preset (name, description, target, query_json, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?);

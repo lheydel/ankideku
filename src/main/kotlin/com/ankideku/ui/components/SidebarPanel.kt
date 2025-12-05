@@ -19,10 +19,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import com.ankideku.util.isEnterKey
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
+import com.ankideku.ui.components.AppButton
+import com.ankideku.ui.components.AppButtonVariant
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ankideku.data.remote.llm.LlmProvider
@@ -179,10 +185,10 @@ private fun SidebarHeader(
             ) {
                 // Session buttons (when session is active)
                 if (currentSession != null) {
-                    Button(
+                    AppButton(
                         onClick = onNewSession,
-                        modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
-                        colors = ButtonDefaults.buttonColors(
+                        variant = AppButtonVariant.Outlined,
+                        colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = colors.surface,
                             contentColor = colors.textPrimary,
                         ),
@@ -482,7 +488,7 @@ private fun ChatInputArea(
             modifier = Modifier
                 .fillMaxWidth()
                 .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
+                    if (event.type == KeyEventType.KeyDown && event.isEnterKey()) {
                         if (!event.isShiftPressed) {
                             submitPrompt()
                             true

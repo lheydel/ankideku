@@ -15,7 +15,7 @@ fun History_entry.toDomain(fieldValues: List<Field_value>, modelName: String): H
         deckName = deck_name,
         modelName = modelName,
         action = ReviewAction.fromDbString(action),
-        originalFields = (byContext[FieldContext.HIST_ORIGINAL] ?: emptyList()).toNoteFields(),
+        originalFields = (byContext[FieldContext.ORIGINAL] ?: emptyList()).toNoteFields(),
         aiChanges = (byContext[FieldContext.HIST_AI_CHANGES] ?: emptyList()).toStringMap(),
         appliedChanges = byContext[FieldContext.HIST_APPLIED]?.toStringMap(),
         userEdits = byContext[FieldContext.HIST_EDITED]?.toStringMap(),

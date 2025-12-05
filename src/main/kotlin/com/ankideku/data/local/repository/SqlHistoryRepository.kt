@@ -26,7 +26,7 @@ class SqlHistoryRepository(
         val historyId = database.historyQueries.lastInsertedHistoryId().executeAsOne()
         val owner = FieldOwner.History(historyId)
 
-        database.fieldValueQueries.insertFields(owner, FieldContext.HIST_ORIGINAL, entry.originalFields)
+        database.fieldValueQueries.insertFields(owner, FieldContext.ORIGINAL, entry.originalFields)
         database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.HIST_AI_CHANGES, entry.aiChanges)
         entry.appliedChanges?.let {
             database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.HIST_APPLIED, it)

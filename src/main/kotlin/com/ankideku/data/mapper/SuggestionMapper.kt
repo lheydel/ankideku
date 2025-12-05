@@ -12,7 +12,7 @@ fun DbSuggestion.toDomain(fieldValues: List<Field_value>, modelName: String): Su
         sessionId = session_id,
         noteId = note_id,
         modelName = modelName,
-        originalFields = (byContext[FieldContext.SUGG_ORIGINAL] ?: emptyList()).toNoteFields(),
+        originalFields = (byContext[FieldContext.ORIGINAL] ?: emptyList()).toNoteFields(),
         changes = (byContext[FieldContext.SUGG_CHANGES] ?: emptyList()).toStringMap(),
         reasoning = reasoning,
         status = SuggestionStatus.fromDbString(status),

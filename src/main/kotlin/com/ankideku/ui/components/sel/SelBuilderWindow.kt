@@ -11,14 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -40,10 +36,14 @@ import com.ankideku.domain.sel.ast.SelQuery
 import com.ankideku.domain.sel.model.EntityType
 import com.ankideku.domain.usecase.deck.DeckFinder
 import com.ankideku.domain.usecase.session.SessionFinder
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import com.ankideku.ui.components.AccentButton
+import com.ankideku.ui.components.AppAlertDialog
 import com.ankideku.ui.components.AppButton
 import com.ankideku.ui.components.AppButtonVariant
 import com.ankideku.ui.components.AppDropdown
+import com.ankideku.ui.components.DestructiveButton
 import com.ankideku.ui.components.sel.common.SavePresetDialog
 import com.ankideku.ui.components.sel.header.BreadcrumbBar
 import com.ankideku.ui.components.sel.header.RootQueryHeader
@@ -159,8 +159,10 @@ private fun SelBuilderContent(
         noteTypeFields = deckFinder.fetchAllNoteTypeFields(noteTypes)
     }
 
-    // Save preset dialog state
+    // Preset state
     var showSaveDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var loadedPreset by remember { mutableStateOf<SelPreset?>(null) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -172,11 +174,8 @@ private fun SelBuilderContent(
                 .padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            // Header with preset selector
-            HeaderRow(
-                state = state,
-                presets = presets,
-            )
+            // Header
+            HeaderRow(loadedPresetName = loadedPreset?.name)
 
             // Breadcrumb navigation (when in subquery)
             val isInSubquery = state.navigationStack.isNotEmpty()
@@ -225,8 +224,25 @@ private fun SelBuilderContent(
             ActionButtonRow(
                 state = state,
                 isInSubquery = isInSubquery,
+                presets = presets,
+                loadedPreset = loadedPreset,
+                onLoadPreset = { preset ->
+                    state.loadFromJson(preset.queryJson)
+                    loadedPreset = preset
+                },
+                onSavePreset = {
+                    loadedPreset?.let { preset ->
+                        scope.launch(Dispatchers.IO) {
+                            presetRepository.update(preset.copy(queryJson = state.toJson()))
+                        }
+                    }
+                },
+                onDeletePreset = { showDeleteConfirmDialog = true },
                 onShowSaveDialog = { showSaveDialog = true },
-                onReset = { state.reset() },
+                onReset = {
+                    state.reset()
+                    loadedPreset = null
+                },
                 onClose = onClose,
                 onConfirm = { onConfirm(state.toSelQuery()) },
             )
@@ -235,12 +251,11 @@ private fun SelBuilderContent(
             if (showSaveDialog) {
                 SavePresetDialog(
                     onDismiss = { showSaveDialog = false },
-                    onSave = { name, description ->
+                    onSave = { name ->
                         scope.launch(Dispatchers.IO) {
                             presetRepository.save(
                                 SelPreset(
                                     name = name,
-                                    description = description.takeIf { it.isNotBlank() },
                                     target = state.target,
                                     queryJson = state.toJson(),
                                 )
@@ -248,52 +263,68 @@ private fun SelBuilderContent(
                         }
                         showSaveDialog = false
                     },
+                    checkNameExists = { name -> presetRepository.existsByName(name) },
                 )
+            }
+
+            // Delete confirmation dialog
+            if (showDeleteConfirmDialog && loadedPreset != null) {
+                AppAlertDialog(
+                    onDismissRequest = { showDeleteConfirmDialog = false },
+                    title = "Delete Preset",
+                    confirmButton = {
+                        DestructiveButton(
+                            onClick = {
+                                loadedPreset?.let { preset ->
+                                    scope.launch(Dispatchers.IO) {
+                                        presetRepository.delete(preset.id)
+                                    }
+                                    loadedPreset = null
+                                }
+                                showDeleteConfirmDialog = false
+                            },
+                        ) {
+                            Text("Delete")
+                        }
+                    },
+                    dismissButton = {
+                        AppButton(
+                            onClick = { showDeleteConfirmDialog = false },
+                            variant = AppButtonVariant.Text,
+                        ) {
+                            Text("Cancel")
+                        }
+                    },
+                ) {
+                    Text(
+                        "Are you sure you want to delete \"${loadedPreset?.name}\"?",
+                        color = colors.textPrimary,
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun HeaderRow(
-    state: SelBuilderState,
-    presets: List<SelPreset>,
-) {
+private fun HeaderRow(loadedPresetName: String?) {
     val colors = LocalAppColors.current
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(
             "Search Builder",
             style = MaterialTheme.typography.titleLarge,
             color = colors.textPrimary,
         )
-
-        // Preset selector (only at root level)
-        if (state.navigationStack.isEmpty() && presets.isNotEmpty()) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Load preset:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textMuted,
-                )
-                AppDropdown(
-                    items = presets,
-                    selectedItem = null,
-                    onItemSelected = { preset ->
-                        state.loadFromJson(preset.queryJson)
-                    },
-                    itemLabel = { it.name },
-                    placeholder = "Select...",
-                    modifier = Modifier.width(180.dp),
-                )
-            }
+        if (loadedPresetName != null) {
+            Text(
+                "— $loadedPresetName",
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.textSecondary,
+            )
         }
     }
 }
@@ -302,22 +333,51 @@ private fun HeaderRow(
 private fun ActionButtonRow(
     state: SelBuilderState,
     isInSubquery: Boolean,
+    presets: List<SelPreset>,
+    loadedPreset: SelPreset?,
+    onLoadPreset: (SelPreset) -> Unit,
+    onSavePreset: () -> Unit,
+    onDeletePreset: () -> Unit,
     onShowSaveDialog: () -> Unit,
     onReset: () -> Unit,
     onClose: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val colors = LocalAppColors.current
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Left side: Save preset (only at root level)
+        // Left side: Load preset dropdown (only at root level)
+        if (!isInSubquery && presets.isNotEmpty()) {
+            AppDropdown(
+                items = presets,
+                selectedItem = loadedPreset,
+                onItemSelected = onLoadPreset,
+                itemLabel = { it.name },
+                placeholder = "Load preset...",
+                modifier = Modifier.width(160.dp),
+            )
+        }
+
+        // Save/Delete buttons (only when a preset is loaded)
+        if (!isInSubquery && loadedPreset != null) {
+            AppButton(onClick = onSavePreset, variant = AppButtonVariant.Outlined) {
+                Text("Save")
+            }
+        }
+
+        // Save as Preset (only at root level)
         if (!isInSubquery) {
-                Text("Save as Preset")
             AppButton(onClick = onShowSaveDialog, variant = AppButtonVariant.Outlined) {
+                Text("Save as...")
+            }
+        }
+
+        // Save/Delete buttons (only when a preset is loaded)
+        if (!isInSubquery && loadedPreset != null) {
+            DestructiveButton(onClick = onDeletePreset, variant = AppButtonVariant.Outlined) {
+                Text("Delete")
             }
         }
 

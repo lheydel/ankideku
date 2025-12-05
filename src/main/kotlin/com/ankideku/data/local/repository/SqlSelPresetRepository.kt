@@ -33,6 +33,10 @@ class SqlSelPresetRepository(
             .executeAsOneOrNull()
             ?.toDomain()
 
+    override fun existsByName(name: String): Boolean =
+        database.selPresetQueries.getByName(name)
+            .executeAsOneOrNull() != null
+
     override fun save(preset: SelPreset): SelPresetId {
         val now = System.currentTimeMillis()
         database.selPresetQueries.insert(

@@ -18,6 +18,9 @@ interface SelPresetRepository {
     /** Get a single preset by ID. */
     fun getById(id: SelPresetId): SelPreset?
 
+    /** Check if a preset with the given name already exists. */
+    fun existsByName(name: String): Boolean
+
     /** Save a new preset, returns the generated ID. */
     fun save(preset: SelPreset): SelPresetId
 

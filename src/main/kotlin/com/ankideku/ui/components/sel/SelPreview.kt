@@ -5,13 +5,18 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ankideku.ui.components.sel.state.SelBuilderState
 import com.ankideku.ui.theme.*
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 
 /**
  * Preview panel showing the JSON representation of the current SEL query.
@@ -44,11 +49,31 @@ fun SelPreview(
             modifier = Modifier.padding(Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
-            Text(
-                "Query Preview",
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.textMuted,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Query Preview",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.textMuted,
+                )
+                IconButton(
+                    onClick = {
+                        Toolkit.getDefaultToolkit().systemClipboard
+                            .setContents(StringSelection(json), null)
+                    },
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "Copy to clipboard",
+                        modifier = Modifier.size(16.dp),
+                        tint = colors.textMuted,
+                    )
+                }
+            }
 
             Surface(
                 modifier = Modifier
