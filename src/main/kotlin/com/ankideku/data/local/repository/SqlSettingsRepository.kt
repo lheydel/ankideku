@@ -22,9 +22,9 @@ class SqlSettingsRepository(
             try {
                 AppTheme.valueOf(it)
             } catch (e: IllegalArgumentException) {
-                AppTheme.System
+                AppTheme.Dark
             }
-        } ?: AppTheme.System
+        } ?: AppTheme.Dark
 
         val llmProvider = getSetting(KEY_LLM_PROVIDER)
             ?.parseJson<LlmProvider>()
