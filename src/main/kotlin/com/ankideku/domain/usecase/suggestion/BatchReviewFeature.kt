@@ -67,24 +67,29 @@ class BatchReviewFeature(
 
     /**
      * Batch accept suggestions with the given strategy for handling conflicts.
+     * @param onProgress Called with (current, total) as each suggestion is processed
      */
     suspend fun batchAccept(
         suggestions: List<Suggestion>,
         strategy: BatchConflictStrategy,
-    ): BatchReviewResult = batchReview(suggestions, strategy, ReviewAction.Accept)
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
+    ): BatchReviewResult = batchReview(suggestions, strategy, ReviewAction.Accept, onProgress)
 
     /**
      * Batch reject suggestions with the given strategy for handling conflicts.
+     * @param onProgress Called with (current, total) as each suggestion is processed
      */
     suspend fun batchReject(
         suggestions: List<Suggestion>,
         strategy: BatchConflictStrategy,
-    ): BatchReviewResult = batchReview(suggestions, strategy, ReviewAction.Reject)
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
+    ): BatchReviewResult = batchReview(suggestions, strategy, ReviewAction.Reject, onProgress)
 
     private suspend fun batchReview(
         suggestions: List<Suggestion>,
         strategy: BatchConflictStrategy,
         action: ReviewAction,
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
     ): BatchReviewResult {
         if (suggestions.isEmpty()) {
             return BatchReviewResult.Success(processed = 0, skipped = 0)
@@ -113,16 +118,17 @@ class BatchReviewFeature(
 
         // For accept: apply changes to Anki (not transactional - partial failures possible)
         val (successfulSuggestions, ankiFailures) = if (action == ReviewAction.Accept) {
-            applyChangesToAnki(toProcess)
+            applyChangesToAnki(toProcess, onProgress)
         } else {
             toProcess to 0
         }
 
         // Update DB in a single transaction
         val status = if (action == ReviewAction.Accept) SuggestionStatus.Accepted else SuggestionStatus.Rejected
+        val totalForProgress = successfulSuggestions.size
 
         transactionService.runInTransaction {
-            for (suggestion in successfulSuggestions) {
+            for ((index, suggestion) in successfulSuggestions.withIndex()) {
                 val appliedChanges = if (action == ReviewAction.Accept) {
                     suggestion.editedChanges ?: suggestion.changes
                 } else null
@@ -142,6 +148,11 @@ class BatchReviewFeature(
                 }
                 suggestionRepository.updateStatus(suggestion.id, status)
                 historyRepository.saveEntry(historyEntry)
+
+                // Emit progress for rejects (accepts already emitted during Anki update)
+                if (action == ReviewAction.Reject) {
+                    onProgress?.invoke(index + 1, totalForProgress)
+                }
             }
         }
 
@@ -151,11 +162,15 @@ class BatchReviewFeature(
         )
     }
 
-    private suspend fun applyChangesToAnki(suggestions: List<Suggestion>): Pair<List<Suggestion>, Int> {
+    private suspend fun applyChangesToAnki(
+        suggestions: List<Suggestion>,
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
+    ): Pair<List<Suggestion>, Int> {
         var failures = 0
         val successful = mutableListOf<Suggestion>()
+        val total = suggestions.size
 
-        for (suggestion in suggestions) {
+        for ((index, suggestion) in suggestions.withIndex()) {
             val changesToApply = suggestion.editedChanges ?: suggestion.changes
             try {
                 ankiClient.updateNoteFields(suggestion.noteId, changesToApply)
@@ -163,6 +178,7 @@ class BatchReviewFeature(
             } catch (e: AnkiConnectException) {
                 failures++
             }
+            onProgress?.invoke(index + 1, total)
         }
 
         return successful to failures

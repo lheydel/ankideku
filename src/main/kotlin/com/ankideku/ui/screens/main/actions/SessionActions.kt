@@ -298,16 +298,29 @@ class SessionActionsImpl(
             suggestionFinder.observePendingForSession(sessionId).collect { suggestions ->
                 val state = ctx.currentState
 
+                // Update batch filtered suggestions if in batch mode
+                // Keep only suggestions that still exist in the updated list
+                val suggestionIds = suggestions.map { it.id }.toSet()
+                val updatedBatchFiltered = state.batchFilteredSuggestions?.let { filtered ->
+                    val updated = filtered
+                        .filter { it.id in suggestionIds }
+                        .map { old -> suggestions.find { it.id == old.id } ?: old }
+                    updated.ifEmpty { null }
+                }
+
+                // Use filtered list for index calculation if in batch mode
+                val displayList = updatedBatchFiltered ?: suggestions
+
                 // Preserve index position (clamped to list size)
                 // This ensures skip/accept/reject move to the next card naturally
-                val newIndex = if (suggestions.isEmpty()) {
+                val newIndex = if (displayList.isEmpty()) {
                     0
                 } else {
-                    state.currentSuggestionIndex.coerceIn(0, suggestions.lastIndex)
+                    state.currentSuggestionIndex.coerceIn(0, displayList.lastIndex)
                 }
 
                 // Load edits for the new current suggestion (if it changed)
-                val newCurrentSuggestion = suggestions.getOrNull(newIndex)
+                val newCurrentSuggestion = displayList.getOrNull(newIndex)
                 val currentSuggestionChanged = newCurrentSuggestion?.id != state.currentSuggestion?.id
 
                 val editedFields = if (currentSuggestionChanged) {
@@ -324,6 +337,7 @@ class SessionActionsImpl(
                 ctx.update {
                     copy(
                         suggestions = suggestions,
+                        batchFilteredSuggestions = updatedBatchFiltered,
                         currentSuggestionIndex = newIndex,
                         editedFields = editedFields,
                         hasManualEdits = hasEdits,

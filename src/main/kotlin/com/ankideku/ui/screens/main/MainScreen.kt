@@ -107,6 +107,7 @@ fun MainScreen(
                         // Batch filter mode
                         isInBatchFilterMode = uiState.isInBatchFilterMode,
                         isBatchProcessing = uiState.isBatchProcessing,
+                        batchProgress = uiState.batchProgress,
                         onTabChanged = viewModel::setActiveTab,
                         onHistoryViewModeChanged = viewModel::setHistoryViewMode,
                         onSuggestionClick = viewModel::selectSuggestion,

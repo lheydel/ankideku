@@ -10,6 +10,7 @@ import com.ankideku.domain.usecase.suggestion.BatchPreCheckResult
 import com.ankideku.domain.usecase.suggestion.BatchReviewFeature
 import com.ankideku.domain.usecase.suggestion.BatchReviewResult
 import com.ankideku.ui.screens.main.BatchAction
+import com.ankideku.ui.screens.main.BatchProgress
 import com.ankideku.ui.screens.main.DialogState
 import com.ankideku.ui.screens.main.ToastType
 import kotlinx.coroutines.launch
@@ -94,7 +95,11 @@ class BatchActionsImpl(
                 when (val preCheck = batchReviewFeature.preCheckConflicts(suggestions)) {
                     is BatchPreCheckResult.Ready -> {
                         // No conflicts - proceed directly
-                        executeBatchAction(action, suggestions, BatchConflictStrategy.Force)
+                        try {
+                            executeBatchAction(action, suggestions, BatchConflictStrategy.Force)
+                        } finally {
+                            ctx.update { copy(isBatchProcessing = false, batchProgress = null) }
+                        }
                     }
                     is BatchPreCheckResult.HasConflicts -> {
                         // Show conflict dialog
@@ -116,7 +121,7 @@ class BatchActionsImpl(
                 }
             } catch (e: Exception) {
                 ctx.showToast("Failed: ${e.message}", ToastType.Error)
-                ctx.update { copy(isBatchProcessing = false) }
+                ctx.update { copy(isBatchProcessing = false, batchProgress = null) }
             }
         }
     }
@@ -130,7 +135,7 @@ class BatchActionsImpl(
             try {
                 executeBatchAction(action, suggestions, strategy)
             } finally {
-                ctx.update { copy(isBatchProcessing = false) }
+                ctx.update { copy(isBatchProcessing = false, batchProgress = null) }
             }
         }
     }
@@ -144,9 +149,16 @@ class BatchActionsImpl(
         suggestions: List<Suggestion>,
         strategy: BatchConflictStrategy,
     ) {
+        // Initialize progress
+        ctx.update { copy(batchProgress = BatchProgress(current = 0, total = suggestions.size)) }
+
+        val onProgress: (Int, Int) -> Unit = { current, total ->
+            ctx.update { copy(batchProgress = BatchProgress(current = current, total = total)) }
+        }
+
         val result = when (action) {
-            BatchAction.Accept -> batchReviewFeature.batchAccept(suggestions, strategy)
-            BatchAction.Reject -> batchReviewFeature.batchReject(suggestions, strategy)
+            BatchAction.Accept -> batchReviewFeature.batchAccept(suggestions, strategy, onProgress)
+            BatchAction.Reject -> batchReviewFeature.batchReject(suggestions, strategy, onProgress)
         }
 
         when (result) {

@@ -30,6 +30,7 @@ data class MainUiState(
     val batchFilteredSuggestions: List<Suggestion>? = null,
     val batchQuery: SelQuery? = null,
     val isBatchProcessing: Boolean = false,
+    val batchProgress: BatchProgress? = null,
 
     // History
     val historyEntries: List<HistoryEntry> = emptyList(),
@@ -152,3 +153,8 @@ sealed class DialogState {
 }
 
 enum class BatchAction { Accept, Reject }
+
+data class BatchProgress(
+    val current: Int,
+    val total: Int,
+)

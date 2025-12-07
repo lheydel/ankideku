@@ -28,6 +28,7 @@ import com.ankideku.ui.theme.appInputColors
 import com.ankideku.ui.theme.clickableWithPointer
 import com.ankideku.ui.theme.handPointer
 import com.ankideku.ui.components.batch.BatchActionBar
+import com.ankideku.ui.screens.main.BatchProgress
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 
@@ -45,6 +46,7 @@ fun QueuePanel(
     // Batch filter mode
     isInBatchFilterMode: Boolean = false,
     isBatchProcessing: Boolean = false,
+    batchProgress: BatchProgress? = null,
     onTabChanged: (QueueTab) -> Unit,
     onHistoryViewModeChanged: (HistoryViewMode) -> Unit,
     onSuggestionClick: (Int) -> Unit,
@@ -100,6 +102,7 @@ fun QueuePanel(
                     // Batch mode
                     isInBatchFilterMode = isInBatchFilterMode,
                     isBatchProcessing = isBatchProcessing,
+                    batchProgress = batchProgress,
                     hasSuggestions = totalSuggestionsCount > 0,
                     onOpenBatchFilter = onOpenBatchFilter,
                     onClearBatchFilter = onClearBatchFilter,
@@ -277,6 +280,7 @@ private fun QueueContent(
     // Batch mode
     isInBatchFilterMode: Boolean = false,
     isBatchProcessing: Boolean = false,
+    batchProgress: BatchProgress? = null,
     hasSuggestions: Boolean = false,
     onOpenBatchFilter: (() -> Unit)? = null,
     onClearBatchFilter: (() -> Unit)? = null,
@@ -415,6 +419,7 @@ private fun QueueContent(
                 isProcessing = isBatchProcessing,
                 onRejectAll = onBatchRejectAll,
                 onAcceptAll = onBatchAcceptAll,
+                batchProgress = batchProgress,
             )
         } else if (suggestions.isNotEmpty() && !isInBatchFilterMode) {
             // Normal progress footer with Done / Left counts
