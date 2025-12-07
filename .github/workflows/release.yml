@@ -36,6 +36,7 @@ jobs:
 
       - name: Build with Conveyor
         run: |
+          chmod +x ./gradlew
           ./gradlew jar
           conveyor make site
 
