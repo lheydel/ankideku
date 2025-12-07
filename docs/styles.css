@@ -345,6 +345,22 @@ nav a:hover {
     justify-content: center;
 }
 
+.download-buttons .btn.recommended {
+    box-shadow: 0 0 0 2px var(--color-accent);
+    transform: scale(1.05);
+}
+
+.download-hint {
+    margin-top: var(--space-sm);
+    font-size: 0.875rem;
+    color: var(--color-accent);
+}
+
+.download-note {
+    margin-top: var(--space-sm);
+    font-size: 0.875rem;
+}
+
 /* Requirements */
 .requirements {
     padding: var(--space-2xl) 0;
