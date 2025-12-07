@@ -394,7 +394,7 @@ private fun OriginalCard(
                         isChanged = isChanged,
                         noteTypeConfig = noteTypeConfig,
                         style = originalFieldStyle(isChanged),
-                        diffContent = if (isChanged && field.value.isNotEmpty() && suggestedValue != null) {
+                        diffContent = if (isChanged && field.value.isNotEmpty()) {
                             { DiffHighlightedText(field.value, suggestedValue, DiffDisplayMode.Original) }
                         } else null,
                     )

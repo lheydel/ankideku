@@ -51,6 +51,7 @@ jobs:
       - name: Build with Conveyor
         env:
           CONVEYOR_AGREE_TO_LICENSE: "1"
+          CONVEYOR_BILLING_EMAIL: ${{ secrets.CONVEYOR_BILLING_EMAIL }}
         run: |
           chmod +x ./gradlew
           ./gradlew jar

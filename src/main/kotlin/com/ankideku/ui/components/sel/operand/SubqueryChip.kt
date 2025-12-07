@@ -52,7 +52,6 @@ internal fun SubqueryChip(
                 SelType.Boolean -> resultType.returnType == SelType.Boolean
                 SelType.Number -> resultType.returnType == SelType.Number || resultType.returnType == null
                 SelType.String -> resultType.returnType == null // Only ScalarProperty can return string
-                else -> resultType.returnType == expectedType || resultType.returnType == null
             }
         }
     }
