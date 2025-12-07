@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Install Conveyor
+        run: |
+          wget -qO- https://downloads.hydraulic.dev/conveyor/conveyor-linux-amd64.tar.gz | tar xzf -
+          echo "$PWD/conveyor" >> $GITHUB_PATH
+
+      - name: Build with Conveyor
+        run: |
+          ./gradlew jar
+          conveyor make site
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output
+          destination_dir: download

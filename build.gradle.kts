@@ -6,13 +6,20 @@ plugins {
     kotlin("plugin.compose") version "2.2.21"
     id("org.jetbrains.compose") version "1.9.3"
     id("app.cash.sqldelight") version "2.2.1"
+    id("dev.hydraulic.conveyor") version "1.12"
 }
 
 group = "com.ankideku"
 version = "2.0.0"
 
 dependencies {
-    // Compose
+    // Compose - platform-specific for Conveyor cross-platform builds
+    "linuxAmd64"(compose.desktop.linux_x64)
+    "macAmd64"(compose.desktop.macos_x64)
+    "macAarch64"(compose.desktop.macos_arm64)
+    "windowsAmd64"(compose.desktop.windows_x64)
+
+    // Compose - currentOs for local development
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
     implementation(compose.materialIconsExtended)
