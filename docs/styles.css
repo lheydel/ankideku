@@ -347,7 +347,6 @@ nav a:hover {
 
 .download-buttons .btn.recommended {
     box-shadow: 0 0 0 2px var(--color-accent);
-    transform: scale(1.05);
 }
 
 .download-hint {
