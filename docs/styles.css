@@ -148,6 +148,7 @@ a:hover {
 .btn-download:hover {
     border-color: var(--color-primary);
     background-color: var(--color-bg);
+    transform: none;
 }
 
 /* Header */
