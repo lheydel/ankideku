@@ -20,6 +20,7 @@ class ReviewSuggestionFeature(
     private val deckRepository: DeckRepository,
     private val historyRepository: HistoryRepository,
     private val transactionService: TransactionService,
+    private val conflictChecker: ConflictChecker,
     private val ankiClient: AnkiConnectClient,
 ) {
     /**
@@ -79,19 +80,14 @@ class ReviewSuggestionFeature(
 
         // Check for conflicts if requested
         if (checkConflict) {
-            val conflictCheck = try {
-                checkForConflict(suggestion)
-            } catch (e: AnkiConnectException) {
-                return ReviewResult.Error("Failed to check for conflicts: ${e.message}")
-            }
-
-            when (conflictCheck) {
-                is ConflictCheck.Conflict -> return ReviewResult.Conflict(
+            when (val result = conflictChecker.check(suggestion)) {
+                is ConflictCheckResult.Conflict -> return ReviewResult.Conflict(
                     suggestionId = suggestionId,
-                    currentFields = conflictCheck.currentFields,
+                    currentFields = result.currentFields,
                 )
-                ConflictCheck.NoteDeleted -> return ReviewResult.Error("Note was deleted in Anki")
-                ConflictCheck.NoConflict -> { /* proceed */ }
+                is ConflictCheckResult.NoteDeleted -> return ReviewResult.Error("Note was deleted in Anki")
+                is ConflictCheckResult.Error -> return ReviewResult.Error("Failed to check for conflicts: ${result.message}")
+                is ConflictCheckResult.NoConflict -> { /* proceed */ }
             }
         }
 
@@ -169,27 +165,6 @@ class ReviewSuggestionFeature(
         timestamp = System.currentTimeMillis(),
     )
 
-    private suspend fun checkForConflict(suggestion: Suggestion): ConflictCheck {
-        val noteInfos = ankiClient.notesInfo(listOf(suggestion.noteId))
-        if (noteInfos.isEmpty()) {
-            return ConflictCheck.NoteDeleted
-        }
-
-        val noteInfo = noteInfos.first()
-        val currentFields = noteInfo.fields.mapValues { (name, field) ->
-            NoteField(name = name, value = field.value, order = field.order)
-        }
-
-        val hasFieldChanges = suggestion.originalFields.any { (name, original) ->
-            currentFields[name]?.value != original.value
-        }
-
-        return if (hasFieldChanges) {
-            ConflictCheck.Conflict(currentFields)
-        } else {
-            ConflictCheck.NoConflict
-        }
-    }
 }
 
 /**
@@ -202,10 +177,4 @@ sealed class ReviewResult {
         val suggestionId: SuggestionId,
         val currentFields: Map<String, NoteField>,
     ) : ReviewResult()
-}
-
-private sealed class ConflictCheck {
-    data object NoConflict : ConflictCheck()
-    data object NoteDeleted : ConflictCheck()
-    data class Conflict(val currentFields: Map<String, NoteField>) : ConflictCheck()
 }

@@ -5,6 +5,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import com.ankideku.data.local.database.AnkiDekuDb
 import com.ankideku.data.mapper.FieldContext
 import com.ankideku.data.mapper.FieldOwner
+import com.ankideku.data.mapper.insertField
 import com.ankideku.data.mapper.insertFields
 import com.ankideku.data.mapper.insertFieldsFromMap
 import com.ankideku.data.mapper.toDomain
@@ -120,5 +121,53 @@ class SqlSuggestionRepository(
         val owner = FieldOwner.Suggestion(suggestionId)
         database.fieldValueQueries.deleteFieldsForSuggestionByContext(suggestionId, FieldContext.SUGG_EDITED.dbValue)
         database.fieldValueQueries.insertFieldsFromMap(owner, FieldContext.SUGG_EDITED, editedChanges)
+    }
+
+    override fun refreshOriginalFields(sessionId: SessionId): Int {
+        // Get pending suggestions for the session
+        val suggestions = database.suggestionQueries
+            .getPendingSuggestionsForSession(sessionId)
+            .executeAsList()
+
+        if (suggestions.isEmpty()) return 0
+
+        val noteIds = suggestions.map { it.note_id }
+
+        // Get current fields for all notes from cache
+        val noteFields = database.fieldValueQueries
+            .getFieldsForNotes(noteIds, FieldContext.NOTE_FIELDS.dbValue)
+            .executeAsList()
+            .groupBy { it.note_id }
+
+        var updated = 0
+        database.transaction {
+            for (suggestion in suggestions) {
+                val fields = noteFields[suggestion.note_id] ?: continue
+
+                // Delete old original fields
+                database.fieldValueQueries.deleteFieldsForSuggestionByContext(
+                    suggestion.id,
+                    FieldContext.ORIGINAL.dbValue,
+                )
+
+                // Insert new original fields from cached note
+                val owner = FieldOwner.Suggestion(suggestion.id)
+                for (field in fields) {
+                    database.fieldValueQueries.insertField(
+                        owner,
+                        FieldContext.ORIGINAL,
+                        field.field_name,
+                        field.field_value,
+                        field.field_order,
+                    )
+                }
+
+                // Touch suggestion to trigger Flow re-emission
+                database.suggestionQueries.touchSuggestion(suggestion.id)
+                updated++
+            }
+        }
+
+        return updated
     }
 }

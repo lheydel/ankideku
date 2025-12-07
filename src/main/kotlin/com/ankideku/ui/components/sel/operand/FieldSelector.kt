@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.delay
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -114,6 +118,15 @@ internal fun GroupedFieldDropdown(
     var triggerWidth by remember { mutableIntStateOf(0) }
     var triggerHeight by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
+    val searchFocusRequester = remember { FocusRequester() }
+
+    // Auto-focus search field when dropdown opens (delay ensures popup is composed)
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            delay(50)
+            searchFocusRequester.requestFocus()
+        }
+    }
 
     // Filter note types and fields by search query (case-insensitive)
     val filteredNoteTypes = remember(noteTypeFields, searchQuery) {
@@ -193,7 +206,8 @@ internal fun GroupedFieldDropdown(
                             singleLine = true,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(Spacing.sm),
+                                .padding(Spacing.sm)
+                                .focusRequester(searchFocusRequester),
                             decorationBox = { innerTextField ->
                                 Box {
                                     if (searchQuery.isEmpty()) {

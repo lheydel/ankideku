@@ -40,10 +40,11 @@ class SelBuilderState(
     initialTarget: EntityType = EntityType.Note,
     initialScopes: Map<String, ScopeValue> = emptyMap(),
     initialAlias: String = "root",
+    initialConditions: ConditionGroupState? = null,
 ) {
     var target by mutableStateOf(initialTarget)
     var alias by mutableStateOf(initialAlias)
-    var rootGroup by mutableStateOf(ConditionGroupState())
+    var rootGroup by mutableStateOf(initialConditions ?: ConditionGroupState())
     var orderBy by mutableStateOf<List<SelOrderClause>>(emptyList())
     var limit by mutableStateOf<Int?>(null)
 
@@ -167,9 +168,91 @@ class SelBuilderState(
     }
 
     /**
-     * Build the JSON representation of the current query.
+     * Build the JSON representation of the current query (includes scope conditions).
      */
     fun toJson(): String = toSelQuery().toJson()
+
+    /**
+     * Build a SelQuery WITHOUT scope conditions baked in.
+     * Used for preset storage - scopes are stored separately.
+     */
+    fun toSelQueryWithoutScopes(): SelQuery {
+        val whereNode = rootGroup.toSelNode(alias)
+
+        return SelQuery(
+            target = target,
+            where = whereNode,
+            alias = alias,
+            orderBy = orderBy.takeIf { it.isNotEmpty() },
+            limit = limit,
+        )
+    }
+
+    /**
+     * Build JSON representation WITHOUT scope conditions.
+     * Used for preset storage.
+     */
+    fun toJsonWithoutScopes(): String = toSelQueryWithoutScopes().toJson()
+
+    /**
+     * Serialize current scope values to JSON for preset storage.
+     * Only serializes non-locked scopes (locked scopes are set by the caller, not saved in presets).
+     */
+    fun scopesToJson(): String? {
+        val nonLockedScopes = scopes.filterValues { !it.locked }
+        if (nonLockedScopes.isEmpty()) return null
+
+        val scopesObj = buildJsonObject {
+            nonLockedScopes.forEach { (key, scopeValue) ->
+                put(key, buildJsonObject {
+                    put("value", when (val v = scopeValue.value) {
+                        is String -> JsonPrimitive(v)
+                        is Number -> JsonPrimitive(v)
+                        is Boolean -> JsonPrimitive(v)
+                        else -> JsonPrimitive(v.toString())
+                    })
+                    put("displayLabel", JsonPrimitive(scopeValue.displayLabel))
+                })
+            }
+        }
+        return scopesObj.toString()
+    }
+
+    /**
+     * Load scope values from JSON (for preset loading).
+     * Does not overwrite locked scopes.
+     */
+    fun loadScopesFromJson(scopesJson: String?) {
+        if (scopesJson.isNullOrBlank()) return
+
+        try {
+            val scopesObj = json.parseToJsonElement(scopesJson) as? JsonObject ?: return
+            val newScopes = scopes.toMutableMap()
+
+            scopesObj.forEach { (key, element) ->
+                // Don't overwrite locked scopes
+                if (scopes[key]?.locked == true) return@forEach
+
+                val obj = element as? JsonObject ?: return@forEach
+                val valueElement = obj["value"] ?: return@forEach
+                val displayLabel = obj["displayLabel"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+
+                val value: Any = when {
+                    valueElement is JsonPrimitive && valueElement.isString -> valueElement.content
+                    valueElement is JsonPrimitive -> {
+                        valueElement.longOrNull ?: valueElement.doubleOrNull ?: valueElement.booleanOrNull ?: valueElement.content
+                    }
+                    else -> return@forEach
+                }
+
+                newScopes[key] = ScopeValue(value, displayLabel, locked = false)
+            }
+
+            scopes = newScopes
+        } catch (_: Exception) {
+            // Ignore parse errors
+        }
+    }
 
     /**
      * Generate a natural language preview of the query.

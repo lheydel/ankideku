@@ -111,13 +111,12 @@ fun AccentButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val colors = LocalAppColors.current
     AppButton(
         onClick = onClick,
         modifier = modifier,
         variant = AppButtonVariant.Primary,
         enabled = enabled,
-        colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
+        colors = ButtonDefaults.buttonColors(),
         contentPadding = contentPadding,
         content = content,
     )

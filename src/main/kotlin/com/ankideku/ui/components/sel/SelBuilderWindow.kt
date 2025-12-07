@@ -49,6 +49,7 @@ import com.ankideku.ui.components.sel.header.BreadcrumbBar
 import com.ankideku.ui.components.sel.header.RootQueryHeader
 import com.ankideku.ui.components.sel.header.SubqueryHeader
 import com.ankideku.ui.components.sel.state.ScopeValue
+import com.ankideku.ui.components.sel.state.ConditionGroupState
 import com.ankideku.ui.components.sel.state.SelBuilderState
 import com.ankideku.ui.theme.AnkiDekuTheme
 import com.ankideku.ui.theme.LocalAppColors
@@ -73,6 +74,7 @@ private const val WINDOW_STATE_KEY = "search-builder"
  * @param onConfirm Called with the built query when confirmed
  * @param initialTarget Initial entity type to query
  * @param lockedScopes Scopes that are pre-filled and cannot be changed by the user
+ * @param initialConditions Initial conditions to populate the query with
  */
 @OptIn(FlowPreview::class)
 @Composable
@@ -81,6 +83,7 @@ fun SelBuilderWindow(
     onConfirm: (SelQuery) -> Unit,
     initialTarget: EntityType = EntityType.Note,
     lockedScopes: Map<String, ScopeValue> = emptyMap(),
+    initialConditions: ConditionGroupState? = null,
 ) {
     val windowState = remember {
         WindowStateManager.loadOrDefault(
@@ -123,6 +126,7 @@ fun SelBuilderWindow(
                     onConfirm = onConfirm,
                     initialTarget = initialTarget,
                     lockedScopes = lockedScopes,
+                    initialConditions = initialConditions,
                 )
             }
         }
@@ -135,9 +139,10 @@ private fun SelBuilderContent(
     onConfirm: (SelQuery) -> Unit,
     initialTarget: EntityType,
     lockedScopes: Map<String, ScopeValue>,
+    initialConditions: ConditionGroupState?,
 ) {
     val colors = LocalAppColors.current
-    val state = remember { SelBuilderState(initialTarget, lockedScopes) }
+    val state = remember { SelBuilderState(initialTarget, lockedScopes, initialConditions = initialConditions) }
     val scope = rememberCoroutineScope()
 
     // Inject finders for scope data
@@ -218,6 +223,7 @@ private fun SelBuilderContent(
             SelPreview(
                 state = state,
                 modifier = Modifier.fillMaxWidth(),
+                enabled = false
             )
 
             // Action buttons
@@ -227,13 +233,19 @@ private fun SelBuilderContent(
                 presets = presets,
                 loadedPreset = loadedPreset,
                 onLoadPreset = { preset ->
+                    // Load scopes first (before loading query)
+                    state.loadScopesFromJson(preset.scopesJson)
+                    // Then load the query (which doesn't have scopes baked in)
                     state.loadFromJson(preset.queryJson)
                     loadedPreset = preset
                 },
                 onSavePreset = {
                     loadedPreset?.let { preset ->
                         scope.launch(Dispatchers.IO) {
-                            presetRepository.update(preset.copy(queryJson = state.toJson()))
+                            presetRepository.update(preset.copy(
+                                queryJson = state.toJsonWithoutScopes(),
+                                scopesJson = state.scopesToJson(),
+                            ))
                         }
                     }
                 },
@@ -257,7 +269,8 @@ private fun SelBuilderContent(
                                 SelPreset(
                                     name = name,
                                     target = state.target,
-                                    queryJson = state.toJson(),
+                                    queryJson = state.toJsonWithoutScopes(),
+                                    scopesJson = state.scopesToJson(),
                                 )
                             )
                         }
@@ -356,7 +369,7 @@ private fun ActionButtonRow(
                 onItemSelected = onLoadPreset,
                 itemLabel = { it.name },
                 placeholder = "Load preset...",
-                modifier = Modifier.width(160.dp),
+                modifier = Modifier.width(300.dp),
             )
         }
 

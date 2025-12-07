@@ -17,15 +17,19 @@ data class AnkiConnectResponse<T>(
 )
 
 // Response models for specific actions
+// Note: Fields have defaults to handle empty objects returned by AnkiConnect for deleted notes
 @Serializable
 data class AnkiNoteInfo(
-    val noteId: Long,
-    val modelName: String,
-    val tags: List<String>,
-    val fields: Map<String, AnkiFieldValue>,
-    val cards: List<Long>,
-    val mod: Long,
-)
+    val noteId: Long = 0,
+    val modelName: String = "",
+    val tags: List<String> = emptyList(),
+    val fields: Map<String, AnkiFieldValue> = emptyMap(),
+    val cards: List<Long> = emptyList(),
+    val mod: Long = 0,
+) {
+    /** Returns true if this is a valid note (not an empty placeholder for a deleted note) */
+    val isValid: Boolean get() = noteId != 0L
+}
 
 @Serializable
 data class AnkiFieldValue(

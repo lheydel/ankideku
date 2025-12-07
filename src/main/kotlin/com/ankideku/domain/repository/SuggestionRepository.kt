@@ -20,4 +20,7 @@ interface SuggestionRepository {
     fun skip(suggestionId: SuggestionId)
     fun saveEditedChanges(suggestionId: SuggestionId, editedChanges: Map<String, String>)
     fun clearEditedChanges(suggestionId: SuggestionId)
+
+    /** Update originalFields of all pending suggestions in a session from cached notes */
+    fun refreshOriginalFields(sessionId: SessionId): Int
 }

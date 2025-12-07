@@ -11,6 +11,7 @@ import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
 import com.ankideku.domain.usecase.settings.SettingsManager
 import com.ankideku.domain.usecase.suggestion.SuggestionFinder
 import com.ankideku.domain.usecase.deck.SyncDeckFeature
+import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.ui.screens.main.actions.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,9 @@ class MainViewModel(
     syncDeckFeature: SyncDeckFeature,
     sessionOrchestrator: SessionOrchestrator,
     reviewSuggestionFeature: ReviewSuggestionFeature,
+    batchReviewFeature: BatchReviewFeature,
+    selService: SelService,
+    suggestionRepository: SuggestionRepository,
     private val deckFinder: DeckFinder,
     private val sessionFinder: SessionFinder,
     private val suggestionFinder: SuggestionFinder,
@@ -36,7 +40,7 @@ class MainViewModel(
     private val noteTypeConfigFinder: NoteTypeConfigFinder,
     v1Importer: V1DatabaseImporter,  // DEV ONLY: Remove after migration
 ) : DeckActions by DeckActionsImpl(ctx, syncDeckFeature, deckFinder),
-    SessionActions by SessionActionsImpl(ctx, sessionOrchestrator, sessionFinder, suggestionFinder, syncDeckFeature, deckFinder),
+    SessionActions by SessionActionsImpl(ctx, sessionOrchestrator, sessionFinder, suggestionFinder, suggestionRepository, syncDeckFeature, deckFinder),
     ReviewActions by ReviewActionsImpl(ctx, reviewSuggestionFeature),
     HistoryActions by HistoryActionsImpl(ctx, historyFinder),
     SettingsActions by SettingsActionsImpl(ctx, settingsManager),

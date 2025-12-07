@@ -175,12 +175,15 @@ class SyncDeckFeature(
         deckId: DeckId,
     ): List<Note> {
         val noteInfos = fetchWithRetry(noteIds) { ankiClient.notesInfo(it) }
-        return noteInfos.mapIndexed { index, noteInfo ->
-            val note = noteInfo.toDomain(deckId, deckName)
-            val formattedNote = PromptBuilder.formatNote(note, index)
-            val tokens = TokenEstimator.estimate(formattedNote)
-            note.copy(estimatedTokens = tokens)
-        }
+        return noteInfos
+            .filterNotNull()
+            .filter { it.isValid }
+            .mapIndexed { index, noteInfo ->
+                val note = noteInfo.toDomain(deckId, deckName)
+                val formattedNote = PromptBuilder.formatNote(note, index)
+                val tokens = TokenEstimator.estimate(formattedNote)
+                note.copy(estimatedTokens = tokens)
+            }
     }
 
     private suspend fun <T, R> fetchWithRetry(

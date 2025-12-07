@@ -6,10 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.Suggestion
+import com.ankideku.domain.usecase.suggestion.BatchConflictStrategy
+import com.ankideku.ui.components.batch.BatchConflictDialog
 import com.ankideku.ui.screens.main.DialogState
 import com.ankideku.ui.theme.Spacing
-import com.ankideku.ui.components.AppButton
-import com.ankideku.ui.components.AppButtonVariant
 
 /**
  * Renders the appropriate dialog based on the current dialog state.
@@ -18,6 +18,7 @@ import com.ankideku.ui.components.AppButtonVariant
 fun AppDialogs(
     dialogState: DialogState?,
     onDismiss: () -> Unit,
+    onBatchConflictAction: ((BatchConflictStrategy) -> Unit)? = null,
 ) {
     when (dialogState) {
         is DialogState.Confirm -> ConfirmDialog(
@@ -41,6 +42,14 @@ fun AppDialogs(
             title = dialogState.title,
             message = dialogState.message,
             onDismiss = dialogState.onDismiss,
+        )
+        is DialogState.BatchConflict -> BatchConflictDialog(
+            action = dialogState.action,
+            conflicts = dialogState.conflicts,
+            nonConflicting = dialogState.nonConflicting,
+            onForce = { onBatchConflictAction?.invoke(BatchConflictStrategy.Force) },
+            onSkipConflicts = { onBatchConflictAction?.invoke(BatchConflictStrategy.SkipConflicts) },
+            onCancel = onDismiss,
         )
         null -> { /* No dialog */ }
     }

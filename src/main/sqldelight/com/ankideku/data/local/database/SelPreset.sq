@@ -6,6 +6,7 @@ CREATE TABLE sel_preset (
     description TEXT,
     target TEXT NOT NULL,
     query_json TEXT NOT NULL,
+    scopes_json TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -27,15 +28,15 @@ getByName:
 SELECT * FROM sel_preset WHERE name = ?;
 
 insert:
-INSERT INTO sel_preset (name, description, target, query_json, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO sel_preset (name, description, target, query_json, scopes_json, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 lastInsertedId:
 SELECT last_insert_rowid();
 
 update:
 UPDATE sel_preset
-SET name = ?, description = ?, query_json = ?, updated_at = ?
+SET name = ?, description = ?, query_json = ?, scopes_json = ?, updated_at = ?
 WHERE id = ?;
 
 delete:

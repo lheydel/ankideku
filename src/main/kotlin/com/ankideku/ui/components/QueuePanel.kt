@@ -27,12 +27,14 @@ import com.ankideku.ui.theme.InputShape
 import com.ankideku.ui.theme.appInputColors
 import com.ankideku.ui.theme.clickableWithPointer
 import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.batch.BatchActionBar
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 
 @Composable
 fun QueuePanel(
     suggestions: List<Suggestion>,
+    totalSuggestionsCount: Int,
     currentSuggestionIndex: Int,
     historyEntries: List<HistoryEntry>,
     activeTab: QueueTab,
@@ -40,10 +42,19 @@ fun QueuePanel(
     historySearchQuery: String,
     historyViewMode: HistoryViewMode,
     noteTypeConfigs: Map<String, NoteTypeConfig>,
+    // Batch filter mode
+    isInBatchFilterMode: Boolean = false,
+    isBatchProcessing: Boolean = false,
     onTabChanged: (QueueTab) -> Unit,
     onHistoryViewModeChanged: (HistoryViewMode) -> Unit,
     onSuggestionClick: (Int) -> Unit,
     onHistoryClick: (HistoryEntry) -> Unit,
+    // Batch actions
+    onOpenBatchFilter: (() -> Unit)? = null,
+    onClearBatchFilter: (() -> Unit)? = null,
+    onBatchAcceptAll: (() -> Unit)? = null,
+    onBatchRejectAll: (() -> Unit)? = null,
+    onRefreshBaselines: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalAppColors.current
@@ -86,6 +97,15 @@ fun QueuePanel(
                     currentIndex = currentSuggestionIndex,
                     noteTypeConfigs = noteTypeConfigs,
                     onSuggestionClick = onSuggestionClick,
+                    // Batch mode
+                    isInBatchFilterMode = isInBatchFilterMode,
+                    isBatchProcessing = isBatchProcessing,
+                    hasSuggestions = totalSuggestionsCount > 0,
+                    onOpenBatchFilter = onOpenBatchFilter,
+                    onClearBatchFilter = onClearBatchFilter,
+                    onBatchAcceptAll = onBatchAcceptAll,
+                    onBatchRejectAll = onBatchRejectAll,
+                    onRefreshBaselines = onRefreshBaselines,
                 )
                 QueueTab.History -> HistoryContent(
                     entries = historyEntries,
@@ -254,14 +274,110 @@ private fun QueueContent(
     currentIndex: Int,
     noteTypeConfigs: Map<String, NoteTypeConfig>,
     onSuggestionClick: (Int) -> Unit,
+    // Batch mode
+    isInBatchFilterMode: Boolean = false,
+    isBatchProcessing: Boolean = false,
+    hasSuggestions: Boolean = false,
+    onOpenBatchFilter: (() -> Unit)? = null,
+    onClearBatchFilter: (() -> Unit)? = null,
+    onBatchAcceptAll: (() -> Unit)? = null,
+    onBatchRejectAll: (() -> Unit)? = null,
+    onRefreshBaselines: (() -> Unit)? = null,
 ) {
     val colors = LocalAppColors.current
     val pendingSuggestions = suggestions.filter { it.status == SuggestionStatus.Pending }
     val doneSuggestions = suggestions.filter { it.status != SuggestionStatus.Pending }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Header row with filter button
+        if (hasSuggestions || isInBatchFilterMode) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isInBatchFilterMode) {
+                    // Filter active indicator with match count and clear button
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = colors.accent,
+                        )
+                        Text(
+                            text = "Filter active",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.accent,
+                        )
+                        Text(
+                            text = "·",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.textMuted,
+                        )
+                        Text(
+                            text = "${suggestions.size} match${if (suggestions.size != 1) "es" else ""}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.textSecondary,
+                        )
+                        if (onClearBatchFilter != null) {
+                            Text(
+                                text = "·",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.textMuted,
+                            )
+                            Text(
+                                text = "Clear",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.accent,
+                                modifier = Modifier.clickableWithPointer { onClearBatchFilter() },
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+
+                Row {
+                    // Refresh baselines button
+                    if (onRefreshBaselines != null && !isInBatchFilterMode) {
+                        IconButton(
+                            onClick = onRefreshBaselines,
+                            modifier = Modifier.size(32.dp).handPointer(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh baselines from Anki",
+                                modifier = Modifier.size(20.dp),
+                                tint = colors.textSecondary,
+                            )
+                        }
+                    }
+
+                    // Filter button
+                    if (onOpenBatchFilter != null && !isInBatchFilterMode) {
+                        IconButton(
+                            onClick = onOpenBatchFilter,
+                            modifier = Modifier.size(32.dp).handPointer(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = "Filter suggestions",
+                                modifier = Modifier.size(20.dp),
+                                tint = colors.textSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(Spacing.sm))
+        }
+
         if (suggestions.isEmpty()) {
-            // Simple empty state (matching V1)
+            // Empty state
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -269,7 +385,7 @@ private fun QueueContent(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No cards in queue",
+                    text = if (isInBatchFilterMode) "No suggestions match filter" else "No cards in queue",
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.textMuted,
                 )
@@ -291,8 +407,17 @@ private fun QueueContent(
             }
         }
 
-        // Progress footer with Done / Left counts
-        if (suggestions.isNotEmpty()) {
+        // Batch action bar (when in filter mode)
+        if (isInBatchFilterMode && onBatchAcceptAll != null && onBatchRejectAll != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            BatchActionBar(
+                matchCount = suggestions.size,
+                isProcessing = isBatchProcessing,
+                onRejectAll = onBatchRejectAll,
+                onAcceptAll = onBatchAcceptAll,
+            )
+        } else if (suggestions.isNotEmpty() && !isInBatchFilterMode) {
+            // Normal progress footer with Done / Left counts
             Spacer(Modifier.height(Spacing.sm))
             HorizontalDivider()
             Spacer(Modifier.height(Spacing.sm))

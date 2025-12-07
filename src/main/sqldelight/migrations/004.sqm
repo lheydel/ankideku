@@ -1,0 +1,2 @@
+-- Add scopes_json column to sel_preset for storing scope values separately from query
+ALTER TABLE sel_preset ADD COLUMN scopes_json TEXT;

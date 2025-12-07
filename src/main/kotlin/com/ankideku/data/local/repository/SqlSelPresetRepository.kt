@@ -44,6 +44,7 @@ class SqlSelPresetRepository(
             description = preset.description,
             target = preset.target.name,
             query_json = preset.queryJson,
+            scopes_json = preset.scopesJson,
             created_at = now,
             updated_at = now,
         )
@@ -55,6 +56,7 @@ class SqlSelPresetRepository(
             name = preset.name,
             description = preset.description,
             query_json = preset.queryJson,
+            scopes_json = preset.scopesJson,
             updated_at = System.currentTimeMillis(),
             id = preset.id,
         )
@@ -70,6 +72,7 @@ class SqlSelPresetRepository(
         description = description,
         target = EntityType.valueOf(target),
         queryJson = query_json,
+        scopesJson = scopes_json,
         createdAt = created_at,
         updatedAt = updated_at,
     )

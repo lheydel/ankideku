@@ -2,6 +2,8 @@ package com.ankideku.ui.screens.main
 
 import com.ankideku.data.remote.llm.LlmHealthStatus
 import com.ankideku.domain.model.*
+import com.ankideku.domain.sel.ast.SelQuery
+import com.ankideku.domain.usecase.suggestion.ConflictInfo
 
 data class MainUiState(
     // Connection
@@ -23,6 +25,11 @@ data class MainUiState(
     val suggestions: List<Suggestion> = emptyList(),
     val currentSuggestionIndex: Int = 0,
     val queueSearchQuery: String = "",
+
+    // Batch Filter Mode
+    val batchFilteredSuggestions: List<Suggestion>? = null,
+    val batchQuery: SelQuery? = null,
+    val isBatchProcessing: Boolean = false,
 
     // History
     val historyEntries: List<HistoryEntry> = emptyList(),
@@ -64,7 +71,7 @@ data class MainUiState(
     val isSidebarVisible: Boolean = true,
 ) {
     val currentSuggestion: Suggestion?
-        get() = suggestions.getOrNull(currentSuggestionIndex)
+        get() = displayedSuggestions.getOrNull(currentSuggestionIndex)
 
     val pendingSuggestions: List<Suggestion>
         get() = suggestions.filter { it.status == SuggestionStatus.Pending }
@@ -74,6 +81,13 @@ data class MainUiState(
 
     val canStartSession: Boolean
         get() = selectedDeck != null && !isProcessing && ankiConnected
+
+    val isInBatchFilterMode: Boolean
+        get() = batchFilteredSuggestions != null
+
+    /** Suggestions to display in queue - filtered if in batch mode, otherwise all */
+    val displayedSuggestions: List<Suggestion>
+        get() = batchFilteredSuggestions ?: suggestions
 }
 
 data class SyncProgressUi(
@@ -129,4 +143,12 @@ sealed class DialogState {
         val message: String,
         val onDismiss: () -> Unit,
     ) : DialogState()
+
+    data class BatchConflict(
+        val action: BatchAction,
+        val conflicts: List<ConflictInfo>,
+        val nonConflicting: List<Suggestion>,
+    ) : DialogState()
 }
+
+enum class BatchAction { Accept, Reject }

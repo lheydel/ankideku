@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -21,12 +22,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.AppTheme
+import com.ankideku.domain.sel.model.EntityType
+import com.ankideku.domain.usecase.suggestion.BatchConflictStrategy
 import com.ankideku.ui.components.AppDialogs
 import com.ankideku.ui.components.ComparisonPanel
 import com.ankideku.ui.components.ConnectionBanner
 import com.ankideku.ui.components.QueuePanel
 import com.ankideku.ui.components.SessionSelector
 import com.ankideku.ui.components.SidebarPanel
+import com.ankideku.ui.components.sel.SelBuilderWindow
+import com.ankideku.ui.components.sel.state.ConditionGroupState
+import com.ankideku.ui.components.sel.state.ConditionState
+import com.ankideku.ui.components.sel.state.GroupItem
+import com.ankideku.ui.components.sel.state.OperandState
+import com.ankideku.ui.components.sel.state.OperandType
+import com.ankideku.ui.components.sel.state.ScopeValue
 import com.ankideku.ui.screens.settings.SettingsDialog
 import com.ankideku.ui.screens.settings.SettingsTab
 import com.ankideku.ui.theme.AnimationDurations
@@ -41,6 +51,9 @@ fun MainScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // State for batch filter builder window
+    var showBatchFilterBuilder by remember { mutableStateOf(false) }
 
     // Toast notification
     uiState.toastMessage?.let { toast ->
@@ -82,7 +95,8 @@ fun MainScreen(
                 Row(modifier = Modifier.fillMaxSize()) {
                     // Left: Queue Panel
                     QueuePanel(
-                        suggestions = uiState.suggestions,
+                        suggestions = uiState.displayedSuggestions,
+                        totalSuggestionsCount = uiState.suggestions.size,
                         currentSuggestionIndex = uiState.currentSuggestionIndex,
                         historyEntries = uiState.historyEntries,
                         activeTab = uiState.activeTab,
@@ -90,10 +104,19 @@ fun MainScreen(
                         historySearchQuery = uiState.historySearchQuery,
                         historyViewMode = uiState.historyViewMode,
                         noteTypeConfigs = uiState.noteTypeConfigs,
+                        // Batch filter mode
+                        isInBatchFilterMode = uiState.isInBatchFilterMode,
+                        isBatchProcessing = uiState.isBatchProcessing,
                         onTabChanged = viewModel::setActiveTab,
                         onHistoryViewModeChanged = viewModel::setHistoryViewMode,
                         onSuggestionClick = viewModel::selectSuggestion,
                         onHistoryClick = viewModel::viewHistoryEntry,
+                        // Batch actions
+                        onOpenBatchFilter = { showBatchFilterBuilder = true },
+                        onClearBatchFilter = viewModel::clearBatchFilter,
+                        onBatchAcceptAll = viewModel::batchAcceptAll,
+                        onBatchRejectAll = viewModel::batchRejectAll,
+                        onRefreshBaselines = viewModel::refreshSuggestionBaselines,
                         modifier = Modifier.width(queueWidth),
                     )
 
@@ -102,7 +125,7 @@ fun MainScreen(
                         ComparisonPanel(
                             suggestion = uiState.currentSuggestion,
                             session = uiState.currentSession,
-                            suggestions = uiState.suggestions,
+                            suggestions = uiState.displayedSuggestions,
                             currentIndex = uiState.currentSuggestionIndex,
                             editedFields = uiState.editedFields,
                             isEditMode = uiState.isEditMode,
@@ -234,11 +257,13 @@ fun MainScreen(
                                 tint = contentColor,
                                 modifier = Modifier.size(20.dp),
                             )
-                            Text(
-                                text = toast.message,
-                                color = contentColor,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                            SelectionContainer {
+                                Text(
+                                    text = toast.message,
+                                    color = contentColor,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
                         }
                     }
                 }
@@ -249,6 +274,12 @@ fun MainScreen(
         AppDialogs(
             dialogState = uiState.dialogState,
             onDismiss = viewModel::dismissDialog,
+            onBatchConflictAction = { strategy ->
+                val batchAction = (uiState.dialogState as? DialogState.BatchConflict)?.action
+                if (batchAction != null) {
+                    viewModel.confirmBatchWithStrategy(batchAction, strategy)
+                }
+            },
         )
 
         // Settings Dialog
@@ -266,6 +297,42 @@ fun MainScreen(
                 onSave = viewModel::updateSettings,
                 onSaveNoteTypeConfig = viewModel::saveNoteTypeConfig,
                 onTestConnection = viewModel::testLlmConnection,
+            )
+        }
+
+        // Batch Filter Builder Window
+        if (showBatchFilterBuilder && uiState.currentSession != null) {
+            // Create initial condition: status = pending
+            val statusPendingCondition = ConditionState(initialOperator = "==").apply {
+                operands = listOf(
+                    OperandState(
+                        initialType = OperandType.Property,
+                        initialPropertyName = "status",
+                    ),
+                    OperandState(
+                        initialType = OperandType.Value,
+                        initialValue = "pending",
+                    ),
+                )
+            }
+            val initialConditions = ConditionGroupState().apply {
+                items = listOf(GroupItem.Condition(statusPendingCondition))
+            }
+
+            SelBuilderWindow(
+                onClose = { showBatchFilterBuilder = false },
+                onConfirm = { query ->
+                    viewModel.executeBatchQuery(query)
+                },
+                initialTarget = EntityType.Suggestion,
+                lockedScopes = mapOf(
+                    "session" to ScopeValue(
+                        value = uiState.currentSession!!.id,
+                        displayLabel = "Session #${uiState.currentSession!!.id}",
+                        locked = true,
+                    )
+                ),
+                initialConditions = initialConditions,
             )
         }
     }

@@ -40,7 +40,7 @@ fun OperatorSelector(
         items = filteredOperators,
         selectedItem = selectedOp,
         onItemSelected = { onOperatorSelected(it.key) },
-        itemLabel = { "${it.metadata.displayName} (${it.key})" },
+        itemLabel = { it.metadata.displayName },
         placeholder = "Select operator...",
         modifier = modifier,
     )

@@ -11,6 +11,7 @@ import com.ankideku.domain.usecase.suggestion.SessionEvent
 import com.ankideku.domain.usecase.session.SessionFinder
 import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
 import com.ankideku.domain.usecase.suggestion.SuggestionFinder
+import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.ui.screens.main.ChatMessage
 import com.ankideku.ui.screens.main.ChatMessageType
 import com.ankideku.ui.screens.main.SyncProgressUi
@@ -29,6 +30,7 @@ interface SessionActions {
     fun clearSession()
     fun observeSuggestionsForSession(sessionId: Long)
     fun stopObservingSuggestions()
+    fun refreshSuggestionBaselines()
 }
 
 class SessionActionsImpl(
@@ -36,6 +38,7 @@ class SessionActionsImpl(
     private val sessionOrchestrator: SessionOrchestrator,
     private val sessionFinder: SessionFinder,
     private val suggestionFinder: SuggestionFinder,
+    private val suggestionRepository: SuggestionRepository,
     private val syncDeckFeature: SyncDeckFeature,
     private val deckFinder: DeckFinder,
 ) : SessionActions {
@@ -334,5 +337,49 @@ class SessionActionsImpl(
     override fun stopObservingSuggestions() {
         suggestionsJob?.cancel()
         suggestionsJob = null
+    }
+
+    override fun refreshSuggestionBaselines() {
+        val session = ctx.currentState.currentSession ?: return
+        if (ctx.currentState.isSyncing) return
+
+        ctx.scope.launch {
+            ctx.update { copy(isSyncing = true) }
+
+            try {
+                // Sync deck to get latest notes
+                syncDeckFeature(session.deckId).collect { progress ->
+                    val uiProgress = when (progress) {
+                        is SyncProgress.Starting -> SyncProgressUi(
+                            deckName = progress.deckName,
+                            statusText = if (progress.isIncremental) "Syncing..." else "Full sync...",
+                        )
+                        is SyncProgress.SyncingSubDeck -> SyncProgressUi(
+                            deckName = progress.subDeckName,
+                            statusText = "Syncing ${progress.subDeckName}",
+                            step = progress.step,
+                            totalSteps = progress.totalSteps,
+                        )
+                        is SyncProgress.SavingToCache -> SyncProgressUi(
+                            deckName = session.deckName,
+                            statusText = "Saving...",
+                        )
+                        is SyncProgress.Completed -> null
+                    }
+                    ctx.update { copy(syncProgress = uiProgress) }
+                }
+
+                // Update original fields from cached notes (also touches suggestions to trigger Flow)
+                val updated = suggestionRepository.refreshOriginalFields(session.id)
+                ctx.showToast("Updated $updated suggestion baselines", ToastType.Success)
+
+            } catch (e: CancellationException) {
+                // Ignore
+            } catch (e: Exception) {
+                ctx.showToast("Refresh failed: ${e.message}", ToastType.Error)
+            } finally {
+                ctx.update { copy(isSyncing = false, syncProgress = null) }
+            }
+        }
     }
 }

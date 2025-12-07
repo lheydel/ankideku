@@ -9,9 +9,9 @@ object ComparisonOperators : List<ComparisonOperator> by listOf(
     ComparisonOperator("==", "=", "Equals", "Check if two values are equal"),
     ComparisonOperator("!=", "<>", "Not Equals", "Check if two values are different"),
     ComparisonOperator("<", "<", "Less Than", "Check if left is less than right"),
-    ComparisonOperator("<=", "<=", "At Most", "Check if left is less than or equal to right"),
+    ComparisonOperator("<=", "<=", "Less Than Or Equal", "Check if left is less than or equal to right"),
     ComparisonOperator(">", ">", "Greater Than", "Check if left is greater than right"),
-    ComparisonOperator(">=", ">=", "At Least", "Check if left is greater than or equal to right"),
+    ComparisonOperator(">=", ">=", "Greater Than Or Equal", "Check if left is greater than or equal to right"),
 )
 
 /**

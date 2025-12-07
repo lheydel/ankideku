@@ -32,5 +32,5 @@ class ArithmeticOperator(
     override val defaultFirstArgument: Number? = null,
 ) : MathOperator() {
 
-    override val metadata = MathOperator.arithmeticMetadata(displayName, description, minArguments, maxArguments)
+    override val metadata = arithmeticMetadata(displayName, description, minArguments, maxArguments)
 }

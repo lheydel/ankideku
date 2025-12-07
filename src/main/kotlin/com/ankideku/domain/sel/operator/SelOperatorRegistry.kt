@@ -53,10 +53,15 @@ object SelOperatorRegistry : Map<SelOperatorKey, SelOperator> by operators {
 
     /**
      * Get operators that return a specific type.
+     * If type is Any, returns all user operators (no restriction).
      */
     fun returningType(type: SelType): List<SelOperator> =
-        userOperators.filter {
-            it.metadata.signature.returnType == type || it.metadata.signature.returnType == SelType.Any
+        if (type == SelType.Any) {
+            userOperators
+        } else {
+            userOperators.filter {
+                it.metadata.signature.returnType == type || it.metadata.signature.returnType == SelType.Any
+            }
         }
 
     /**

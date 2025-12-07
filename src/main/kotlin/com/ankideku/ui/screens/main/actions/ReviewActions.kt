@@ -188,7 +188,7 @@ class ReviewActionsImpl(
     }
 
     override fun selectSuggestion(index: Int) {
-        val suggestions = ctx.currentState.suggestions
+        val suggestions = ctx.currentState.displayedSuggestions
         if (index in suggestions.indices) {
             // Load hasManualEdits from the suggestion's editedChanges
             val suggestion = suggestions[index]

@@ -13,6 +13,7 @@ data class SelPreset(
     val description: String? = null,
     val target: EntityType,
     val queryJson: String,
+    val scopesJson: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

@@ -7,12 +7,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.ankideku.domain.sel.evaluator.SelSqlEvaluator
 import com.ankideku.ui.components.sel.state.SelBuilderState
 import com.ankideku.ui.theme.*
 import java.awt.Toolkit
@@ -25,6 +27,7 @@ import java.awt.datatransfer.StringSelection
 fun SelPreview(
     state: SelBuilderState,
     modifier: Modifier = Modifier,
+    enabled: Boolean,
 ) {
     val colors = LocalAppColors.current
 
@@ -37,6 +40,23 @@ fun SelPreview(
                 "Error: ${e.message}"
             }
         }
+    }
+
+    // Generate SQL for debugging (with params embedded)
+    val sql by remember {
+        derivedStateOf {
+            try {
+                val query = state.toSelQuery()
+                val sqlQuery = SelSqlEvaluator.buildQuery(query)
+                embedParams(sqlQuery.sql, sqlQuery.params)
+            } catch (e: Exception) {
+                "SQL Error: ${e.message}"
+            }
+        }
+    }
+
+    if (!enabled) {
+        return
     }
 
     Surface(
@@ -88,13 +108,47 @@ fun SelPreview(
                         .verticalScroll(rememberScrollState())
                         .horizontalScroll(rememberScrollState()),
                 ) {
-                    Text(
-                        text = json,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                        ),
-                        color = colors.textPrimary,
-                    )
+                    SelectionContainer {
+                        Text(
+                            text = json,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                            color = colors.textPrimary,
+                        )
+                    }
+                }
+            }
+
+            // SQL Debug section
+            Text(
+                "SQL (debug)",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.textMuted,
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 40.dp, max = 100.dp),
+                shape = InputShape,
+                color = colors.surfaceAlt,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(Spacing.sm)
+                        .verticalScroll(rememberScrollState())
+                        .horizontalScroll(rememberScrollState()),
+                ) {
+                    SelectionContainer {
+                        Text(
+                            text = sql,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                            color = colors.textMuted,
+                        )
+                    }
                 }
             }
         }
@@ -143,4 +197,21 @@ private fun formatJson(json: String): String {
     }
 
     return sb.toString()
+}
+
+/**
+ * Embed params into SQL query by replacing ? placeholders.
+ */
+private fun embedParams(sql: String, params: List<Any?>): String {
+    var result = sql
+    for (param in params) {
+        val replacement = when (param) {
+            null -> "NULL"
+            is String -> "'${param.replace("'", "''")}'"
+            is Number -> param.toString()
+            else -> "'$param'"
+        }
+        result = result.replaceFirst("?", replacement)
+    }
+    return result
 }
