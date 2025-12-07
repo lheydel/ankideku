@@ -48,19 +48,13 @@ jobs:
       - name: Add Conveyor to PATH
         run: echo "$HOME/.npm-global/bin" >> $GITHUB_PATH
 
-      - name: Build with Conveyor
+      - name: Build and upload with Conveyor
         env:
           CONVEYOR_AGREE_TO_LICENSE: "1"
           CONVEYOR_BILLING_EMAIL: ${{ secrets.CONVEYOR_BILLING_EMAIL }}
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           chmod +x ./gradlew
           ./gradlew jar
-          conveyor make site
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./output
-          destination_dir: download
+          conveyor make copied-site
