@@ -41,7 +41,6 @@ fun App() {
                         isConnected = uiState.ankiConnected,
                         onSettingsClick = viewModel::showSettingsDialog,
                         onSidebarToggle = viewModel::toggleSidebar,
-                        onImportV1 = viewModel::importV1Database,
                         isSidebarVisible = uiState.isSidebarVisible,
                     )
                     MainScreen(

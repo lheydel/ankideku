@@ -26,7 +26,6 @@ fun Header(
     isConnected: Boolean,
     onSettingsClick: () -> Unit,
     onSidebarToggle: () -> Unit,
-    onImportV1: () -> Unit,
     isSidebarVisible: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -92,18 +91,6 @@ fun Header(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-
-                // DEV ONLY: Import V1 Database - Remove after migration
-                IconButton(
-                    onClick = onImportV1,
-                    modifier = Modifier.handPointer(),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = "Import V1 Database",
                         modifier = Modifier.size(20.dp),
                     )
                 }
