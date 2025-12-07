@@ -384,6 +384,25 @@ nav a:hover {
     color: var(--color-text);
 }
 
+/* Contribute */
+.contribute {
+    padding: var(--space-2xl) 0;
+    text-align: center;
+}
+
+.contribute p {
+    font-size: 1.125rem;
+    max-width: 600px;
+    margin: 0 auto var(--space-lg);
+}
+
+.contribute-links {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 /* Footer */
 .site-footer {
     padding: var(--space-lg) 0;
