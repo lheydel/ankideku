@@ -80,7 +80,7 @@ fun QueuePanel(
                 Spacer(Modifier.height(Spacing.md))
             }
 
-            // Tab selector (matching v1 styling)
+            // Tab selector
             QueueTabSelector(
                 activeTab = activeTab,
                 queueCount = suggestions.size,
@@ -122,7 +122,7 @@ fun QueuePanel(
 }
 
 /**
- * Custom tab selector matching v1 styling:
+ * Custom tab selector:
  * - Equal-width buttons
  * - Active: bottom border, primary text, subtle background tint
  * - Inactive: muted text with hover

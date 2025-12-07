@@ -147,7 +147,6 @@ class SessionActionsImpl(
                 // Get initial count for chat messages
                 val suggestions = suggestionFinder.observePendingForSession(sessionId).first()
 
-                // Restore chat messages like v1
                 val chatMessages = buildSessionChatMessages(session, suggestions.size)
 
                 ctx.update {
