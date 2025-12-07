@@ -5,6 +5,8 @@ import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.domain.usecase.deck.DeckFinder
 import com.ankideku.domain.usecase.history.HistoryFinder
 import com.ankideku.domain.usecase.notetype.NoteTypeConfigFinder
+import com.ankideku.domain.sel.SelService
+import com.ankideku.domain.usecase.suggestion.BatchReviewFeature
 import com.ankideku.domain.usecase.suggestion.ReviewSuggestionFeature
 import com.ankideku.domain.usecase.session.SessionFinder
 import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
@@ -38,13 +40,13 @@ class MainViewModel(
     private val settingsManager: SettingsManager,
     private val connectionMonitor: AnkiConnectionMonitor,
     private val noteTypeConfigFinder: NoteTypeConfigFinder,
-    v1Importer: V1DatabaseImporter,  // DEV ONLY: Remove after migration
 ) : DeckActions by DeckActionsImpl(ctx, syncDeckFeature, deckFinder),
     SessionActions by SessionActionsImpl(ctx, sessionOrchestrator, sessionFinder, suggestionFinder, suggestionRepository, syncDeckFeature, deckFinder),
     ReviewActions by ReviewActionsImpl(ctx, reviewSuggestionFeature),
+    BatchActions by BatchActionsImpl(ctx, batchReviewFeature, selService),
     HistoryActions by HistoryActionsImpl(ctx, historyFinder),
     SettingsActions by SettingsActionsImpl(ctx, settingsManager),
-    UIActions by UIActionsImpl(ctx, connectionMonitor, v1Importer)
+    UIActions by UIActionsImpl(ctx, connectionMonitor)
 {
     val uiState: StateFlow<MainUiState> = ctx.uiState
 

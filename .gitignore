@@ -9,7 +9,24 @@ build/
 */build/
 *.tsbuildinfo
 
-database/
+# V1 database (not shared with V2)
+/database
+
+# Gradle
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Kotlin/Compose
+*.class
+*.jar
+*.war
+*.ear
+out/
+.kotlin/
+
+# SQLDelight generated
+src/main/sqldelight/.sqldelight/
 
 # Environment variables
 .env
@@ -68,3 +85,6 @@ coverage/
 *.pem
 *.key
 *.cert
+
+NUL
+**/NUL
