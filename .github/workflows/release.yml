@@ -52,6 +52,7 @@ jobs:
         env:
           CONVEYOR_AGREE_TO_LICENSE: "1"
           CONVEYOR_BILLING_EMAIL: ${{ secrets.CONVEYOR_BILLING_EMAIL }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
           chmod +x ./gradlew
           ./gradlew jar
