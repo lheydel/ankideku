@@ -29,13 +29,13 @@ import com.ankideku.ui.theme.clickableWithPointer
 import com.ankideku.ui.theme.handPointer
 import com.ankideku.ui.components.batch.BatchActionBar
 import com.ankideku.ui.screens.main.BatchProgress
+import com.ankideku.util.toJson
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 
 @Composable
 fun QueuePanel(
     suggestions: List<Suggestion>,
-    totalSuggestionsCount: Int,
     currentSuggestionIndex: Int,
     historyEntries: List<HistoryEntry>,
     activeTab: QueueTab,
@@ -116,7 +116,7 @@ fun QueuePanel(
                 )
                 QueueTab.Queue -> QueueContent(
                     suggestions = suggestions,
-                    totalSuggestionsCount = totalSuggestionsCount,
+                    session = currentSession,
                     currentIndex = currentSuggestionIndex,
                     noteTypeConfigs = noteTypeConfigs,
                     onSuggestionClick = onSuggestionClick,
@@ -320,7 +320,7 @@ private fun SessionInfoCard(session: Session) {
 @Composable
 private fun QueueContent(
     suggestions: List<Suggestion>,
-    totalSuggestionsCount: Int,
+    session: Session?,
     currentIndex: Int,
     noteTypeConfigs: Map<String, NoteTypeConfig>,
     onSuggestionClick: (Int) -> Unit,
@@ -335,12 +335,13 @@ private fun QueueContent(
     onRefreshBaselines: (() -> Unit)? = null,
 ) {
     val colors = LocalAppColors.current
+    val progress = session?.progress
     val pendingCount = suggestions.size
-    val doneCount = totalSuggestionsCount - pendingCount
+    val doneCount = (progress?.suggestionsCount ?: 0) - pendingCount
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Header row with filter button
-        if (totalSuggestionsCount > 0 || isInBatchFilterMode) {
+        if ((progress?.suggestionsCount ?: 0) > 0 || isInBatchFilterMode) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

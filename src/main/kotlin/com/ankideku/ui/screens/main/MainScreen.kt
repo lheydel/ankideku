@@ -66,13 +66,6 @@ fun MainScreen(
         }
     }
 
-    // Determine if dark theme is active
-    val isDarkTheme = when (uiState.settings.theme) {
-        AppTheme.Light -> false
-        AppTheme.Dark -> true
-        AppTheme.System -> isSystemInDarkTheme()
-    }
-
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Connection warning banner
@@ -99,7 +92,6 @@ fun MainScreen(
                     // Left: Queue Panel
                     QueuePanel(
                         suggestions = uiState.displayedSuggestions,
-                        totalSuggestionsCount = uiState.suggestions.size,
                         currentSuggestionIndex = uiState.currentSuggestionIndex,
                         historyEntries = uiState.historyEntries,
                         activeTab = uiState.activeTab,

@@ -80,9 +80,6 @@ data class MainUiState(
     val currentSuggestion: Suggestion?
         get() = displayedSuggestions.getOrNull(currentSuggestionIndex)
 
-    val pendingSuggestions: List<Suggestion>
-        get() = suggestions.filter { it.status == SuggestionStatus.Pending }
-
     val isProcessing: Boolean
         get() = currentSession?.state == SessionState.Running
 
