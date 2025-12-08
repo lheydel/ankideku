@@ -3,14 +3,13 @@ package com.ankideku.ui.components
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ankideku.ui.theme.handPointer
-import com.ankideku.ui.components.AppButton
-import com.ankideku.ui.components.AppButtonVariant
-import com.ankideku.ui.components.DestructiveButton
 
 /**
  * Reusable delete session button with confirmation dialog.
@@ -35,29 +34,16 @@ fun DeleteSessionButton(
     }
 
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Session") },
-            text = { Text("Are you sure you want to delete this session? This will permanently remove all suggestions.") },
-            confirmButton = {
-                DestructiveButton(
-                    onClick = {
-                        onDelete()
-                        showDeleteConfirm = false
-                    },
-                    variant = AppButtonVariant.Text,
-                ) {
-                    Text("Delete")
-                }
+        ConfirmDialog(
+            title = "Delete Session",
+            message = "Are you sure you want to delete this session? This will permanently remove all suggestions.",
+            confirmLabel = "Delete",
+            isDestructive = true,
+            onConfirm = {
+                onDelete()
+                showDeleteConfirm = false
             },
-            dismissButton = {
-                AppButton(
-                    onClick = { showDeleteConfirm = false },
-                    variant = AppButtonVariant.Text,
-                ) {
-                    Text("Cancel")
-                }
-            },
+            onDismiss = { showDeleteConfirm = false },
         )
     }
 }

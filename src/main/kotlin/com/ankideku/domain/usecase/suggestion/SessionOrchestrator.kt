@@ -49,8 +49,21 @@ class SessionOrchestrator(
      * Start a new AI processing session for a deck.
      * Uses channelFlow to support concurrent emissions from parallel batch processing.
      */
-    fun startSession(deckId: DeckId, prompt: String): Flow<SessionEvent> = channelFlow {
-        val context = prepareSession(deckId, prompt)
+    fun startSession(deckId: DeckId, prompt: String): Flow<SessionEvent> =
+        runSession { prepareSession(deckId, prompt, notes = null) }
+
+    /**
+     * Start a new AI processing session with pre-filtered notes.
+     * Use this when the caller has already filtered the notes (e.g., via SeL query).
+     */
+    fun startSessionWithNotes(deckId: DeckId, prompt: String, notes: List<Note>): Flow<SessionEvent> =
+        runSession { prepareSession(deckId, prompt, notes) }
+
+    /**
+     * Common session execution logic.
+     */
+    private fun runSession(prepare: suspend () -> SessionContext): Flow<SessionEvent> = channelFlow {
+        val context = prepare()
         send(SessionEvent.Created(context.sessionId, context.deck.id, context.notes.size))
 
         trackJobForCancellation(context.sessionId)
@@ -74,8 +87,9 @@ class SessionOrchestrator(
 
     /**
      * Prepare session: validate, load data, create batches, persist session.
+     * If notes is null, loads notes from the database.
      */
-    private suspend fun prepareSession(deckId: DeckId, prompt: String): SessionContext {
+    private suspend fun prepareSession(deckId: DeckId, prompt: String, notes: List<Note>?): SessionContext {
         // Get LLM service with current settings
         val provider = onIO { settingsRepository.getSettings().llmProvider }
         val llmService = LlmServiceFactory.getInstance(LlmConfig(provider))
@@ -86,17 +100,20 @@ class SessionOrchestrator(
             throw SessionException.LlmNotAvailable(health.error ?: "LLM service not available")
         }
 
-        // Load deck and notes
+        // Load deck
         val deck = onIO { deckRepository.getDeck(deckId) }
             ?: throw SessionException.DeckNotFound(deckId)
-        val notes = onIO { deckRepository.getNotesForDeck(deckId) }
-        if (notes.isEmpty()) {
+
+        // Load notes from DB if not provided, deduplicate to prevent unique constraint violations
+        val sessionNotes = (notes ?: onIO { deckRepository.getNotesForDeck(deckId) })
+            .distinctBy { it.id }
+        if (sessionNotes.isEmpty()) {
             throw SessionException.EmptyDeck(deckId)
         }
 
         // Extract note type and create batches
-        val noteType = extractNoteType(notes.first())
-        val batches = TokenBatcher(MAX_INPUT_TOKENS).createBatches(notes, prompt, noteType)
+        val noteType = extractNoteType(sessionNotes.first())
+        val batches = TokenBatcher(MAX_INPUT_TOKENS).createBatches(sessionNotes, prompt, noteType)
 
         // Persist session
         val session = Session(
@@ -104,13 +121,13 @@ class SessionOrchestrator(
             deckName = deck.name,
             prompt = prompt,
             state = SessionState.Pending,
-            progress = SessionProgress(totalCards = notes.size, totalBatches = batches.size),
+            progress = SessionProgress(totalCards = sessionNotes.size, totalBatches = batches.size),
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis(),
         )
         val sessionId = onIO { sessionRepository.create(session) }
 
-        return SessionContext(sessionId, deck, notes, batches, noteType, prompt, llmService)
+        return SessionContext(sessionId, deck, sessionNotes, batches, noteType, prompt, llmService)
     }
 
     private fun extractNoteType(note: Note) = NoteTypeInfo(
@@ -179,19 +196,22 @@ class SessionOrchestrator(
         batchNotes: List<Note>,
         response: LlmResponse,
     ): List<Suggestion> {
-        val suggestions = response.suggestions.mapNotNull { llmSuggestion ->
-            val note = batchNotes.find { it.id == llmSuggestion.noteId } ?: return@mapNotNull null
-            Suggestion(
-                sessionId = sessionId,
-                noteId = llmSuggestion.noteId,
-                modelName = note.modelName,
-                originalFields = note.fields,
-                changes = llmSuggestion.changes,
-                reasoning = llmSuggestion.reasoning,
-                status = SuggestionStatus.Pending,
-                createdAt = System.currentTimeMillis(),
-            )
-        }
+        // Deduplicate by noteId in case LLM returns duplicates
+        val suggestions = response.suggestions
+            .distinctBy { it.noteId }
+            .mapNotNull { llmSuggestion ->
+                val note = batchNotes.find { it.id == llmSuggestion.noteId } ?: return@mapNotNull null
+                Suggestion(
+                    sessionId = sessionId,
+                    noteId = llmSuggestion.noteId,
+                    modelName = note.modelName,
+                    originalFields = note.fields,
+                    changes = llmSuggestion.changes,
+                    reasoning = llmSuggestion.reasoning,
+                    status = SuggestionStatus.Pending,
+                    createdAt = System.currentTimeMillis(),
+                )
+            }
 
         if (suggestions.isNotEmpty()) {
             onIO { suggestionRepository.saveAll(suggestions) }

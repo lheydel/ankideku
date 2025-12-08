@@ -32,6 +32,12 @@ data class MainUiState(
     val isBatchProcessing: Boolean = false,
     val batchProgress: BatchProgress? = null,
 
+    // Pre-session note browsing & filtering
+    val deckNotes: List<Note> = emptyList(),
+    val noteFilterQuery: SelQuery? = null,
+    val filteredNotes: List<Note>? = null,
+    val selectedNoteIndex: Int = 0,
+
     // History
     val historyEntries: List<HistoryEntry> = emptyList(),
     val historyViewMode: HistoryViewMode = HistoryViewMode.Session,
@@ -66,7 +72,7 @@ data class MainUiState(
     val forceSyncBeforeStart: Boolean = false,
 
     // UI State
-    val activeTab: QueueTab = QueueTab.Queue,
+    val activeTab: QueueTab = QueueTab.Notes,
     val toastMessage: ToastMessage? = null,
     val dialogState: DialogState? = null,
     val isSidebarVisible: Boolean = true,
@@ -89,6 +95,16 @@ data class MainUiState(
     /** Suggestions to display in queue - filtered if in batch mode, otherwise all */
     val displayedSuggestions: List<Suggestion>
         get() = batchFilteredSuggestions ?: suggestions
+
+    /** Notes to display in pre-session mode - filtered if filter active, otherwise all deck notes */
+    val displayedNotes: List<Note>
+        get() = filteredNotes ?: deckNotes
+
+    val hasNoteFilter: Boolean
+        get() = noteFilterQuery != null
+
+    val currentPreviewNote: Note?
+        get() = displayedNotes.getOrNull(selectedNoteIndex)
 }
 
 data class SyncProgressUi(
@@ -98,7 +114,7 @@ data class SyncProgressUi(
     val totalSteps: Int = 0,
 )
 
-enum class QueueTab { Queue, History }
+enum class QueueTab { Notes, Queue, History }
 enum class HistoryViewMode { Session, Global }
 
 data class ToastMessage(
@@ -135,7 +151,7 @@ sealed class DialogState {
         val suggestion: Suggestion,
         val currentFields: Map<String, NoteField>,
         val onUseAi: () -> Unit,
-        val onUseCurrent: () -> Unit,
+        val onRefresh: () -> Unit,
         val onCancel: () -> Unit,
     ) : DialogState()
 

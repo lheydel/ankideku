@@ -9,6 +9,7 @@ import com.ankideku.data.mapper.insertField
 import com.ankideku.data.mapper.insertFields
 import com.ankideku.data.mapper.insertFieldsFromMap
 import com.ankideku.data.mapper.toDomain
+import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.SessionId
 import com.ankideku.domain.model.Suggestion
 import com.ankideku.domain.model.SuggestionId
@@ -169,5 +170,22 @@ class SqlSuggestionRepository(
         }
 
         return updated
+    }
+
+    override fun refreshOriginalFieldsForSuggestion(suggestionId: SuggestionId, fields: Map<String, NoteField>) {
+        database.transaction {
+            // Delete old original fields
+            database.fieldValueQueries.deleteFieldsForSuggestionByContext(
+                suggestionId,
+                FieldContext.ORIGINAL.dbValue,
+            )
+
+            // Insert new original fields
+            val owner = FieldOwner.Suggestion(suggestionId)
+            database.fieldValueQueries.insertFields(owner, FieldContext.ORIGINAL, fields)
+
+            // Touch suggestion to trigger Flow re-emission
+            database.suggestionQueries.touchSuggestion(suggestionId)
+        }
     }
 }

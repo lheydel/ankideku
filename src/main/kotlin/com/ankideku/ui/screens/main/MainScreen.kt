@@ -55,6 +55,9 @@ fun MainScreen(
     // State for batch filter builder window
     var showBatchFilterBuilder by remember { mutableStateOf(false) }
 
+    // State for note filter builder window (pre-session filtering)
+    var showNoteFilterBuilder by remember { mutableStateOf(false) }
+
     // Toast notification
     uiState.toastMessage?.let { toast ->
         LaunchedEffect(toast) {
@@ -108,6 +111,13 @@ fun MainScreen(
                         isInBatchFilterMode = uiState.isInBatchFilterMode,
                         isBatchProcessing = uiState.isBatchProcessing,
                         batchProgress = uiState.batchProgress,
+                        // Pre-session note browsing
+                        notes = uiState.displayedNotes,
+                        selectedNoteIndex = uiState.selectedNoteIndex,
+                        hasNoteFilter = uiState.hasNoteFilter,
+                        onNoteClick = viewModel::selectNoteForPreview,
+                        onOpenNoteFilter = { showNoteFilterBuilder = true },
+                        onClearNoteFilter = viewModel::clearNoteFilter,
                         onTabChanged = viewModel::setActiveTab,
                         onHistoryViewModeChanged = viewModel::setHistoryViewMode,
                         onSuggestionClick = viewModel::selectSuggestion,
@@ -122,7 +132,9 @@ fun MainScreen(
                     )
 
                     // Center: Session Selector or Comparison - fills remaining space
-                    if (uiState.currentSession != null || uiState.viewingHistoryEntry != null) {
+                    // Show ComparisonPanel when: viewing history, active session, or previewing a note
+                    val showPreviewNote = uiState.currentSession == null && uiState.currentPreviewNote != null
+                    if (uiState.currentSession != null || uiState.viewingHistoryEntry != null || showPreviewNote) {
                         ComparisonPanel(
                             suggestion = uiState.currentSuggestion,
                             session = uiState.currentSession,
@@ -136,6 +148,9 @@ fun MainScreen(
                             isProcessing = uiState.isProcessing,
                             historyEntry = uiState.viewingHistoryEntry,
                             noteTypeConfigs = uiState.noteTypeConfigs,
+                            // Pre-session note preview
+                            previewNote = if (showPreviewNote) uiState.currentPreviewNote else null,
+                            selectedDeck = uiState.selectedDeck,
                             onAccept = viewModel::acceptSuggestion,
                             onReject = viewModel::rejectSuggestion,
                             onSkip = viewModel::skipSuggestion,
@@ -181,6 +196,9 @@ fun MainScreen(
                             currentSession = uiState.currentSession,
                             forceSyncBeforeStart = uiState.forceSyncBeforeStart,
                             llmProvider = uiState.settings.llmProvider,
+                            // Pre-session note filter
+                            noteFilterCount = if (uiState.hasNoteFilter) uiState.displayedNotes.size else null,
+                            totalNoteCount = uiState.deckNotes.size,
                             onDeckSelected = viewModel::selectDeck,
                             onRefreshDecks = viewModel::refreshDecks,
                             onSyncDeck = viewModel::syncDeck,
@@ -191,6 +209,8 @@ fun MainScreen(
                                 uiState.currentSession?.id?.let { viewModel.deleteSession(it) }
                             },
                             onForceSyncChanged = viewModel::setForceSyncBeforeStart,
+                            onOpenNoteFilter = { showNoteFilterBuilder = true },
+                            onClearNoteFilter = viewModel::clearNoteFilter,
                             onCloseSidebar = viewModel::toggleSidebar,
                             modifier = Modifier.width(sidebarWidth),
                         )
@@ -334,6 +354,24 @@ fun MainScreen(
                     )
                 ),
                 initialConditions = initialConditions,
+            )
+        }
+
+        // Note Filter Builder Window (pre-session filtering)
+        if (showNoteFilterBuilder && uiState.selectedDeck != null && uiState.currentSession == null) {
+            SelBuilderWindow(
+                onClose = { showNoteFilterBuilder = false },
+                onConfirm = { query ->
+                    viewModel.executeNoteFilter(query)
+                },
+                initialTarget = EntityType.Note,
+                lockedScopes = mapOf(
+                    "deck" to ScopeValue(
+                        value = uiState.selectedDeck!!.id,
+                        displayLabel = uiState.selectedDeck!!.name,
+                        locked = true,
+                    )
+                ),
             )
         }
     }

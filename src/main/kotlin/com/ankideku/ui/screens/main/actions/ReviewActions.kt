@@ -223,7 +223,7 @@ class ReviewActionsImpl(
                     suggestion = suggestion,
                     currentFields = currentFields,
                     onUseAi = { resolveConflictWithAi(suggestion.id) },
-                    onUseCurrent = { resolveConflictWithCurrent(suggestion.id) },
+                    onRefresh = { resolveConflictWithRefresh(suggestion.id, currentFields) },
                     onCancel = { dismissDialog() },
                 ),
             )
@@ -249,11 +249,12 @@ class ReviewActionsImpl(
         }
     }
 
-    private fun resolveConflictWithCurrent(suggestionId: SuggestionId) {
+    private fun resolveConflictWithRefresh(suggestionId: SuggestionId, currentFields: Map<String, NoteField>) {
         ctx.scope.launch {
-            reviewSuggestionFeature.skip(suggestionId)
+            reviewSuggestionFeature.refreshConflict(suggestionId, currentFields)
             dismissDialog()
             resetEditState()
+            ctx.showToast("Card refreshed with current state", ToastType.Info)
         }
     }
 

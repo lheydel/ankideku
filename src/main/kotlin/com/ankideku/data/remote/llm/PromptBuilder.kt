@@ -48,12 +48,13 @@ Schema:
 Rules:
 - Only suggest changes for notes that need improvement
 - Skip notes that are already good
+- At most ONE suggestion per note (do not repeat note IDs)
 - Return empty suggestions array if no notes need changes: { "$SUGGESTIONS": [] }
 - Keep reasoning concise (saves cost)
 - Return ONLY valid JSON, no other text
 - CRITICAL: Your response will be parsed programmatically. Invalid JSON will cause errors. Ensure proper formatting.
 - Field names in "$CHANGES" must exactly match the available fields listed
-- $NOTE_ID must match one of the provided note IDs
+- $NOTE_ID must be the EXACT numeric ID from [Note X] headers (e.g., [Note 1234567890] means $NOTE_ID: 1234567890)
 """.trimIndent()
 
     /**
@@ -98,9 +99,10 @@ Return ONLY the JSON output, no other text.
     /**
      * Format a single note for the prompt.
      * Omits empty fields to save tokens.
+     * Uses only note ID (no index) to avoid LLM confusion.
      */
     fun formatNote(note: Note, index: Int): String = buildString {
-        appendLine("Note ${index + 1} (ID: ${note.id}):")
+        appendLine("[Note ${note.id}]")
 
         // Add non-empty fields only
         for ((fieldName, field) in note.fields) {

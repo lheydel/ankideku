@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +19,9 @@ import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.ankideku.domain.model.Deck
 import com.ankideku.domain.model.HistoryEntry
+import com.ankideku.domain.model.Note
 import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.domain.model.ReviewAction
@@ -46,6 +49,9 @@ fun ComparisonPanel(
     isProcessing: Boolean,
     historyEntry: HistoryEntry?,
     noteTypeConfigs: Map<String, NoteTypeConfig>,
+    // Pre-session note preview
+    previewNote: Note? = null,
+    selectedDeck: Deck? = null,
     onAccept: () -> Unit,
     onReject: () -> Unit,
     onSkip: () -> Unit,
@@ -98,6 +104,19 @@ fun ComparisonPanel(
                             ActionBadge(action = historyEntry.action, color = if (accepted) colors.success else colors.error)
                         },
                         changesHeaderStyle = getHistoryHeaderStyle(accepted),
+                    )
+                }
+
+                // Pre-session note preview mode
+                previewNote != null -> {
+                    val noteTypeConfig = noteTypeConfigs[previewNote.modelName]
+                    NotePreviewContent(
+                        note = previewNote,
+                        deckName = selectedDeck?.name ?: previewNote.deckName,
+                        noteTypeConfig = noteTypeConfig,
+                        onCopy = { copyToClipboard(buildNoteCopyText(previewNote)) },
+                        onOpenNoteTypeSettings = { onOpenNoteTypeSettings(previewNote.modelName) },
+                        onBackToSessions = onBackToSessions,
                     )
                 }
 
@@ -431,3 +450,110 @@ data class HeaderStyle(
     val background: Color,
     val icon: ImageVector,
 )
+
+/**
+ * Build copy text for a note preview (pre-session).
+ */
+private fun buildNoteCopyText(note: Note) = buildString {
+    appendLine("## Note Preview")
+    appendLine("Note Type: ${note.modelName}")
+    appendLine("Deck: ${note.deckName}")
+    if (note.tags.isNotEmpty()) {
+        appendLine("Tags: ${note.tags.joinToString(", ")}")
+    }
+    appendLine()
+    appendLine("## Fields")
+    note.fields.values.sortedBy { it.order }.forEach { field ->
+        appendLine("**${field.name}:** ${field.value}")
+    }
+}
+
+/**
+ * Note preview content for pre-session browsing.
+ * Shows a single note's fields without comparison columns.
+ */
+@Composable
+private fun ColumnScope.NotePreviewContent(
+    note: Note,
+    deckName: String,
+    noteTypeConfig: NoteTypeConfig?,
+    onCopy: () -> Unit,
+    onOpenNoteTypeSettings: () -> Unit,
+    onBackToSessions: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+
+    // Breadcrumb to go back to session selector
+    Breadcrumb(text = "Back to Sessions", onClick = onBackToSessions)
+    Spacer(Modifier.height(Spacing.sm))
+
+    // Reuse the header card from comparison view
+    ComparisonHeaderCard(
+        deckName = deckName,
+        modelName = note.modelName,
+        onCopy = onCopy,
+        onOpenNoteTypeSettings = onOpenNoteTypeSettings,
+        trailingBadge = {},
+    )
+
+    Spacer(Modifier.height(Spacing.md))
+
+    // Fields card - single card showing all fields (no comparison)
+    Card(
+        modifier = Modifier.weight(1f).fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Brush.horizontalGradient(listOf(colors.surfaceAlt, MaterialTheme.colorScheme.surface)))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Article, null, Modifier.size(18.dp), tint = colors.accent)
+                Spacer(Modifier.width(Spacing.sm))
+                Text("Note Fields", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+            }
+
+            HorizontalDivider(color = colors.divider)
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+            ) {
+                val sortedFields = note.fields.entries.sortedBy { it.value.order }
+                items(sortedFields) { (fieldName, field) ->
+                    FieldItem(
+                        fieldName = fieldName,
+                        value = field.value,
+                        isChanged = false,
+                        noteTypeConfig = noteTypeConfig,
+                        style = previewFieldStyle(),
+                    )
+                }
+            }
+        }
+    }
+
+    // Help text at the bottom
+    Spacer(Modifier.height(Spacing.md))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = colors.textMuted,
+        )
+        Spacer(Modifier.width(Spacing.xs))
+        Text(
+            text = "Write a prompt and start a session to get AI suggestions for this note",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textMuted,
+        )
+    }
+}

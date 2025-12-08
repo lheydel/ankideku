@@ -14,6 +14,7 @@ import com.ankideku.domain.usecase.suggestion.SuggestionFinder
 import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.ui.screens.main.ChatMessage
 import com.ankideku.ui.screens.main.ChatMessageType
+import com.ankideku.ui.screens.main.QueueTab
 import com.ankideku.ui.screens.main.SyncProgressUi
 import com.ankideku.ui.screens.main.ToastType
 import kotlinx.coroutines.CancellationException
@@ -58,12 +59,30 @@ class SessionActionsImpl(
         var deck = ctx.currentState.selectedDeck ?: return
         if (prompt.isBlank() || ctx.currentState.isProcessing) return
 
+        // Capture filtered notes before starting (if filter is active)
+        val preFilteredNotes = if (ctx.currentState.hasNoteFilter) {
+            ctx.currentState.displayedNotes
+        } else {
+            null
+        }
+
         sessionJob?.cancel()
         sessionJob = ctx.scope.launch {
             ctx.addChatMessage(prompt, ChatMessageType.UserPrompt)
 
+            // Clear note filter since session is starting
+            ctx.update {
+                copy(
+                    filteredNotes = null,
+                    noteFilterQuery = null,
+                    selectedNoteIndex = 0,
+                )
+            }
+
             // Sync first if force sync is enabled OR deck hasn't been synced yet
-            val needsSync = ctx.currentState.forceSyncBeforeStart || deck.lastSyncTimestamp == null
+            // Skip sync if we have pre-filtered notes (user explicitly selected which notes to use)
+            val needsSync = preFilteredNotes == null &&
+                (ctx.currentState.forceSyncBeforeStart || deck.lastSyncTimestamp == null)
             if (needsSync) {
                 ctx.addChatMessage("Syncing deck...", ChatMessageType.SystemInfo)
                 ctx.update { copy(isSyncing = true) }
@@ -113,7 +132,13 @@ class SessionActionsImpl(
             ctx.addChatMessage("Starting session...", ChatMessageType.SystemInfo)
 
             try {
-                sessionOrchestrator.startSession(deck.id, prompt).collect { event ->
+                // Use pre-filtered notes if available, otherwise let orchestrator load all notes
+                val sessionFlow = if (preFilteredNotes != null) {
+                    sessionOrchestrator.startSessionWithNotes(deck.id, prompt, preFilteredNotes)
+                } else {
+                    sessionOrchestrator.startSession(deck.id, prompt)
+                }
+                sessionFlow.collect { event ->
                     handleSessionEvent(event)
                 }
             } catch (e: CancellationException) {
@@ -154,6 +179,7 @@ class SessionActionsImpl(
                         currentSession = session,
                         isEditMode = false,
                         chatMessages = chatMessages,
+                        activeTab = QueueTab.Queue
                     )
                 }
 
@@ -244,6 +270,11 @@ class SessionActionsImpl(
                 isEditMode = false,
                 hasManualEdits = false,
                 chatMessages = emptyList(), // Reset to show welcome state
+                deckNotes = emptyList(),
+                filteredNotes = emptyList(),
+                selectedDeck = null,
+                selectedNoteIndex = 0,
+                activeTab = QueueTab.Notes,
             )
         }
     }
@@ -253,7 +284,7 @@ class SessionActionsImpl(
             is SessionEvent.Created -> {
                 ctx.scope.launch {
                     val session = sessionFinder.getById(event.sessionId)
-                    ctx.update { copy(currentSession = session) }
+                    ctx.update { copy(currentSession = session, activeTab = QueueTab.Queue) }
                 }
                 // Start observing suggestions - will update reactively as batches complete
                 observeSuggestionsForSession(event.sessionId)

@@ -113,6 +113,7 @@ val appModule = module {
             batchReviewFeature = get(),
             selService = get(),
             suggestionRepository = get(),
+            deckRepository = get(),
             deckFinder = get(),
             sessionFinder = get(),
             suggestionFinder = get(),

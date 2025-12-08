@@ -1,5 +1,6 @@
 package com.ankideku.domain.repository
 
+import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.SessionId
 import com.ankideku.domain.model.Suggestion
 import com.ankideku.domain.model.SuggestionId
@@ -23,4 +24,7 @@ interface SuggestionRepository {
 
     /** Update originalFields of all pending suggestions in a session from cached notes */
     fun refreshOriginalFields(sessionId: SessionId): Int
+
+    /** Update originalFields of a single suggestion with provided fields */
+    fun refreshOriginalFieldsForSuggestion(suggestionId: SuggestionId, fields: Map<String, NoteField>)
 }

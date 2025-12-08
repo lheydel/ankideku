@@ -71,6 +71,15 @@ class ReviewSuggestionFeature(
         return ReviewResult.Success
     }
 
+    /**
+     * Refresh a suggestion's original fields with the current state from Anki.
+     * Use this when the user wants to update the suggestion after detecting a conflict.
+     */
+    suspend fun refreshConflict(suggestionId: SuggestionId, currentFields: Map<String, NoteField>): ReviewResult {
+        onIO { suggestionRepository.refreshOriginalFieldsForSuggestion(suggestionId, currentFields) }
+        return ReviewResult.Success
+    }
+
     private suspend fun doAccept(suggestionId: SuggestionId, checkConflict: Boolean): ReviewResult {
         val suggestion = onIO { suggestionRepository.getById(suggestionId) }
             ?: return ReviewResult.Error("Suggestion not found")

@@ -47,6 +47,13 @@ fun QueuePanel(
     isInBatchFilterMode: Boolean = false,
     isBatchProcessing: Boolean = false,
     batchProgress: BatchProgress? = null,
+    // Pre-session note browsing
+    notes: List<Note> = emptyList(),
+    selectedNoteIndex: Int = 0,
+    hasNoteFilter: Boolean = false,
+    onNoteClick: (Int) -> Unit = {},
+    onOpenNoteFilter: (() -> Unit)? = null,
+    onClearNoteFilter: (() -> Unit)? = null,
     onTabChanged: (QueueTab) -> Unit,
     onHistoryViewModeChanged: (HistoryViewMode) -> Unit,
     onSuggestionClick: (Int) -> Unit,
@@ -82,11 +89,15 @@ fun QueuePanel(
                 Spacer(Modifier.height(Spacing.md))
             }
 
-            // Tab selector
+            // Tab selector - show Notes+History pre-session, Queue+History during session
+            val isPreSession = currentSession == null
             QueueTabSelector(
                 activeTab = activeTab,
+                isPreSession = isPreSession,
+                notesCount = notes.size,
                 queueCount = suggestions.size,
                 historyCount = historyEntries.size,
+                hasNoteFilter = hasNoteFilter,
                 onTabChanged = onTabChanged,
             )
 
@@ -94,16 +105,24 @@ fun QueuePanel(
 
             // Tab content
             when (activeTab) {
+                QueueTab.Notes -> NoteListContent(
+                    notes = notes,
+                    selectedIndex = selectedNoteIndex,
+                    noteTypeConfigs = noteTypeConfigs,
+                    hasNoteFilter = hasNoteFilter,
+                    onNoteClick = onNoteClick,
+                    onOpenNoteFilter = onOpenNoteFilter,
+                    onClearNoteFilter = onClearNoteFilter,
+                )
                 QueueTab.Queue -> QueueContent(
                     suggestions = suggestions,
+                    totalSuggestionsCount = totalSuggestionsCount,
                     currentIndex = currentSuggestionIndex,
                     noteTypeConfigs = noteTypeConfigs,
                     onSuggestionClick = onSuggestionClick,
-                    // Batch mode
                     isInBatchFilterMode = isInBatchFilterMode,
                     isBatchProcessing = isBatchProcessing,
                     batchProgress = batchProgress,
-                    hasSuggestions = totalSuggestionsCount > 0,
                     onOpenBatchFilter = onOpenBatchFilter,
                     onClearBatchFilter = onClearBatchFilter,
                     onBatchAcceptAll = onBatchAcceptAll,
@@ -126,6 +145,7 @@ fun QueuePanel(
 
 /**
  * Custom tab selector:
+ * - Shows Notes+History in pre-session mode, Queue+History during active session
  * - Equal-width buttons
  * - Active: bottom border, primary text, subtle background tint
  * - Inactive: muted text with hover
@@ -133,8 +153,11 @@ fun QueuePanel(
 @Composable
 private fun QueueTabSelector(
     activeTab: QueueTab,
+    isPreSession: Boolean,
+    notesCount: Int,
     queueCount: Int,
     historyCount: Int,
+    hasNoteFilter: Boolean = false,
     onTabChanged: (QueueTab) -> Unit,
 ) {
     val colors = LocalAppColors.current
@@ -144,16 +167,28 @@ private fun QueueTabSelector(
             .fillMaxWidth()
             .background(colors.surface),
     ) {
-        // Queue tab
-        QueueTabButton(
-            text = "Queue",
-            count = queueCount,
-            isActive = activeTab == QueueTab.Queue,
-            onClick = { onTabChanged(QueueTab.Queue) },
-            modifier = Modifier.weight(1f),
-        )
+        if (isPreSession) {
+            // Pre-session: show Notes tab
+            QueueTabButton(
+                text = "Notes",
+                count = notesCount,
+                isActive = activeTab == QueueTab.Notes,
+                hasFilter = hasNoteFilter,
+                onClick = { onTabChanged(QueueTab.Notes) },
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            // Active session: show Queue tab
+            QueueTabButton(
+                text = "Queue",
+                count = queueCount,
+                isActive = activeTab == QueueTab.Queue,
+                onClick = { onTabChanged(QueueTab.Queue) },
+                modifier = Modifier.weight(1f),
+            )
+        }
 
-        // History tab
+        // History tab (always visible)
         QueueTabButton(
             text = "History",
             count = historyCount,
@@ -169,6 +204,7 @@ private fun QueueTabButton(
     text: String,
     count: Int,
     isActive: Boolean,
+    hasFilter: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -194,6 +230,16 @@ private fun QueueTabButton(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
+                // Filter indicator
+                if (hasFilter) {
+                    Icon(
+                        imageVector = Icons.Default.FilterList,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = colors.accent,
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                }
                 Text(
                     text = text,
                     style = MaterialTheme.typography.titleSmall,
@@ -274,6 +320,7 @@ private fun SessionInfoCard(session: Session) {
 @Composable
 private fun QueueContent(
     suggestions: List<Suggestion>,
+    totalSuggestionsCount: Int,
     currentIndex: Int,
     noteTypeConfigs: Map<String, NoteTypeConfig>,
     onSuggestionClick: (Int) -> Unit,
@@ -281,7 +328,6 @@ private fun QueueContent(
     isInBatchFilterMode: Boolean = false,
     isBatchProcessing: Boolean = false,
     batchProgress: BatchProgress? = null,
-    hasSuggestions: Boolean = false,
     onOpenBatchFilter: (() -> Unit)? = null,
     onClearBatchFilter: (() -> Unit)? = null,
     onBatchAcceptAll: (() -> Unit)? = null,
@@ -289,12 +335,12 @@ private fun QueueContent(
     onRefreshBaselines: (() -> Unit)? = null,
 ) {
     val colors = LocalAppColors.current
-    val pendingSuggestions = suggestions.filter { it.status == SuggestionStatus.Pending }
-    val doneSuggestions = suggestions.filter { it.status != SuggestionStatus.Pending }
+    val pendingCount = suggestions.size
+    val doneCount = totalSuggestionsCount - pendingCount
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Header row with filter button
-        if (hasSuggestions || isInBatchFilterMode) {
+        if (totalSuggestionsCount > 0 || isInBatchFilterMode) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -441,7 +487,7 @@ private fun QueueContent(
                     )
                     Spacer(Modifier.width(Spacing.xs))
                     Text(
-                        text = "Done: ${doneSuggestions.size}",
+                        text = "Done: $doneCount",
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.success,
                     )
@@ -457,7 +503,7 @@ private fun QueueContent(
                     )
                     Spacer(Modifier.width(Spacing.xs))
                     Text(
-                        text = "Left: ${pendingSuggestions.size}",
+                        text = "Left: $pendingCount",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -480,7 +526,51 @@ private fun QueueCard(
         fields = suggestion.originalFields,
         noteTypeConfig = noteTypeConfig,
     )
-    val displayValue = fieldValue.ifBlank { "Note #${suggestion.noteId}" }
+    val wasSkipped = suggestion.skippedAt != null
+
+    ItemCard(
+        displayValue = fieldValue.ifBlank { "Note #${suggestion.noteId}" },
+        fieldName = fieldName,
+        index = index,
+        isCurrent = isCurrent,
+        noteTypeConfig = noteTypeConfig,
+        onClick = onClick,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Text(
+                text = "${suggestion.changes.size} field(s) changed",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            if (wasSkipped) {
+                Icon(
+                    imageVector = Icons.Default.Redo,
+                    contentDescription = "Previously skipped",
+                    modifier = Modifier.size(12.dp),
+                    tint = colors.textMuted,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Generic item card used by both QueueCard and NoteCard.
+ */
+@Composable
+private fun ItemCard(
+    displayValue: String,
+    fieldName: String,
+    index: Int,
+    isCurrent: Boolean,
+    noteTypeConfig: NoteTypeConfig?,
+    onClick: () -> Unit,
+    subtitle: @Composable () -> Unit,
+) {
+    val colors = LocalAppColors.current
 
     val cardBackground = if (isCurrent) {
         Brush.horizontalGradient(
@@ -490,7 +580,6 @@ private fun QueueCard(
             )
         )
     } else {
-        // Use surface color for lighter appearance
         Brush.horizontalGradient(
             colors = listOf(colors.surface, colors.surface)
         )
@@ -511,7 +600,7 @@ private fun QueueCard(
                 .padding(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Left accent bar for current card
+            // Left accent bar for current item
             if (isCurrent) {
                 Box(
                     modifier = Modifier
@@ -535,7 +624,7 @@ private fun QueueCard(
                 if (isCurrent) {
                     Icon(
                         imageVector = Icons.Default.Visibility,
-                        contentDescription = "Current card",
+                        contentDescription = "Selected item",
                         modifier = Modifier.size(14.dp),
                         tint = colors.onAccent,
                     )
@@ -550,7 +639,7 @@ private fun QueueCard(
 
             Spacer(Modifier.width(Spacing.sm))
 
-            // Card content
+            // Content
             Column(modifier = Modifier.weight(1f)) {
                 ConfiguredText(
                     text = displayValue,
@@ -561,10 +650,183 @@ private fun QueueCard(
                     noteTypeConfig = noteTypeConfig,
                 )
                 Spacer(Modifier.height(Spacing.xxs))
+                subtitle()
+            }
+        }
+    }
+}
+
+/**
+ * Pre-session note list content - shows deck notes before starting a session.
+ */
+@Composable
+private fun NoteListContent(
+    notes: List<Note>,
+    selectedIndex: Int,
+    noteTypeConfigs: Map<String, NoteTypeConfig>,
+    hasNoteFilter: Boolean,
+    onNoteClick: (Int) -> Unit,
+    onOpenNoteFilter: (() -> Unit)?,
+    onClearNoteFilter: (() -> Unit)?,
+) {
+    val colors = LocalAppColors.current
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Header row with filter controls
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (hasNoteFilter) {
+                // Filter active indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FilterList,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = colors.accent,
+                    )
+                    Text(
+                        text = "Filtered",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.accent,
+                    )
+                    Text(
+                        text = "·",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.textMuted,
+                    )
+                    Text(
+                        text = "${notes.size} note${if (notes.size != 1) "s" else ""}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.textSecondary,
+                    )
+                    if (onClearNoteFilter != null) {
+                        Text(
+                            text = "·",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.textMuted,
+                        )
+                        Text(
+                            text = "Clear",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.accent,
+                            modifier = Modifier.clickableWithPointer { onClearNoteFilter() },
+                        )
+                    }
+                }
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+
+            // Filter button (when no filter active)
+            if (onOpenNoteFilter != null && !hasNoteFilter && notes.isNotEmpty()) {
+                IconButton(
+                    onClick = onOpenNoteFilter,
+                    modifier = Modifier.size(32.dp).handPointer(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FilterList,
+                        contentDescription = "Filter notes",
+                        modifier = Modifier.size(20.dp),
+                        tint = colors.textSecondary,
+                    )
+                }
+            }
+        }
+
+        if (notes.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.sm))
+        }
+
+        if (notes.isEmpty()) {
+            // Empty state
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (hasNoteFilter) "No notes match filter" else "No notes in deck",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textMuted,
+                    )
+                    if (!hasNoteFilter) {
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            text = "Select a deck or sync to load notes",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textMuted,
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                itemsIndexed(notes) { index, note ->
+                    NoteCard(
+                        note = note,
+                        index = index + 1,
+                        isCurrent = index == selectedIndex,
+                        noteTypeConfig = noteTypeConfigs[note.modelName],
+                        onClick = { onNoteClick(index) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteCard(
+    note: Note,
+    index: Int,
+    isCurrent: Boolean,
+    noteTypeConfig: NoteTypeConfig?,
+    onClick: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+    val (fieldName, fieldValue) = com.ankideku.util.getDisplayField(
+        fields = note.fields,
+        noteTypeConfig = noteTypeConfig,
+    )
+
+    ItemCard(
+        displayValue = fieldValue.ifBlank { "Note #${note.id}" },
+        fieldName = fieldName,
+        index = index,
+        isCurrent = isCurrent,
+        noteTypeConfig = noteTypeConfig,
+        onClick = onClick,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Text(
+                text = note.modelName,
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textMuted,
+            )
+            if (note.tags.isNotEmpty()) {
                 Text(
-                    text = "${suggestion.changes.size} field(s) changed",
+                    text = "·",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = colors.textMuted,
+                )
+                Text(
+                    text = "${note.tags.size} tag${if (note.tags.size != 1) "s" else ""}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textMuted,
                 )
             }
         }

@@ -330,7 +330,7 @@ fun ActionButtons(
                 variant = AppButtonVariant.Outlined,
                 enabled = !isDisabled,
             ) {
-                Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Redo, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(Spacing.xs))
                 Text("Skip")
             }

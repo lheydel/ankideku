@@ -218,3 +218,16 @@ fun suggestedFieldStyle(isChanged: Boolean): FieldItemStyle {
         labelColor = if (isChanged) colors.success else colors.textMuted,
     )
 }
+
+/**
+ * Helper to create style for note preview fields (neutral, no change indication)
+ */
+@Composable
+fun previewFieldStyle(): FieldItemStyle {
+    val colors = LocalAppColors.current
+    return FieldItemStyle(
+        icon = Icons.Default.TextFields,
+        iconTint = colors.textMuted,
+        labelColor = colors.textSecondary,
+    )
+}

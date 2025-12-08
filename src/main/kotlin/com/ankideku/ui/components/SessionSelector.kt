@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -212,13 +213,13 @@ private fun SessionCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SessionStateChip(session.state, small = false)
-                    // Delete button - only visible on hover
-                    if (isHovered) {
-                        DeleteSessionButton(
-                            onDelete = onDelete,
-                            modifier = Modifier.size(32.dp),
-                        )
-                    }
+                    // Delete button - always in tree to preserve dialog state, but only visible on hover
+                    DeleteSessionButton(
+                        onDelete = onDelete,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .alpha(if (isHovered) 1f else 0f),
+                    )
                 }
             }
 

@@ -1,12 +1,14 @@
 package com.ankideku.ui.screens.main.actions
 
 import com.ankideku.domain.model.Deck
+import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.usecase.deck.DeckFinder
 import com.ankideku.domain.usecase.deck.SyncDeckFeature
 import com.ankideku.domain.usecase.deck.SyncException
 import com.ankideku.domain.usecase.deck.SyncProgress
 import com.ankideku.ui.screens.main.SyncProgressUi
 import com.ankideku.ui.screens.main.ToastType
+import com.ankideku.util.onIO
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -22,15 +24,30 @@ class DeckActionsImpl(
     private val ctx: ViewModelContext,
     private val syncDeckFeature: SyncDeckFeature,
     private val deckFinder: DeckFinder,
+    private val deckRepository: DeckRepository,
 ) : DeckActions {
 
     private var syncJob: Job? = null
 
     override fun selectDeck(deck: Deck) {
         ctx.scope.launch {
+            // Clear note filter and reset note browsing state
+            ctx.update {
+                copy(
+                    deckNotes = emptyList(),
+                    filteredNotes = null,
+                    noteFilterQuery = null,
+                    selectedNoteIndex = 0,
+                )
+            }
+
             // Fetch deck with aggregated stats for display
             val deckWithStats = deckFinder.getByIdWithAggregatedStats(deck.id) ?: deck
             ctx.update { copy(selectedDeck = deckWithStats) }
+
+            // Load notes for the selected deck
+            val notes = onIO { deckRepository.getNotesForDeck(deck.id) }
+            ctx.update { copy(deckNotes = notes) }
         }
     }
 
@@ -84,6 +101,17 @@ class DeckActionsImpl(
                     copy(
                         selectedDeck = updatedDeck,
                         decks = decks.map { d -> if (d.id == deck.id) updatedDeck ?: d else d },
+                    )
+                }
+
+                // Reload notes after sync (clear filter since notes may have changed)
+                val notes = onIO { deckRepository.getNotesForDeck(deck.id) }
+                ctx.update {
+                    copy(
+                        deckNotes = notes,
+                        filteredNotes = null,
+                        noteFilterQuery = null,
+                        selectedNoteIndex = 0,
                     )
                 }
             } catch (e: CancellationException) {

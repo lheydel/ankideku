@@ -52,6 +52,12 @@ fun SidebarPanel(
     currentSession: Session?,
     forceSyncBeforeStart: Boolean,
     llmProvider: LlmProvider,
+    // Note filter
+    noteFilterCount: Int?,
+    totalNoteCount: Int,
+    onOpenNoteFilter: () -> Unit,
+    onClearNoteFilter: () -> Unit,
+    // Callbacks
     onDeckSelected: (Deck) -> Unit,
     onRefreshDecks: () -> Unit,
     onSyncDeck: () -> Unit,
@@ -90,10 +96,14 @@ fun SidebarPanel(
                 isConnected = isConnected,
                 syncProgress = syncProgress,
                 currentSession = currentSession,
+                noteFilterCount = noteFilterCount,
+                totalNoteCount = totalNoteCount,
                 colors = colors,
                 onDeckSelected = onDeckSelected,
                 onRefreshDecks = onRefreshDecks,
                 onSyncDeck = onSyncDeck,
+                onOpenNoteFilter = onOpenNoteFilter,
+                onClearNoteFilter = onClearNoteFilter,
             )
 
             // Border after deck selector
@@ -236,10 +246,14 @@ private fun DeckSelectorSection(
     isConnected: Boolean,
     syncProgress: SyncProgressUi?,
     currentSession: Session?,
+    noteFilterCount: Int?,
+    totalNoteCount: Int,
     colors: com.ankideku.ui.theme.AppColorScheme,
     onDeckSelected: (Deck) -> Unit,
     onRefreshDecks: () -> Unit,
     onSyncDeck: () -> Unit,
+    onOpenNoteFilter: () -> Unit,
+    onClearNoteFilter: () -> Unit,
 ) {
     val hasActiveSession = currentSession != null
     // When there's an active session, show the session's deck as a readonly display
@@ -344,6 +358,70 @@ private fun DeckSelectorSection(
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.textMuted,
             )
+
+            // Note filter row (only when no active session)
+            if (currentSession == null && totalNoteCount > 0) {
+                Spacer(Modifier.height(Spacing.sm))
+                NoteFilterRow(
+                    noteFilterCount = noteFilterCount,
+                    totalNoteCount = totalNoteCount,
+                    onOpenFilter = onOpenNoteFilter,
+                    onClearFilter = onClearNoteFilter,
+                    colors = colors,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteFilterRow(
+    noteFilterCount: Int?,
+    totalNoteCount: Int,
+    onOpenFilter: () -> Unit,
+    onClearFilter: () -> Unit,
+    colors: com.ankideku.ui.theme.AppColorScheme,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Filter button
+        AppButton(
+            onClick = onOpenFilter,
+            variant = if (noteFilterCount != null) AppButtonVariant.Outlined else AppButtonVariant.Text,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.FilterList,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = if (noteFilterCount != null) {
+                    "$noteFilterCount of $totalNoteCount notes"
+                } else {
+                    "Filter Notes"
+                },
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+
+        // Clear button (only when filter active)
+        if (noteFilterCount != null) {
+            IconButton(
+                onClick = onClearFilter,
+                modifier = Modifier.size(24.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Clear filter",
+                    modifier = Modifier.size(16.dp),
+                    tint = colors.textSecondary,
+                )
+            }
         }
     }
 }

@@ -22,7 +22,6 @@ import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
 import com.ankideku.ui.components.AppButton
 import com.ankideku.ui.components.AppButtonVariant
-import com.ankideku.ui.components.DestructiveButton
 
 /**
  * Generic changes card. Shows field changes with diff highlighting.
@@ -188,27 +187,16 @@ fun SuggestionEditControls(
     }
 
     if (showRevertDialog) {
-        AlertDialog(
-            onDismissRequest = { showRevertDialog = false },
-            title = { Text("Revert Manual Edits") },
-            text = { Text("Are you sure you want to revert all manual edits?") },
-            confirmButton = {
-                DestructiveButton(
-                    onClick = {
-                        onRevertEdits()
-                        showRevertDialog = false
-                    },
-                    variant = AppButtonVariant.Text,
-                ) { Text("Revert") }
+        ConfirmDialog(
+            title = "Revert Manual Edits",
+            message = "Are you sure you want to revert all manual edits?",
+            confirmLabel = "Revert",
+            isDestructive = true,
+            onConfirm = {
+                onRevertEdits()
+                showRevertDialog = false
             },
-            dismissButton = {
-                AppButton(
-                    onClick = { showRevertDialog = false },
-                    variant = AppButtonVariant.Text,
-                ) {
-                    Text("Cancel")
-                }
-            },
+            onDismiss = { showRevertDialog = false },
         )
     }
 }
