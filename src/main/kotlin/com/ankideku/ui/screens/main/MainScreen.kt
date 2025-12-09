@@ -25,11 +25,11 @@ import com.ankideku.domain.model.AppTheme
 import com.ankideku.domain.sel.model.EntityType
 import com.ankideku.domain.usecase.suggestion.BatchConflictStrategy
 import com.ankideku.ui.components.AppDialogs
-import com.ankideku.ui.components.ComparisonPanel
+import com.ankideku.ui.components.comparison.ComparisonPanel
 import com.ankideku.ui.components.ConnectionBanner
-import com.ankideku.ui.components.QueuePanel
+import com.ankideku.ui.components.queue.QueuePanel
 import com.ankideku.ui.components.SessionSelector
-import com.ankideku.ui.components.SidebarPanel
+import com.ankideku.ui.components.sidebar.SidebarPanel
 import com.ankideku.ui.components.sel.SelBuilderWindow
 import com.ankideku.ui.components.sel.state.ConditionGroupState
 import com.ankideku.ui.components.sel.state.ConditionState

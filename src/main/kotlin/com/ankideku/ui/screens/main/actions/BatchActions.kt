@@ -44,12 +44,14 @@ class BatchActionsImpl(
 
     override fun executeBatchQuery(query: SelQuery) {
         ctx.scope.launch {
-            ctx.update { copy(isBatchProcessing = true) }
-            try {
+            ctx.withLoading(
+                setLoading = { copy(isBatchProcessing = true) },
+                resetLoading = { copy(isBatchProcessing = false) },
+            ) {
                 val filtered = executeAndFilter(query)
                 if (filtered == null) {
                     ctx.showToast("Query must target Suggestions", ToastType.Error)
-                    return@launch
+                    return@withLoading
                 }
 
                 ctx.update {
@@ -63,10 +65,6 @@ class BatchActionsImpl(
                 if (filtered.isEmpty()) {
                     ctx.showToast("No pending suggestions match your query", ToastType.Info)
                 }
-            } catch (e: Exception) {
-                ctx.showToast("Query failed: ${e.message}", ToastType.Error)
-            } finally {
-                ctx.update { copy(isBatchProcessing = false) }
             }
         }
     }
@@ -131,11 +129,8 @@ class BatchActionsImpl(
         ctx.update { copy(dialogState = null) }
 
         ctx.scope.launch {
-            ctx.update { copy(isBatchProcessing = true) }
-            try {
+            ctx.withBatchProcessing {
                 executeBatchAction(action, suggestions, strategy)
-            } finally {
-                ctx.update { copy(isBatchProcessing = false, batchProgress = null) }
             }
         }
     }

@@ -30,16 +30,14 @@ class ReviewActionsImpl(
         val editedChanges = ctx.currentState.editedFields.takeIf { it.isNotEmpty() }
 
         ctx.scope.launch {
-            ctx.update { copy(isActionLoading = true) }
-            try {
+            ctx.withActionLoading {
                 if (editedChanges != null) {
                     reviewSuggestionFeature.saveEdits(suggestion.id, editedChanges)
                 }
 
                 when (val result = reviewSuggestionFeature.accept(suggestion.id)) {
                     is ReviewResult.Success -> {
-                        // Flow observation will remove accepted item and update list
-                        resetEditState()
+                        ctx.resetEditState()
                         ctx.showToast("Changes applied", ToastType.Success)
                     }
                     is ReviewResult.Conflict -> {
@@ -49,8 +47,6 @@ class ReviewActionsImpl(
                         ctx.showToast("Failed to apply: ${result.message}", ToastType.Error)
                     }
                 }
-            } finally {
-                ctx.update { copy(isActionLoading = false) }
             }
         }
     }
@@ -59,18 +55,12 @@ class ReviewActionsImpl(
         val suggestion = ctx.currentState.currentSuggestion ?: return
 
         ctx.scope.launch {
-            ctx.update { copy(isActionLoading = true) }
-            try {
+            ctx.withActionLoading {
                 when (val result = reviewSuggestionFeature.reject(suggestion.id)) {
-                    is ReviewResult.Success -> {
-                        // Flow observation will remove rejected item and update list
-                        resetEditState()
-                    }
+                    is ReviewResult.Success -> ctx.resetEditState()
                     is ReviewResult.Error -> ctx.showToast("Failed to reject: ${result.message}", ToastType.Error)
                     is ReviewResult.Conflict -> { /* shouldn't happen for reject */ }
                 }
-            } finally {
-                ctx.update { copy(isActionLoading = false) }
             }
         }
     }
@@ -79,18 +69,12 @@ class ReviewActionsImpl(
         val suggestion = ctx.currentState.currentSuggestion ?: return
 
         ctx.scope.launch {
-            ctx.update { copy(isActionLoading = true) }
-            try {
+            ctx.withActionLoading {
                 when (val result = reviewSuggestionFeature.skip(suggestion.id)) {
-                    is ReviewResult.Success -> {
-                        // Flow observation will move item to end and update list
-                        resetEditState()
-                    }
+                    is ReviewResult.Success -> ctx.resetEditState()
                     is ReviewResult.Error -> ctx.showToast("Failed to skip: ${result.message}", ToastType.Error)
                     is ReviewResult.Conflict -> { /* shouldn't happen for skip */ }
                 }
-            } finally {
-                ctx.update { copy(isActionLoading = false) }
             }
         }
     }
@@ -206,16 +190,6 @@ class ReviewActionsImpl(
         }
     }
 
-    private fun resetEditState() {
-        ctx.update {
-            copy(
-                editedFields = emptyMap(),
-                isEditMode = false,
-                hasManualEdits = false,
-            )
-        }
-    }
-
     private fun showConflictDialog(suggestion: Suggestion, currentFields: Map<String, NoteField>) {
         ctx.update {
             copy(
@@ -240,7 +214,7 @@ class ReviewActionsImpl(
             when (val result = reviewSuggestionFeature.forceAccept(suggestionId)) {
                 is ReviewResult.Success -> {
                     dismissDialog()
-                    resetEditState()
+                    ctx.resetEditState()
                     ctx.showToast("Changes applied (overwritten)", ToastType.Success)
                 }
                 is ReviewResult.Error -> ctx.showToast("Failed: ${result.message}", ToastType.Error)
@@ -253,7 +227,7 @@ class ReviewActionsImpl(
         ctx.scope.launch {
             reviewSuggestionFeature.refreshConflict(suggestionId, currentFields)
             dismissDialog()
-            resetEditState()
+            ctx.resetEditState()
             ctx.showToast("Card refreshed with current state", ToastType.Info)
         }
     }

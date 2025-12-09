@@ -15,8 +15,8 @@ import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.ui.screens.main.ChatMessage
 import com.ankideku.ui.screens.main.ChatMessageType
 import com.ankideku.ui.screens.main.QueueTab
-import com.ankideku.ui.screens.main.SyncProgressUi
 import com.ankideku.ui.screens.main.ToastType
+import com.ankideku.ui.screens.main.toUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
@@ -89,24 +89,7 @@ class SessionActionsImpl(
 
                 try {
                     syncDeckFeature(deck.id).collect { progress ->
-                        val uiProgress = when (progress) {
-                            is SyncProgress.Starting -> SyncProgressUi(
-                                deckName = progress.deckName,
-                                statusText = if (progress.isIncremental) "Incremental sync..." else "Full sync...",
-                            )
-                            is SyncProgress.SyncingSubDeck -> SyncProgressUi(
-                                deckName = progress.subDeckName,
-                                statusText = "Syncing ${progress.subDeckName}",
-                                step = progress.step,
-                                totalSteps = progress.totalSteps,
-                            )
-                            is SyncProgress.SavingToCache -> SyncProgressUi(
-                                deckName = deck.name,
-                                statusText = "Saving ${progress.noteCount} notes...",
-                            )
-                            is SyncProgress.Completed -> null
-                        }
-                        ctx.update { copy(syncProgress = uiProgress) }
+                        ctx.update { copy(syncProgress = progress.toUi(deck.name)) }
                     }
 
                     // Reload deck after sync with aggregated stats
@@ -393,24 +376,7 @@ class SessionActionsImpl(
             try {
                 // Sync deck to get latest notes
                 syncDeckFeature(session.deckId).collect { progress ->
-                    val uiProgress = when (progress) {
-                        is SyncProgress.Starting -> SyncProgressUi(
-                            deckName = progress.deckName,
-                            statusText = if (progress.isIncremental) "Syncing..." else "Full sync...",
-                        )
-                        is SyncProgress.SyncingSubDeck -> SyncProgressUi(
-                            deckName = progress.subDeckName,
-                            statusText = "Syncing ${progress.subDeckName}",
-                            step = progress.step,
-                            totalSteps = progress.totalSteps,
-                        )
-                        is SyncProgress.SavingToCache -> SyncProgressUi(
-                            deckName = session.deckName,
-                            statusText = "Saving...",
-                        )
-                        is SyncProgress.Completed -> null
-                    }
-                    ctx.update { copy(syncProgress = uiProgress) }
+                    ctx.update { copy(syncProgress = progress.toUi(session.deckName)) }
                 }
 
                 // Update original fields from cached notes (also touches suggestions to trigger Flow)

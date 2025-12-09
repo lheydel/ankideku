@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.Suggestion
@@ -72,49 +70,25 @@ fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = LocalAppColors.current
-
     AppDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.widthIn(min = 280.dp, max = 400.dp),
     ) {
-        Column(modifier = Modifier.padding(Spacing.lg)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.textPrimary,
-            )
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textSecondary,
-            )
-            Spacer(Modifier.height(Spacing.lg))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppButton(
-                    onClick = onDismiss,
-                    variant = AppButtonVariant.Text,
-                ) {
+        DialogContent(
+            title = title,
+            message = message,
+            buttons = {
+                AppButton(onClick = onDismiss, variant = AppButtonVariant.Text) {
                     Text("Cancel")
                 }
                 Spacer(Modifier.width(Spacing.sm))
                 if (isDestructive) {
-                    DestructiveButton(onClick = onConfirm) {
-                        Text(confirmLabel)
-                    }
+                    DestructiveButton(onClick = onConfirm) { Text(confirmLabel) }
                 } else {
-                    AppButton(onClick = onConfirm) {
-                        Text(confirmLabel)
-                    }
+                    AppButton(onClick = onConfirm) { Text(confirmLabel) }
                 }
-            }
-        }
+            },
+        )
     }
 }
 
@@ -132,7 +106,6 @@ fun ConflictDialog(
 ) {
     val colors = LocalAppColors.current
 
-    // Show which fields changed
     val changedFields = suggestion.originalFields.filter { (name, original) ->
         currentFields[name]?.value != original.value
     }
@@ -141,61 +114,39 @@ fun ConflictDialog(
         onDismissRequest = onCancel,
         modifier = Modifier.widthIn(min = 300.dp, max = 450.dp),
     ) {
-        Column(modifier = Modifier.padding(Spacing.lg)) {
-            Text(
-                text = "Conflict Detected",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.textPrimary,
-            )
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                text = "The note has been modified since this suggestion was created. The following fields have changed:",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textSecondary,
-            )
-            Spacer(Modifier.height(Spacing.sm))
-
-            changedFields.forEach { (name, _) ->
+        DialogContent(
+            title = "Conflict Detected",
+            message = "The note has been modified since this suggestion was created. The following fields have changed:",
+            content = {
+                Spacer(Modifier.height(Spacing.sm))
+                changedFields.forEach { (name, _) ->
+                    Text(
+                        text = "• $name",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.error,
+                    )
+                }
+                Spacer(Modifier.height(Spacing.md))
                 Text(
-                    text = "• $name",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.error,
+                    text = "How would you like to proceed?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textSecondary,
                 )
-            }
-
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                text = "How would you like to proceed?",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textSecondary,
-            )
-            Spacer(Modifier.height(Spacing.lg))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppButton(
-                    onClick = onCancel,
-                    variant = AppButtonVariant.Text,
-                ) {
+            },
+            buttons = {
+                AppButton(onClick = onCancel, variant = AppButtonVariant.Text) {
                     Text("Cancel")
                 }
                 Spacer(Modifier.width(Spacing.sm))
-                AppButton(
-                    onClick = onRefresh,
-                    variant = AppButtonVariant.Outlined,
-                ) {
+                AppButton(onClick = onRefresh, variant = AppButtonVariant.Outlined) {
                     Text("Refresh Card")
                 }
                 Spacer(Modifier.width(Spacing.sm))
                 AppButton(onClick = onUseAi) {
                     Text("Use AI Changes")
                 }
-            }
-        }
+            },
+        )
     }
 }
 
@@ -214,28 +165,13 @@ fun ErrorDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.widthIn(min = 280.dp, max = 400.dp),
     ) {
-        Column(modifier = Modifier.padding(Spacing.lg)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.error,
-            )
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textSecondary,
-            )
-            Spacer(Modifier.height(Spacing.lg))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                AppButton(onClick = onDismiss) {
-                    Text("OK")
-                }
-            }
-        }
+        DialogContent(
+            title = title,
+            titleColor = colors.error,
+            message = message,
+            buttons = {
+                AppButton(onClick = onDismiss) { Text("OK") }
+            },
+        )
     }
 }

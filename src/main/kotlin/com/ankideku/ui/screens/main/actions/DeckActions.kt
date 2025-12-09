@@ -6,8 +6,8 @@ import com.ankideku.domain.usecase.deck.DeckFinder
 import com.ankideku.domain.usecase.deck.SyncDeckFeature
 import com.ankideku.domain.usecase.deck.SyncException
 import com.ankideku.domain.usecase.deck.SyncProgress
-import com.ankideku.ui.screens.main.SyncProgressUi
 import com.ankideku.ui.screens.main.ToastType
+import com.ankideku.ui.screens.main.toUi
 import com.ankideku.util.onIO
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -72,27 +72,10 @@ class DeckActionsImpl(
 
             try {
                 syncDeckFeature(deck.id).collect { progress ->
-                    val uiProgress = when (progress) {
-                        is SyncProgress.Starting -> SyncProgressUi(
-                            deckName = progress.deckName,
-                            statusText = if (progress.isIncremental) "Incremental sync..." else "Full sync...",
-                        )
-                        is SyncProgress.SyncingSubDeck -> SyncProgressUi(
-                            deckName = progress.subDeckName,
-                            statusText = "Syncing ${progress.subDeckName}",
-                            step = progress.step,
-                            totalSteps = progress.totalSteps,
-                        )
-                        is SyncProgress.SavingToCache -> SyncProgressUi(
-                            deckName = deck.name,
-                            statusText = "Saving ${progress.noteCount} notes...",
-                        )
-                        is SyncProgress.Completed -> {
-                            ctx.showToast("Synced ${progress.noteCount} notes", ToastType.Success)
-                            null
-                        }
+                    ctx.update { copy(syncProgress = progress.toUi(deck.name)) }
+                    if (progress is SyncProgress.Completed) {
+                        ctx.showToast("Synced ${progress.noteCount} notes", ToastType.Success)
                     }
-                    ctx.update { copy(syncProgress = uiProgress) }
                 }
 
                 // Reload deck after sync with aggregated stats
