@@ -1,0 +1,151 @@
+-- Review session for interactive AI chat after batch suggestion generation
+
+CREATE TABLE review_session (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+    llm_provider TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    last_activity_at INTEGER NOT NULL,
+    context_config TEXT  -- JSON: field selection, message limit, etc.
+);
+
+CREATE INDEX idx_review_session_session ON review_session(session_id);
+
+-- Review messages (conversation history)
+
+CREATE TABLE review_message (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_session_id INTEGER NOT NULL REFERENCES review_session(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,  -- 'user', 'assistant', 'action_result'
+    content TEXT NOT NULL,
+    action_calls TEXT,  -- JSON array of action calls (for assistant messages)
+    action_call_id TEXT,  -- For action_result messages
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_review_message_session ON review_message(review_session_id);
+CREATE INDEX idx_review_message_created ON review_message(review_session_id, created_at);
+
+-- Review memory (persistent instructions)
+
+CREATE TABLE review_memory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_session_id INTEGER NOT NULL REFERENCES review_session(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_review_memory_key ON review_memory(review_session_id, key);
+
+-- Review suggestions (AI suggestions from chat)
+
+CREATE TABLE review_suggestion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_session_id INTEGER NOT NULL REFERENCES review_session(id) ON DELETE CASCADE,
+    message_id INTEGER NOT NULL REFERENCES review_message(id) ON DELETE CASCADE,
+    suggestion_id INTEGER NOT NULL REFERENCES suggestion(id) ON DELETE CASCADE,
+    proposed_reasoning TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',  -- 'pending', 'applied', 'dismissed'
+    applied_at INTEGER
+);
+
+CREATE INDEX idx_review_suggestion_session ON review_suggestion(review_session_id);
+CREATE INDEX idx_review_suggestion_suggestion ON review_suggestion(suggestion_id);
+CREATE INDEX idx_review_suggestion_status ON review_suggestion(status);
+
+-- Review session queries
+
+getReviewSessionForSession:
+SELECT * FROM review_session WHERE session_id = ? LIMIT 1;
+
+getReviewSessionById:
+SELECT * FROM review_session WHERE id = ?;
+
+insertReviewSession:
+INSERT INTO review_session (session_id, llm_provider, started_at, last_activity_at, context_config)
+VALUES (?, ?, ?, ?, ?);
+
+lastInsertedReviewSessionId:
+SELECT last_insert_rowid();
+
+updateReviewSessionActivity:
+UPDATE review_session SET last_activity_at = ? WHERE id = ?;
+
+updateReviewSessionConfig:
+UPDATE review_session SET context_config = ?, last_activity_at = ? WHERE id = ?;
+
+deleteReviewSession:
+DELETE FROM review_session WHERE id = ?;
+
+-- Review message queries
+
+getMessagesForReviewSession:
+SELECT * FROM review_message WHERE review_session_id = ? ORDER BY created_at ASC;
+
+getLastNMessagesForReviewSession:
+SELECT * FROM review_message WHERE review_session_id = ? ORDER BY created_at DESC LIMIT ?;
+
+getMessageById:
+SELECT * FROM review_message WHERE id = ?;
+
+insertReviewMessage:
+INSERT INTO review_message (review_session_id, role, content, action_calls, action_call_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+lastInsertedReviewMessageId:
+SELECT last_insert_rowid();
+
+deleteMessagesForReviewSession:
+DELETE FROM review_message WHERE review_session_id = ?;
+
+-- Review memory queries
+
+getMemoryForReviewSession:
+SELECT * FROM review_memory WHERE review_session_id = ? ORDER BY key;
+
+getMemoryByKey:
+SELECT * FROM review_memory WHERE review_session_id = ? AND key = ?;
+
+upsertMemory:
+INSERT OR REPLACE INTO review_memory (review_session_id, key, value, created_at)
+VALUES (?, ?, ?, ?);
+
+deleteMemoryByKey:
+DELETE FROM review_memory WHERE review_session_id = ? AND key = ?;
+
+deleteAllMemoryForReviewSession:
+DELETE FROM review_memory WHERE review_session_id = ?;
+
+countMemoryForReviewSession:
+SELECT COUNT(*) FROM review_memory WHERE review_session_id = ?;
+
+-- Review suggestion queries
+
+getReviewSuggestionsForSession:
+SELECT * FROM review_suggestion WHERE review_session_id = ? ORDER BY id;
+
+getPendingReviewSuggestionsForSession:
+SELECT * FROM review_suggestion WHERE review_session_id = ? AND status = 'pending' ORDER BY id;
+
+getReviewSuggestionsForSuggestion:
+SELECT * FROM review_suggestion WHERE suggestion_id = ? ORDER BY id;
+
+getPendingReviewSuggestionsForSuggestion:
+SELECT * FROM review_suggestion WHERE suggestion_id = ? AND status = 'pending' ORDER BY id;
+
+getReviewSuggestionById:
+SELECT * FROM review_suggestion WHERE id = ?;
+
+insertReviewSuggestion:
+INSERT INTO review_suggestion (review_session_id, message_id, suggestion_id, proposed_reasoning, status)
+VALUES (?, ?, ?, ?, ?);
+
+lastInsertedReviewSuggestionId:
+SELECT last_insert_rowid();
+
+updateReviewSuggestionStatus:
+UPDATE review_suggestion SET status = ?, applied_at = ? WHERE id = ?;
+
+dismissPendingReviewSuggestionsForSuggestion:
+UPDATE review_suggestion SET status = 'dismissed' WHERE suggestion_id = ? AND status = 'pending';

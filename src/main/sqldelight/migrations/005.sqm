@@ -1,0 +1,54 @@
+-- Add review session tables for interactive AI chat
+
+CREATE TABLE review_session (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+    llm_provider TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    last_activity_at INTEGER NOT NULL,
+    context_config TEXT
+);
+
+CREATE INDEX idx_review_session_session ON review_session(session_id);
+
+CREATE TABLE review_message (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_session_id INTEGER NOT NULL REFERENCES review_session(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    action_calls TEXT,
+    action_call_id TEXT,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_review_message_session ON review_message(review_session_id);
+CREATE INDEX idx_review_message_created ON review_message(review_session_id, created_at);
+
+CREATE TABLE review_memory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_session_id INTEGER NOT NULL REFERENCES review_session(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_review_memory_key ON review_memory(review_session_id, key);
+
+CREATE TABLE review_suggestion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_session_id INTEGER NOT NULL REFERENCES review_session(id) ON DELETE CASCADE,
+    message_id INTEGER NOT NULL REFERENCES review_message(id) ON DELETE CASCADE,
+    suggestion_id INTEGER NOT NULL REFERENCES suggestion(id) ON DELETE CASCADE,
+    proposed_reasoning TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    applied_at INTEGER
+);
+
+CREATE INDEX idx_review_suggestion_session ON review_suggestion(review_session_id);
+CREATE INDEX idx_review_suggestion_suggestion ON review_suggestion(suggestion_id);
+CREATE INDEX idx_review_suggestion_status ON review_suggestion(status);
+
+-- Add review_suggestion_id column to field_value
+ALTER TABLE field_value ADD COLUMN review_suggestion_id INTEGER REFERENCES review_suggestion(id) ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX idx_field_review_suggestion ON field_value(review_suggestion_id, context, field_name) WHERE review_suggestion_id IS NOT NULL;

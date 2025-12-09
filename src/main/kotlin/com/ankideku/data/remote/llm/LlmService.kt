@@ -23,4 +23,11 @@ interface LlmService {
      * Check if the LLM provider is available and configured.
      */
     suspend fun getHealth(): LlmHealthStatus
+
+    /**
+     * Start a new conversation with the LLM.
+     * @param systemPrompt System prompt defining behavior and available actions
+     * @return A handle for sending messages to the conversation
+     */
+    suspend fun startConversation(systemPrompt: String): ConversationHandle
 }

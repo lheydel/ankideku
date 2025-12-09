@@ -5,6 +5,7 @@ import com.ankideku.data.remote.llm.LlmJsonFields.NOTE_ID
 import com.ankideku.data.remote.llm.LlmJsonFields.REASONING
 import com.ankideku.data.remote.llm.LlmJsonFields.SUGGESTIONS
 import kotlinx.coroutines.delay
+import java.util.UUID
 import kotlin.random.Random
 
 /**
@@ -16,6 +17,12 @@ class MockLlmService(
     private val suggestionRate: Double = 0.5,
     maxRetries: Int = 0,
 ) : BaseLlmService(maxRetries = maxRetries) {
+
+    override suspend fun startConversation(systemPrompt: String): ConversationHandle {
+        return MockConversationHandle(
+            responseDelayMs = responseDelayMs,
+        )
+    }
 
     override suspend fun getHealth(): LlmHealthStatus {
         return LlmHealthStatus(
@@ -90,5 +97,43 @@ class MockLlmService(
     private fun generateRandomValue(fieldName: String): String {
         val randomId = Random.nextLong().toString(36).take(8)
         return "Mock $fieldName - $randomId"
+    }
+}
+
+/**
+ * Mock conversation handle for testing.
+ */
+private class MockConversationHandle(
+    private val responseDelayMs: Long,
+) : ConversationHandle {
+
+    override val id: String = UUID.randomUUID().toString()
+
+    private var closed = false
+    private var messageCount = 0
+
+    override suspend fun sendMessage(content: String): ConversationResponse {
+        if (closed) {
+            throw IllegalStateException("Conversation is closed")
+        }
+
+        delay(responseDelayMs)
+        messageCount++
+
+        // Generate a simple mock response
+        val response = "Mock response #$messageCount to: ${content.take(50)}..."
+
+        return ConversationResponse(
+            content = response,
+            actionCalls = emptyList(),
+            usage = TokenUsage(
+                inputTokens = content.length / 4,
+                outputTokens = response.length / 4,
+            )
+        )
+    }
+
+    override suspend fun close() {
+        closed = true
     }
 }

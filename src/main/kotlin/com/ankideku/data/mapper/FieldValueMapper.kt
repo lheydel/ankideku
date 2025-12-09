@@ -15,7 +15,9 @@ enum class FieldContext(val dbValue: String) {
     // History contexts
     HIST_AI_CHANGES("ai_changes"),
     HIST_APPLIED("applied"),
-    HIST_EDITED("user_edits");
+    HIST_EDITED("user_edits"),
+    // Review suggestion contexts
+    REVIEW_SUGG_CHANGES("review_changes");
 
     companion object {
         private val byDbValue = entries.associateBy { it.dbValue }
@@ -29,6 +31,7 @@ sealed class FieldOwner {
     data class Note(val id: Long) : FieldOwner()
     data class Suggestion(val id: Long) : FieldOwner()
     data class History(val id: Long) : FieldOwner()
+    data class ReviewSuggestion(val id: Long) : FieldOwner()
 }
 
 // Insert helper
@@ -39,13 +42,21 @@ fun FieldValueQueries.insertField(
     fieldValue: String,
     fieldOrder: Long,
 ) {
-    val (noteId, suggestionId, historyId) = when (owner) {
-        is FieldOwner.Note -> Triple(owner.id, null, null)
-        is FieldOwner.Suggestion -> Triple(null, owner.id, null)
-        is FieldOwner.History -> Triple(null, null, owner.id)
+    val (noteId, suggestionId, historyId, reviewSuggestionId) = when (owner) {
+        is FieldOwner.Note -> FieldOwnerId(noteId = owner.id)
+        is FieldOwner.Suggestion -> FieldOwnerId(suggestionId = owner.id)
+        is FieldOwner.History -> FieldOwnerId(historyId = owner.id)
+        is FieldOwner.ReviewSuggestion -> FieldOwnerId(reviewSuggestionId = owner.id)
     }
-    insertField(noteId, suggestionId, historyId, context.dbValue, fieldName, fieldValue, fieldOrder)
+    insertField(noteId, suggestionId, historyId, reviewSuggestionId, context.dbValue, fieldName, fieldValue, fieldOrder)
 }
+
+private data class FieldOwnerId(
+    val noteId: Long? = null,
+    val suggestionId: Long? = null,
+    val historyId: Long? = null,
+    val reviewSuggestionId: Long? = null,
+)
 
 // Batch insert helpers
 fun FieldValueQueries.insertNoteFields(

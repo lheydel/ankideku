@@ -165,7 +165,7 @@ class SqlSelService(
 
         val contextClause = contextFilter?.let { " AND context = ?" } ?: ""
         val sql = """
-            SELECT id, note_id, suggestion_id, history_id, context, field_name, field_value, field_order
+            SELECT id, note_id, suggestion_id, history_id, review_suggestion_id, context, field_name, field_value, field_order
             FROM field_value
             WHERE $fkColumn IN (${ids.placeholders()})$contextClause
         """.trimIndent()
@@ -178,10 +178,11 @@ class SqlSelService(
                 note_id = c.getLong(1),
                 suggestion_id = c.getLong(2),
                 history_id = c.getLong(3),
-                context = c.getString(4)!!,
-                field_name = c.getString(5)!!,
-                field_value = c.getString(6)!!,
-                field_order = c.getLong(7)!!,
+                review_suggestion_id = c.getLong(4),
+                context = c.getString(5)!!,
+                field_name = c.getString(6)!!,
+                field_value = c.getString(7)!!,
+                field_order = c.getLong(8)!!,
             )
         }.groupBy { it.note_id ?: it.suggestion_id ?: it.history_id!! }
     }

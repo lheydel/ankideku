@@ -9,3 +9,6 @@ typealias DeckId = Long
 typealias SessionId = Long
 typealias SuggestionId = Long
 typealias HistoryEntryId = Long
+typealias ReviewSessionId = Long
+typealias ReviewMessageId = Long
+typealias ReviewSuggestionId = Long
