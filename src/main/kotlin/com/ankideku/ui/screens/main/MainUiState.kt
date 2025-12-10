@@ -1,7 +1,19 @@
 package com.ankideku.ui.screens.main
 
 import com.ankideku.data.remote.llm.LlmHealthStatus
-import com.ankideku.domain.model.*
+import com.ankideku.domain.model.ActionCall
+import com.ankideku.domain.model.Deck
+import com.ankideku.domain.model.HistoryEntry
+import com.ankideku.domain.model.Note
+import com.ankideku.domain.model.NoteField
+import com.ankideku.domain.model.NoteTypeConfig
+import com.ankideku.domain.model.ReviewMessage
+import com.ankideku.domain.model.ReviewMessageRole
+import com.ankideku.domain.model.ReviewSuggestion
+import com.ankideku.domain.model.Session
+import com.ankideku.domain.model.SessionState
+import com.ankideku.domain.model.Settings
+import com.ankideku.domain.model.Suggestion
 import com.ankideku.domain.sel.ast.SelQuery
 import com.ankideku.domain.usecase.suggestion.ConflictInfo
 
@@ -54,6 +66,7 @@ data class MainUiState(
 
     // Sidebar / Chat
     val chatMessages: List<ChatMessage> = emptyList(),
+    val reviewSessionState: ReviewSessionState = ReviewSessionState(),
 
     // Settings
     val settings: Settings = Settings(),
@@ -170,4 +183,71 @@ enum class BatchAction { Accept, Reject }
 data class BatchProgress(
     val current: Int,
     val total: Int,
+)
+
+// --- Review Session State ---
+
+data class ReviewSessionState(
+    val isActive: Boolean = false,
+    val messages: List<ReviewChatMessage> = emptyList(),
+    val pendingSuggestions: List<ReviewSuggestionUi> = emptyList(),
+    val memory: Map<String, String> = emptyMap(),
+    val isLoading: Boolean = false,
+    val error: String? = null,
+)
+
+data class ReviewChatMessage(
+    val id: Long,
+    val role: ReviewChatRole,
+    val content: String,
+    val actionCalls: List<ReviewActionCallUi>? = null,
+    val timestamp: Long,
+)
+
+enum class ReviewChatRole {
+    User,
+    Assistant,
+    ActionResult,
+}
+
+data class ReviewActionCallUi(
+    val id: String,
+    val action: String,
+    val params: Map<String, String>,
+)
+
+data class ReviewSuggestionUi(
+    val id: Long,
+    val suggestionId: Long,
+    val proposedChanges: Map<String, String>,
+    val proposedReasoning: String?,
+)
+
+// --- Mappers ---
+
+fun ReviewMessage.toUi(): ReviewChatMessage = ReviewChatMessage(
+    id = id,
+    role = role.toUi(),
+    content = content,
+    actionCalls = actionCalls?.map { it.toUi() },
+    timestamp = createdAt,
+)
+
+fun ReviewMessageRole.toUi(): ReviewChatRole = when (this) {
+    ReviewMessageRole.User -> ReviewChatRole.User
+    ReviewMessageRole.Assistant -> ReviewChatRole.Assistant
+    ReviewMessageRole.ActionResult -> ReviewChatRole.ActionResult
+}
+
+fun ActionCall.toUi(): ReviewActionCallUi = ReviewActionCallUi(
+    id = id,
+    action = action,
+    params = params,
+)
+
+fun ReviewSuggestion.toUi(): ReviewSuggestionUi = ReviewSuggestionUi(
+    id = id,
+    suggestionId = suggestionId,
+    proposedChanges = proposedChanges,
+    proposedReasoning = proposedReasoning,
 )

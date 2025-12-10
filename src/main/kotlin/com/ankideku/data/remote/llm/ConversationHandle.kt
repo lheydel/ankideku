@@ -19,6 +19,12 @@ interface ConversationHandle {
     suspend fun sendMessage(content: String): ConversationResponse
 
     /**
+     * Reset the conversation context while keeping the connection alive.
+     * The system prompt is preserved, but message history is cleared.
+     */
+    suspend fun reset()
+
+    /**
      * Close the conversation and release resources.
      * After calling this, the handle should not be used.
      */

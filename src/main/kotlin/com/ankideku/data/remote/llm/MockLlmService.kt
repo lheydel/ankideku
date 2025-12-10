@@ -133,6 +133,13 @@ private class MockConversationHandle(
         )
     }
 
+    override suspend fun reset() {
+        if (closed) {
+            throw IllegalStateException("Conversation is closed")
+        }
+        messageCount = 0
+    }
+
     override suspend fun close() {
         closed = true
     }

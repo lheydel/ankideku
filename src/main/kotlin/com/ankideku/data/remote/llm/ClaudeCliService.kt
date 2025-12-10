@@ -308,6 +308,26 @@ internal class ClaudeConversationHandle(
         overallTimeout ?: throw Exception("Claude conversation timed out after ${timeoutMs}ms")
     }
 
+    override suspend fun reset() {
+        onIO {
+            if (closed) {
+                throw IllegalStateException("Conversation is closed")
+            }
+
+            if (!process.isAlive) {
+                throw IllegalStateException("Claude process has terminated")
+            }
+
+            // Send /clear to reset conversation context
+            stdin.write("/clear")
+            stdin.newLine()
+            stdin.flush()
+        }
+
+        // Read and discard any response from /clear
+        readResponse()
+    }
+
     override suspend fun close() = onIO {
         if (closed) return@onIO
         closed = true
