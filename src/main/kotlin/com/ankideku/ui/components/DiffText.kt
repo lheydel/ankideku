@@ -18,6 +18,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import com.ankideku.ui.theme.Spacing
+import com.ankideku.util.htmlToPlainText
 import org.bitbucket.cowwoc.diffmatchpatch.DiffMatchPatch
 import org.bitbucket.cowwoc.diffmatchpatch.DiffMatchPatch.Operation
 
@@ -260,7 +261,8 @@ fun DiffHighlightedText(
     val colors = com.ankideku.ui.theme.LocalAppColors.current
     val diffs = remember(original, modified) {
         val dmp = DiffMatchPatch()
-        val diffs = dmp.diffMain(original, modified)
+        // Convert HTML to plain text before diffing for accurate display
+        val diffs = dmp.diffMain(original.htmlToPlainText(), modified.htmlToPlainText())
         dmp.diffCleanupSemantic(diffs)
         diffs
     }

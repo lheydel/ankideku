@@ -10,6 +10,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.ankideku.domain.model.FontOption
 import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.ui.theme.AppFonts
+import com.ankideku.util.htmlToPlainText
 
 /**
  * Text composable that applies font configuration based on the field and note type.
@@ -44,7 +45,7 @@ fun ConfiguredText(
     }
 
     Text(
-        text = text,
+        text = text.htmlToPlainText(),
         modifier = modifier,
         style = effectiveStyle,
         color = color,
