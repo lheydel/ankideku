@@ -19,6 +19,12 @@ interface DeckRepository {
     fun saveNotes(notes: List<Note>)
     fun updateNoteFields(noteId: NoteId, fields: Map<String, String>)
 
+    /** Get cached note IDs for a deck (including sub-decks) */
+    fun getNoteIdsForDeck(deckName: String): Set<NoteId>
+
+    /** Delete notes that are no longer in Anki */
+    fun deleteStaleNotes(deckName: String, currentAnkiNoteIds: Set<NoteId>): Int
+
     /** Get the actual note count and token estimate from cached notes for a deck (including sub-decks) */
     fun getDeckStats(deckName: String): DeckStats
 

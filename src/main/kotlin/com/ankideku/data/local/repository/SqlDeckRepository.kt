@@ -99,6 +99,22 @@ class SqlDeckRepository(
         }
     }
 
+    override fun getNoteIdsForDeck(deckName: String): Set<NoteId> {
+        return database.deckCacheQueries
+            .getNoteIdsForDeck(deckName, deckName)
+            .executeAsList()
+            .toSet()
+    }
+
+    override fun deleteStaleNotes(deckName: String, currentAnkiNoteIds: Set<NoteId>): Int {
+        val cachedNoteIds = getNoteIdsForDeck(deckName)
+        val staleNoteIds = cachedNoteIds - currentAnkiNoteIds
+        if (staleNoteIds.isNotEmpty()) {
+            database.deckCacheQueries.deleteNotesByIds(staleNoteIds)
+        }
+        return staleNoteIds.size
+    }
+
     override fun getDeckStats(deckName: String): DeckStats {
         val noteCount = database.deckCacheQueries
             .countNotesForDeckByName(deckName, deckName)

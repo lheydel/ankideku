@@ -125,3 +125,11 @@ UPDATE cached_note SET deck_name = ?, updated_at = ? WHERE deck_id = ?;
 -- Get model names for a list of note IDs
 getModelNamesForNotes:
 SELECT id, model_name FROM cached_note WHERE id IN ?;
+
+-- Get note IDs for a deck (for stale note detection)
+getNoteIdsForDeck:
+SELECT id FROM cached_note WHERE deck_name = ? OR deck_name LIKE ? || '::%';
+
+-- Delete notes by IDs
+deleteNotesByIds:
+DELETE FROM cached_note WHERE id IN ?;

@@ -78,9 +78,20 @@ class SyncDeckFeature(
 
         emit(SyncProgress.SavingToCache(deckId, allNotes.size))
 
+        // For incremental sync, fetch all current note IDs from Anki to detect deletions
+        val currentAnkiNoteIds: Set<Long>? = if (isIncremental) {
+            val allNoteIds = ankiClient.findNotes("deck:\"$rootDeckName\"")
+            allNoteIds.toSet()
+        } else null
+
         // Save notes first, then save all decks with hierarchy
         val stats = transactionService.runInTransaction {
             deckRepository.saveNotes(allNotes)
+
+            // Remove notes that were deleted in Anki (incremental sync only)
+            if (currentAnkiNoteIds != null) {
+                deckRepository.deleteStaleNotes(rootDeckName, currentAnkiNoteIds)
+            }
 
             // Save all decks with parent relationships
             saveAllDecks(decksToSync, deckNamesAndIds)
