@@ -22,6 +22,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.AppTheme
+import com.ankideku.domain.sel.ast.SelArray
+import com.ankideku.domain.sel.ast.SelNumber
+import com.ankideku.domain.sel.ast.SelOperation
+import com.ankideku.domain.sel.ast.SelString
 import com.ankideku.domain.sel.model.EntityType
 import com.ankideku.domain.usecase.suggestion.BatchConflictStrategy
 import com.ankideku.ui.components.AppDialogs
@@ -99,6 +103,22 @@ fun MainScreen(
                         historySearchQuery = uiState.historySearchQuery,
                         historyViewMode = uiState.historyViewMode,
                         noteTypeConfigs = uiState.noteTypeConfigs,
+                        // Queue search
+                        queueSearchQuery = uiState.queueSearchQuery,
+                        queueSearchScope = uiState.currentSession?.id?.let { sessionId ->
+                            // Build scope: sessionId == X AND status == "pending"
+                            SelOperation("and", SelArray(listOf(
+                                SelOperation("==", SelArray(listOf(
+                                    SelOperation("prop", SelArray(listOf(SelString("sessionId")))),
+                                    SelNumber(sessionId),
+                                ))),
+                                SelOperation("==", SelArray(listOf(
+                                    SelOperation("prop", SelArray(listOf(SelString("status")))),
+                                    SelString("pending"),
+                                ))),
+                            )))
+                        },
+                        onQueueSearchChanged = viewModel::searchQueue,
                         // Batch filter mode
                         isInBatchFilterMode = uiState.isInBatchFilterMode,
                         isBatchProcessing = uiState.isBatchProcessing,

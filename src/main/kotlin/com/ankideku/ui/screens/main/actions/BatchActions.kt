@@ -4,7 +4,12 @@ import com.ankideku.domain.model.Suggestion
 import com.ankideku.domain.model.SuggestionStatus
 import com.ankideku.domain.sel.SelService
 import com.ankideku.domain.sel.SelResult
+import com.ankideku.domain.sel.ast.SelArray
+import com.ankideku.domain.sel.ast.SelNode
+import com.ankideku.domain.sel.ast.SelOperation
 import com.ankideku.domain.sel.ast.SelQuery
+import com.ankideku.domain.sel.ast.SelString
+import com.ankideku.domain.sel.model.EntityType
 import com.ankideku.domain.usecase.suggestion.BatchConflictStrategy
 import com.ankideku.domain.usecase.suggestion.BatchPreCheckResult
 import com.ankideku.domain.usecase.suggestion.BatchReviewFeature
@@ -24,6 +29,7 @@ interface BatchActions {
     fun batchRejectAll()
     fun confirmBatchWithStrategy(action: BatchAction, strategy: BatchConflictStrategy)
     fun cancelBatchDialog()
+    fun searchQueue(query: String, scope: SelNode?)
 }
 
 class BatchActionsImpl(
@@ -74,6 +80,7 @@ class BatchActionsImpl(
             copy(
                 batchFilteredSuggestions = null,
                 batchQuery = null,
+                queueSearchQuery = "",
                 currentSuggestionIndex = 0,
             )
         }
@@ -137,6 +144,65 @@ class BatchActionsImpl(
 
     override fun cancelBatchDialog() {
         ctx.update { copy(dialogState = null) }
+    }
+
+    override fun searchQueue(query: String, scope: SelNode?) {
+        // Update the search query state
+        ctx.update { copy(queueSearchQuery = query) }
+
+        // If query is empty or no scope, show all suggestions
+        if (query.isBlank() || scope == null) {
+            ctx.update {
+                copy(
+                    batchFilteredSuggestions = null,
+                    batchQuery = null,
+                    currentSuggestionIndex = 0,
+                )
+            }
+            return
+        }
+
+        // Build SEL query: AND(scope, contains(field["*", "*"], query))
+        val fieldOp = SelOperation(
+            operator = "field",
+            arguments = SelArray(listOf(SelString("*"), SelString("*")))
+        )
+        val containsOp = SelOperation(
+            operator = "contains",
+            arguments = SelArray(listOf(fieldOp, SelString(query)))
+        )
+        val whereClause = SelOperation(
+            operator = "and",
+            arguments = SelArray(listOf(scope, containsOp))
+        )
+        val selQuery = SelQuery(
+            target = EntityType.Suggestion,
+            where = whereClause,
+        )
+
+        // Execute the query
+        ctx.scope.launch {
+            try {
+                val result = selService.execute(selQuery)
+                if (result is SelResult.Suggestions) {
+                    ctx.update {
+                        copy(
+                            batchFilteredSuggestions = result.items,
+                            batchQuery = selQuery,
+                            currentSuggestionIndex = 0,
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                // Silently ignore search errors - just don't filter
+                ctx.update {
+                    copy(
+                        batchFilteredSuggestions = null,
+                        batchQuery = null,
+                    )
+                }
+            }
+        }
     }
 
     private suspend fun executeBatchAction(

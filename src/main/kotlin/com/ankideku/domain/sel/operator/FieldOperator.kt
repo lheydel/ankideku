@@ -16,6 +16,9 @@ import com.ankideku.domain.sel.ast.SelString
  * Usage:
  * - `{ "field": ["example", "changes"] }` - Access field "example" from "changes" context
  * - `{ "field": ["example", ["edited", "changes", "original"]] }` - Priority fallback
+ * - `{ "field": ["*", "context"] }` - All fields in context (concatenated, for search)
+ * - `{ "field": ["*", "*"] }` - All fields in all contexts (concatenated, for search)
+ * - `{ "field": ["fieldName", "*"] }` - Specific field across all contexts
  *
  * Valid contexts by entity (see FieldValueMapper.kt):
  * - Notes: "fields"
@@ -24,6 +27,7 @@ import com.ankideku.domain.sel.ast.SelString
  */
 object FieldOperator : SelOperator {
     override val key = "field"
+    private const val WILDCARD = "*"
 
     override val metadata = SelOperatorMetadata(
         displayName = "Field",
@@ -46,8 +50,19 @@ object FieldOperator : SelOperator {
 
         return when (contextArg) {
             is SelString -> {
-                // { "field": ["example", "changes"] } - single context
-                buildFieldSubquery(fieldName, contextArg.value, context, jsonPath)
+                val contextSelKey = contextArg.value
+                if (fieldName == WILDCARD || contextSelKey == WILDCARD) {
+                    // Wildcard mode - use GROUP_CONCAT for searching
+                    buildWildcardSubquery(
+                        fieldName = fieldName.takeUnless { it == WILDCARD },
+                        contextSelKey = contextSelKey.takeUnless { it == WILDCARD },
+                        context = context,
+                        jsonPath = jsonPath,
+                    )
+                } else {
+                    // { "field": ["example", "changes"] } - single context
+                    buildFieldSubquery(fieldName, contextSelKey, context, jsonPath)
+                }
             }
             is SelArray -> {
                 // { "field": ["example", ["editedChanges", "changes", "original"]] } - priority
@@ -64,7 +79,18 @@ object FieldOperator : SelOperator {
                         jsonPath
                     )
                 }
-                buildFieldSubqueryWithPriority(fieldName, contexts, context, jsonPath)
+                if (fieldName == WILDCARD) {
+                    // Wildcard field with multiple contexts
+                    buildWildcardSubquery(
+                        fieldName = null,
+                        contextSelKey = null,
+                        contextSelKeys = contexts,
+                        context = context,
+                        jsonPath = jsonPath,
+                    )
+                } else {
+                    buildFieldSubqueryWithPriority(fieldName, contexts, context, jsonPath)
+                }
             }
             else -> throw SelOperatorException(
                 "Field context must be a string or array of strings",
@@ -153,6 +179,76 @@ object FieldOperator : SelOperator {
                 "ORDER BY CASE fv.context $orderByCase END " +
                 "LIMIT 1)",
             listOf(fieldName) + contextSqlValues
+        )
+    }
+
+    /**
+     * Generate a wildcard subquery using GROUP_CONCAT for searching across multiple fields/contexts.
+     *
+     * This allows patterns like:
+     * - `{ "field": ["*", "*"] }` - All fields in all contexts
+     * - `{ "field": ["*", "original"] }` - All fields in a specific context
+     * - `{ "field": ["Front", "*"] }` - Specific field across all contexts
+     * - `{ "field": ["*", ["original", "changes"]] }` - All fields in multiple contexts
+     *
+     * Returns a concatenation of all matching field values, suitable for LIKE/contains searches.
+     */
+    private fun buildWildcardSubquery(
+        fieldName: String?,
+        contextSelKey: String?,
+        contextSelKeys: List<String>? = null,
+        context: SelSqlContext,
+        jsonPath: String,
+    ): SqlFragment {
+        val schema = context.schema
+        val fkColumn = schema.fieldValueFkColumn
+            ?: throw SelOperatorException(
+                "${context.entityType} entity does not support field access",
+                jsonPath
+            )
+
+        val conditions = mutableListOf("fv.$fkColumn = ${context.tableAlias}.id")
+        val params = mutableListOf<Any>()
+
+        // Add field name filter if specified
+        if (fieldName != null) {
+            conditions.add("fv.field_name = ?")
+            params.add(fieldName)
+        }
+
+        // Add context filter(s) if specified
+        when {
+            contextSelKey != null -> {
+                val fieldContext = schema.getFieldContext(contextSelKey)
+                    ?: throw SelOperatorException(
+                        "Field context '$contextSelKey' is not valid for entity ${context.entityType}. " +
+                            "Valid contexts: ${schema.fieldContexts.map { it.selKey }}",
+                        jsonPath
+                    )
+                conditions.add("fv.context = ?")
+                params.add(fieldContext.sqlValue)
+            }
+            contextSelKeys != null -> {
+                val fieldContexts = contextSelKeys.map { selKey ->
+                    schema.getFieldContext(selKey)
+                        ?: throw SelOperatorException(
+                            "Field context '$selKey' is not valid for entity ${context.entityType}. " +
+                                "Valid contexts: ${schema.fieldContexts.map { it.selKey }}",
+                            jsonPath
+                        )
+                }
+                val placeholders = fieldContexts.joinToString(", ") { "?" }
+                conditions.add("fv.context IN ($placeholders)")
+                params.addAll(fieldContexts.map { it.sqlValue })
+            }
+            // If neither specified (both "*"), no context filter - search all contexts
+        }
+
+        val whereClause = conditions.joinToString(" AND ")
+
+        return SqlFragment(
+            "(SELECT GROUP_CONCAT(fv.field_value, ' ') FROM field_value fv WHERE $whereClause)",
+            params
         )
     }
 }

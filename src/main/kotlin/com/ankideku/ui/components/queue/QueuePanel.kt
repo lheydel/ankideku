@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import com.ankideku.domain.model.*
+import com.ankideku.domain.sel.ast.SelNode
 import com.ankideku.ui.screens.main.BatchProgress
 import com.ankideku.ui.screens.main.HistoryViewMode
 import com.ankideku.ui.screens.main.QueueTab
@@ -22,6 +23,10 @@ fun QueuePanel(
     historySearchQuery: String,
     historyViewMode: HistoryViewMode,
     noteTypeConfigs: Map<String, NoteTypeConfig>,
+    // Queue search
+    queueSearchQuery: String = "",
+    queueSearchScope: SelNode? = null,
+    onQueueSearchChanged: ((String, SelNode?) -> Unit)? = null,
     // Batch filter mode
     isInBatchFilterMode: Boolean = false,
     isBatchProcessing: Boolean = false,
@@ -99,6 +104,9 @@ fun QueuePanel(
                     currentIndex = currentSuggestionIndex,
                     noteTypeConfigs = noteTypeConfigs,
                     onSuggestionClick = onSuggestionClick,
+                    searchQuery = queueSearchQuery,
+                    searchScope = queueSearchScope,
+                    onSearchQueryChanged = onQueueSearchChanged,
                     isInBatchFilterMode = isInBatchFilterMode,
                     isBatchProcessing = isBatchProcessing,
                     batchProgress = batchProgress,

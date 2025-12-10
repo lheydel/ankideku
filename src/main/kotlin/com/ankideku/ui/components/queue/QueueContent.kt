@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.domain.model.Session
 import com.ankideku.domain.model.Suggestion
+import com.ankideku.domain.sel.ast.SelNode
+import com.ankideku.ui.components.SearchBar
 import com.ankideku.ui.components.batch.BatchActionBar
 import com.ankideku.ui.screens.main.BatchProgress
 import com.ankideku.ui.theme.LocalAppColors
@@ -27,6 +29,10 @@ fun QueueContent(
     currentIndex: Int,
     noteTypeConfigs: Map<String, NoteTypeConfig>,
     onSuggestionClick: (Int) -> Unit,
+    // Search
+    searchQuery: String = "",
+    searchScope: SelNode? = null,
+    onSearchQueryChanged: ((String, SelNode?) -> Unit)? = null,
     // Batch mode
     isInBatchFilterMode: Boolean = false,
     isBatchProcessing: Boolean = false,
@@ -42,19 +48,24 @@ fun QueueContent(
     val pendingCount = suggestions.size
     val doneCount = (progress?.suggestionsCount ?: 0) - pendingCount
 
+    // Distinguish between search-based filtering and SEL builder filtering
+    val isSearchFiltering = searchQuery.isNotBlank()
+    val isSelBuilderFiltering = isInBatchFilterMode && !isSearchFiltering
+
     Column(modifier = Modifier.fillMaxSize()) {
-        // Header row with filter button
-        if ((progress?.suggestionsCount ?: 0) > 0 || isInBatchFilterMode) {
+        // Header row with search bar and buttons
+        if ((progress?.suggestionsCount ?: 0) > 0 || isInBatchFilterMode || onSearchQueryChanged != null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (isInBatchFilterMode) {
-                    // Filter active indicator with match count and clear button
+                if (isSelBuilderFiltering) {
+                    // Filter active indicator with match count and clear button (SEL builder only)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        modifier = Modifier.weight(1f),
                     ) {
                         Icon(
                             imageVector = Icons.Default.FilterList,
@@ -91,13 +102,23 @@ fun QueueContent(
                             )
                         }
                     }
+                } else if (onSearchQueryChanged != null) {
+                    // Search bar takes remaining space (stays visible even when filtering)
+                    SearchBar(
+                        value = searchQuery,
+                        onSearch = onSearchQueryChanged,
+                        scope = searchScope,
+                        placeholder = "Search in fields...",
+                        modifier = Modifier.weight(1f),
+                    )
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
 
-                Row {
+                // Buttons (only when not in SEL builder filter mode)
+                if (!isSelBuilderFiltering) {
                     // Refresh baselines button
-                    if (onRefreshBaselines != null && !isInBatchFilterMode) {
+                    if (onRefreshBaselines != null) {
                         IconButton(
                             onClick = onRefreshBaselines,
                             modifier = Modifier.size(32.dp).handPointer(),
@@ -112,7 +133,7 @@ fun QueueContent(
                     }
 
                     // Filter button
-                    if (onOpenBatchFilter != null && !isInBatchFilterMode) {
+                    if (onOpenBatchFilter != null) {
                         IconButton(
                             onClick = onOpenBatchFilter,
                             modifier = Modifier.size(32.dp).handPointer(),
@@ -139,7 +160,11 @@ fun QueueContent(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = if (isInBatchFilterMode) "No suggestions match filter" else "No cards in queue",
+                    text = when {
+                        searchQuery.isNotBlank() -> "No suggestions match search"
+                        isInBatchFilterMode -> "No suggestions match filter"
+                        else -> "No cards in queue"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.textMuted,
                 )
@@ -161,8 +186,8 @@ fun QueueContent(
             }
         }
 
-        // Batch action bar (when in filter mode)
-        if (isInBatchFilterMode && onBatchAcceptAll != null && onBatchRejectAll != null) {
+        // Batch action bar (only for SEL builder filter mode, not search)
+        if (isSelBuilderFiltering && onBatchAcceptAll != null && onBatchRejectAll != null) {
             Spacer(Modifier.height(Spacing.sm))
             BatchActionBar(
                 matchCount = suggestions.size,
@@ -171,7 +196,7 @@ fun QueueContent(
                 onAcceptAll = onBatchAcceptAll,
                 batchProgress = batchProgress,
             )
-        } else if (suggestions.isNotEmpty() && !isInBatchFilterMode) {
+        } else if (suggestions.isNotEmpty() && !isSelBuilderFiltering) {
             // Normal progress footer with Done / Left counts
             Spacer(Modifier.height(Spacing.sm))
             HorizontalDivider()
