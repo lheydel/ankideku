@@ -2,16 +2,20 @@ package com.ankideku.data.remote.llm
 
 import com.ankideku.util.TokenEstimator
 import com.ankideku.util.onIO
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * Claude CLI Service
@@ -49,7 +53,7 @@ class ClaudeCliService(
         }
     }
 
-    override suspend fun callLlm(prompt: String): String = onIO {
+    override suspend fun callLlm(prompt: String): String {
         val processId = "${System.currentTimeMillis()}-${(Math.random() * 1000000).toInt()}"
 
         try {
@@ -69,33 +73,53 @@ class ClaudeCliService(
                 writer.write(prompt)
             }
 
-            // Read stdout and stderr concurrently
-            val stdoutDeferred = async {
-                process.inputStream.bufferedReader().use { it.readText() }
-            }
-            val stderrDeferred = async {
-                process.errorStream.bufferedReader().use { it.readText() }
-            }
-
-            // Wait for process with timeout
-            val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-
-            if (!completed) {
-                process.destroyForcibly()
-                throw Exception("Claude CLI timed out after ${timeoutMs}ms")
-            }
-
-            val stdout = stdoutDeferred.await()
-            val stderr = stderrDeferred.await()
+            // Wait for process in a cancellation-aware manner
+            val (stdout, stderr) = awaitProcess(process, processId)
             val exitCode = process.exitValue()
 
             if (exitCode != 0) {
                 throw Exception(stderr.ifBlank { "Claude CLI exited with code $exitCode" })
             }
 
-            stdout
+            return stdout
         } finally {
             activeProcesses.remove(processId)?.destroyForcibly()
+        }
+    }
+
+    /**
+     * Await process completion in a cancellation-aware manner.
+     * If the coroutine is cancelled, the process will be destroyed.
+     */
+    private suspend fun awaitProcess(process: Process, processId: String): Pair<String, String> = suspendCancellableCoroutine { cont ->
+        cont.invokeOnCancellation {
+            process.destroyForcibly()
+            activeProcesses.remove(processId)
+        }
+
+        // Use a background thread to wait for the process
+        val executor = Executors.newSingleThreadExecutor()
+        executor.submit {
+            try {
+                val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+                if (!completed) {
+                    process.destroyForcibly()
+                    cont.resumeWithException(Exception("Claude CLI timed out after ${timeoutMs}ms"))
+                    return@submit
+                }
+
+                val stdout = process.inputStream.bufferedReader().readText()
+                val stderr = process.errorStream.bufferedReader().readText()
+                cont.resume(Pair(stdout, stderr))
+            } catch (e: InterruptedException) {
+                process.destroyForcibly()
+                cont.resumeWithException(CancellationException("Process interrupted"))
+            } catch (e: Exception) {
+                process.destroyForcibly()
+                cont.resumeWithException(e)
+            } finally {
+                executor.shutdown()
+            }
         }
     }
 
