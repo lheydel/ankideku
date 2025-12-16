@@ -15,7 +15,7 @@ import com.ankideku.domain.model.NoteTypeConfig
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.clickableWithPointer
-import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppIconButton
 
 /**
  * Pre-session note list content - shows deck notes before starting a session.
@@ -86,9 +86,9 @@ fun NoteListContent(
 
             // Filter button (when no filter active)
             if (onOpenNoteFilter != null && !hasNoteFilter && notes.isNotEmpty()) {
-                IconButton(
+                AppIconButton(
                     onClick = onOpenNoteFilter,
-                    modifier = Modifier.size(32.dp).handPointer(),
+                    modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.FilterList,

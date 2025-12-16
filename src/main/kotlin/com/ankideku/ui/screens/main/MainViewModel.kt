@@ -9,9 +9,11 @@ import com.ankideku.domain.sel.SelService
 import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.usecase.suggestion.BatchReviewFeature
 import com.ankideku.domain.usecase.suggestion.ReviewSuggestionFeature
+import com.ankideku.domain.usecase.review.ReviewSessionOrchestrator
 import com.ankideku.domain.usecase.session.SessionFinder
 import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
 import com.ankideku.domain.usecase.settings.SettingsManager
+import com.ankideku.domain.repository.ReviewSessionRepository
 import com.ankideku.domain.usecase.suggestion.SuggestionFinder
 import com.ankideku.domain.usecase.deck.SyncDeckFeature
 import com.ankideku.domain.repository.SuggestionRepository
@@ -32,6 +34,8 @@ class MainViewModel(
     sessionOrchestrator: SessionOrchestrator,
     reviewSuggestionFeature: ReviewSuggestionFeature,
     batchReviewFeature: BatchReviewFeature,
+    reviewSessionOrchestrator: ReviewSessionOrchestrator,
+    reviewSessionRepository: ReviewSessionRepository,
     selService: SelService,
     suggestionRepository: SuggestionRepository,
     deckRepository: DeckRepository,
@@ -49,7 +53,8 @@ class MainViewModel(
     HistoryActions by HistoryActionsImpl(ctx, historyFinder),
     SettingsActions by SettingsActionsImpl(ctx, settingsManager),
     UIActions by UIActionsImpl(ctx, connectionMonitor),
-    NoteBrowseActions by NoteBrowseActionsImpl(ctx, deckRepository, selService)
+    NoteBrowseActions by NoteBrowseActionsImpl(ctx, deckRepository, selService),
+    ReviewChatActions by ReviewChatActionsImpl(ctx, reviewSessionOrchestrator, reviewSessionRepository)
 {
     val uiState: StateFlow<MainUiState> = ctx.uiState
 

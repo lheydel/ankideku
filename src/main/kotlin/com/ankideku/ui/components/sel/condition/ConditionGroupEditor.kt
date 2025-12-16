@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.ankideku.domain.sel.model.EntityType
 import com.ankideku.domain.sel.operator.SelOperatorRegistry
 import com.ankideku.domain.sel.operator.SelType
+import com.ankideku.ui.components.AppIconButton
 import com.ankideku.ui.components.sel.operand.AddButton
 import com.ankideku.ui.components.sel.operand.OperandChip
 import com.ankideku.ui.components.sel.operand.OperandEditor
@@ -162,7 +163,7 @@ private fun NestedGroupEditor(
                 color = colors.textMuted,
             )
 
-            IconButton(
+            AppIconButton(
                 onClick = onRemove,
                 modifier = Modifier.size(20.dp),
             ) {
@@ -258,7 +259,7 @@ private fun ConditionHeader(
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
         // Collapse toggle
-        IconButton(
+        AppIconButton(
             onClick = onExpandToggle,
             modifier = Modifier.size(24.dp),
         ) {
@@ -295,7 +296,7 @@ private fun ConditionHeader(
 
         // Remove button
         if (onRemove != null) {
-            IconButton(
+            AppIconButton(
                 onClick = onRemove,
                 modifier = Modifier.size(24.dp),
             ) {

@@ -127,12 +127,51 @@ New users don't run migrations - they get the schema directly from .sq files. Ex
 - Use mappers for clean domain <-> data layer conversion
 - Handle errors with sealed classes or Result types
 - **NEVER use `Palette` directly in components** - Always use `LocalAppColors.current` for colors to ensure proper light/dark theme support
+- **Reusability is a must** - Always reuse existing components, especially generic ones like `AppButton`, `DialogContent`, `AppDialog`. Check `ui/components/` before creating new UI elements. Never duplicate button styles, dialog layouts, or common patterns.
 
 **Key Files:**
 - `MainViewModel.kt` - Central state management with action delegation
 - `MainUiState.kt` - Immutable UI state data class
 - `AppModule.kt` - All DI bindings in one place
 - `SyncDeckFeature.kt` - Deck sync workflow with progress emission
+
+## UI Component Organization
+
+**Directory Structure for Large Components:**
+When a UI component grows beyond ~300-400 LOC, split it into a subdirectory:
+```
+ui/components/
+├── ComponentName/
+│   ├── ComponentName.kt    # Main composable (routing/orchestration only)
+│   ├── SubComponent1.kt    # Extracted sub-component
+│   ├── SubComponent2.kt    # Extracted sub-component
+│   └── Helpers.kt          # Shared utilities, styles, builders
+```
+
+**Current Component Directories:**
+- `queue/` - QueuePanel and related components (tabs, cards, content)
+- `sidebar/` - SidebarPanel, header, deck selector, chat areas
+- `comparison/` - ComparisonPanel, cards, styles, copy builders
+- `batch/` - Batch conflict dialog
+
+**Reusable Patterns:**
+- `DialogContent.kt` - Standard dialog layout (title, message, content slot, buttons)
+- `ActionHelpers.kt` - Loading state wrappers (`withActionLoading`, `withBatchProcessing`), `resetEditState`
+- `SyncProgressMapper.kt` - Extension function `SyncProgress.toUi()` for progress display
+
+**When Refactoring UI:**
+1. Split files >400 LOC into focused components
+2. Extract duplicated patterns into shared helpers/composables
+3. Use extension functions for domain → UI mappings
+4. Keep main component as thin routing/orchestration layer
+5. Verify build with `./gradlew compileKotlin` after each change
+
+**File Structure Matters:**
+- Never dump many files in a single folder - organize into logical subdirectories
+- Related components belong together (e.g., `queue/QueuePanel.kt`, `queue/QueueCard.kt`)
+- Generic reusable components stay in `ui/components/` root (e.g., `AppButton.kt`, `DialogContent.kt`)
+- Feature-specific components go in subdirectories (e.g., `sidebar/`, `comparison/`, `queue/`)
+- When a folder grows beyond 8-10 files, consider further organization
 
 ## Important Reminders
 
@@ -143,3 +182,4 @@ New users don't run migrations - they get the schema directly from .sq files. Ex
 5. **NEVER run the app yourself** - Always ask the user to run `./gradlew run` to test changes
 6. **"Memorize"** - When the user asks to "memorize" something, it means update this CLAUDE.md file with the information
 7. **No automatic backward compatibility** - Always ask the user before adding backward compatibility code (aliases, shims, re-exports, etc.). Many cases in this project don't need it.
+8. **Code quality over speed** - Always prioritize maintainability and clean code. If implementing a feature properly requires refactoring existing code, do it. If the refactoring is consequent (multi-file, architectural changes), ask the user for confirmation before proceeding.

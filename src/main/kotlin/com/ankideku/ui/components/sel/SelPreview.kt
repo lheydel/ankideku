@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.sel.evaluator.SelSqlEvaluator
+import com.ankideku.ui.components.AppIconButton
 import com.ankideku.ui.components.sel.state.SelBuilderState
 import com.ankideku.ui.theme.*
 import java.awt.Toolkit
@@ -79,7 +80,7 @@ fun SelPreview(
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.textMuted,
                 )
-                IconButton(
+                AppIconButton(
                     onClick = {
                         Toolkit.getDefaultToolkit().systemClipboard
                             .setContents(StringSelection(json), null)

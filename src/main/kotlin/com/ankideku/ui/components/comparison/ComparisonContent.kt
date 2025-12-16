@@ -22,7 +22,7 @@ import com.ankideku.ui.components.IconLabel
 import com.ankideku.ui.components.ReasoningCard
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
-import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppIconButton
 
 @Composable
 fun ColumnScope.ComparisonContent(
@@ -141,7 +141,7 @@ fun ComparisonHeaderCard(
                     ) {
                         Icon(Icons.Default.Description, null, Modifier.size(16.dp), tint = colors.secondary)
                         Text(modelName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = colors.textSecondary)
-                        IconButton(onClick = onOpenNoteTypeSettings, modifier = Modifier.size(24.dp).handPointer()) {
+                        AppIconButton(onClick = onOpenNoteTypeSettings, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Default.Settings, "Configure note type", Modifier.size(14.dp), tint = colors.textMuted)
                         }
                     }

@@ -172,9 +172,9 @@ fun SuggestionEditControls(
         }
 
         if (hasManualEdits && !isEditMode) {
-            IconButton(
+            AppIconButton(
                 onClick = { showRevertDialog = true },
-                modifier = Modifier.size(28.dp).handPointer(),
+                modifier = Modifier.size(28.dp),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Undo,

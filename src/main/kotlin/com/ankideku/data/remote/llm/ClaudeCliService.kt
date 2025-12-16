@@ -2,10 +2,9 @@ package com.ankideku.data.remote.llm
 
 import com.ankideku.util.TokenEstimator
 import com.ankideku.util.onIO
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.serialization.json.*
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.util.UUID
@@ -141,36 +140,41 @@ class ClaudeCliService(
     }
 
     /**
-     * Start a new conversation using Claude CLI in interactive mode.
-     * The Claude process is kept alive for the duration of the conversation.
+     * Start a new conversation using Claude CLI with streaming JSON.
+     * Uses --print mode with stream-json format for pipe-compatible bidirectional streaming.
      */
     override suspend fun startConversation(systemPrompt: String): ConversationHandle = onIO {
-        val conversationId = UUID.randomUUID().toString()
+        val sessionId = UUID.randomUUID().toString()
 
         val processBuilder = ProcessBuilder(
             "claude",
+            "--print",
+            "--verbose",
             "--model", "sonnet",
+            "--output-format", "stream-json",
+            "--input-format", "stream-json",
+            "--session-id", sessionId,
             "--system-prompt", systemPrompt,
         )
         processBuilder.redirectErrorStream(false)
 
         val process = processBuilder.start()
-        activeProcesses[conversationId] = process
+        activeProcesses[sessionId] = process
 
         val handle = ClaudeConversationHandle(
-            id = conversationId,
+            id = sessionId,
             process = process,
             stdin = process.outputStream.bufferedWriter(),
             stdout = process.inputStream.bufferedReader(),
             stderr = process.errorStream.bufferedReader(),
             timeoutMs = conversationTimeoutMs,
             onClose = {
-                activeProcesses.remove(conversationId)
-                activeConversations.remove(conversationId)
+                activeProcesses.remove(sessionId)
+                activeConversations.remove(sessionId)
             }
         )
 
-        activeConversations[conversationId] = handle
+        activeConversations[sessionId] = handle
         handle
     }
 
@@ -211,8 +215,8 @@ class ClaudeCliService(
 }
 
 /**
- * Handle for an interactive conversation with Claude CLI.
- * Manages a persistent process and reads/writes via stdin/stdout.
+ * Handle for a conversation with Claude CLI using stream-json format.
+ * Uses --print mode with bidirectional JSON streaming for pipe compatibility.
  */
 internal class ClaudeConversationHandle(
     override val id: String,
@@ -224,10 +228,50 @@ internal class ClaudeConversationHandle(
     private val onClose: () -> Unit,
 ) : ConversationHandle {
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lineChannel = Channel<String>(Channel.UNLIMITED)
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
     @Volatile
     private var closed = false
 
-    override suspend fun sendMessage(content: String): ConversationResponse = onIO {
+    init {
+        // Background reader for stdout - reads JSON lines
+        scope.launch {
+            try {
+                while (isActive && process.isAlive) {
+                    val line = stdout.readLine() ?: break
+                    if (line.isNotBlank()) {
+                        lineChannel.send(line)
+                    }
+                }
+            } catch (e: Exception) {
+                if (!closed) {
+                    println("[ClaudeConversation] stdout reader error: ${e.message}")
+                }
+            } finally {
+                lineChannel.close()
+            }
+        }
+
+        // Background reader for stderr
+        scope.launch {
+            try {
+                while (isActive && process.isAlive) {
+                    val line = stderr.readLine() ?: break
+                    if (line.isNotBlank()) {
+                        println("[ClaudeConversation] stderr: $line")
+                    }
+                }
+            } catch (e: Exception) {
+                if (!closed) {
+                    println("[ClaudeConversation] stderr reader error: ${e.message}")
+                }
+            }
+        }
+    }
+
+    override suspend fun sendMessage(content: String): ConversationResponse {
         if (closed) {
             throw IllegalStateException("Conversation is closed")
         }
@@ -236,22 +280,38 @@ internal class ClaudeConversationHandle(
             throw IllegalStateException("Claude process has terminated")
         }
 
+        println("[ClaudeConversation] sendMessage: sending ${content.length} chars...")
         val inputTokens = TokenEstimator.estimate(content)
 
-        // Write message to stdin
-        stdin.write(content)
-        stdin.newLine()
-        stdin.flush()
+        // Send message as JSON - format: {"type":"user","message":{"role":"user","content":[{"type":"text","text":"..."}]}}
+        val inputJson = buildJsonObject {
+            put("type", "user")
+            putJsonObject("message") {
+                put("role", "user")
+                putJsonArray("content") {
+                    addJsonObject {
+                        put("type", "text")
+                        put("text", content)
+                    }
+                }
+            }
+        }
+        onIO {
+            stdin.write(inputJson.toString())
+            stdin.newLine()
+            stdin.flush()
+        }
+        println("[ClaudeConversation] sendMessage: sent JSON, waiting for response...")
 
-        // Read response until we get a complete message
-        // Claude CLI outputs a response and then waits for the next input
-        val response = readResponse()
+        // Read streaming response
+        val response = readStreamingResponse()
+        println("[ClaudeConversation] sendMessage: got response of ${response.length} chars")
 
         // Parse for action calls
         val parseResult = ActionParser.parse(response)
         val outputTokens = TokenEstimator.estimate(response)
 
-        ConversationResponse(
+        return ConversationResponse(
             content = parseResult.textContent,
             actionCalls = parseResult.actionCalls,
             usage = TokenUsage(
@@ -262,104 +322,86 @@ internal class ClaudeConversationHandle(
     }
 
     /**
-     * Read response from Claude.
-     * Claude CLI in interactive mode outputs the response and then waits.
-     * We detect end of response by checking for a pause in output.
+     * Read streaming JSON response until we get a system result message.
+     * Format: assistant messages have type="message", role="assistant", content=[{type:"text",text:"..."}]
+     *         final result has role="system" with result field
      */
-    private suspend fun readResponse(): String = onIO {
-        val buffer = StringBuilder()
-        val readTimeoutMs = 100L // Short timeout to check for more data
-        var consecutiveEmptyReads = 0
-        val maxEmptyReads = 20 // ~2 seconds of silence means response complete
+    private suspend fun readStreamingResponse(): String {
+        val contentBuilder = StringBuilder()
 
-        val overallTimeout = withTimeoutOrNull(timeoutMs) {
-            while (coroutineContext.isActive) {
-                // Check if there's data available
-                if (stdout.ready()) {
-                    val char = stdout.read()
-                    if (char == -1) break // EOF
-                    buffer.append(char.toChar())
-                    consecutiveEmptyReads = 0
-                } else {
-                    consecutiveEmptyReads++
-                    if (consecutiveEmptyReads >= maxEmptyReads && buffer.isNotEmpty()) {
-                        // No more data coming, response complete
-                        break
-                    }
-                    delay(readTimeoutMs)
+        println("[ClaudeConversation] readStreamingResponse: starting...")
+
+        withTimeout(timeoutMs) {
+            while (true) {
+                val line = withTimeoutOrNull(100) {
+                    lineChannel.receiveCatching().getOrNull()
                 }
 
-                // Also check stderr for errors
-                if (stderr.ready()) {
-                    val errorBuffer = StringBuilder()
-                    while (stderr.ready()) {
-                        val char = stderr.read()
-                        if (char == -1) break
-                        errorBuffer.append(char.toChar())
+                if (line != null) {
+                    println("[ClaudeConversation] received: $line")
+                    try {
+                        val jsonObj = json.parseToJsonElement(line).jsonObject
+                        val type = jsonObj["type"]?.jsonPrimitive?.contentOrNull
+
+                        when (type) {
+                            // Final result message - contains complete response
+                            "result" -> {
+                                val result = jsonObj["result"]?.jsonPrimitive?.contentOrNull ?: ""
+                                contentBuilder.append(result)
+                                break
+                            }
+                            // Ignore intermediary messages
+                            "system", "assistant", "user" -> { }
+                            else -> {
+                                println("[ClaudeConversation] Unknown message type: $type")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        println("[ClaudeConversation] Failed to parse JSON: $line - ${e.message}")
                     }
-                    if (errorBuffer.isNotEmpty()) {
-                        println("[ClaudeConversation] stderr: $errorBuffer")
+                } else {
+                    // Check if process ended
+                    if (!process.isAlive || lineChannel.isClosedForReceive) {
+                        println("[ClaudeConversation] readStreamingResponse: process/channel closed")
+                        break
                     }
                 }
             }
-            buffer.toString()
         }
 
-        overallTimeout ?: throw Exception("Claude conversation timed out after ${timeoutMs}ms")
+        return contentBuilder.toString()
     }
 
     override suspend fun reset() {
-        onIO {
-            if (closed) {
-                throw IllegalStateException("Conversation is closed")
-            }
-
-            if (!process.isAlive) {
-                throw IllegalStateException("Claude process has terminated")
-            }
-
-            // Send /clear to reset conversation context
-            stdin.write("/clear")
-            stdin.newLine()
-            stdin.flush()
-        }
-
-        // Read and discard any response from /clear
-        readResponse()
+        // For stream-json mode, we can't send /clear
+        // Instead, we'd need to restart the process or use a new session
+        // For now, just log a warning
+        println("[ClaudeConversation] reset() not supported in stream-json mode")
     }
 
-    override suspend fun close() = onIO {
-        if (closed) return@onIO
-        closed = true
-
-        try {
-            // Send exit/quit to gracefully close
-            stdin.write("/exit")
-            stdin.newLine()
-            stdin.flush()
-
-            // Give it a moment to exit
-            process.waitFor(2, TimeUnit.SECONDS)
-        } catch (e: Exception) {
-            // Ignore errors during close
-        } finally {
-            forceClose()
-        }
+    override suspend fun close() {
+        if (closed) return
+        forceClose()
     }
 
     /**
-     * Force close without graceful shutdown.
+     * Force close - fire and forget.
      */
     internal fun forceClose() {
+        if (closed) return
         closed = true
-        try {
-            stdin.close()
-            stdout.close()
-            stderr.close()
-            process.destroyForcibly()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        scope.cancel()
         onClose()
+
+        // Fire and forget cleanup
+        @OptIn(DelicateCoroutinesApi::class)
+        GlobalScope.launch(Dispatchers.IO) {
+            runCatching {
+                process.destroyForcibly()
+                stdin.close()
+                stdout.close()
+                stderr.close()
+            }
+        }
     }
 }

@@ -20,7 +20,7 @@ import com.ankideku.ui.screens.main.BatchProgress
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.clickableWithPointer
-import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppIconButton
 
 @Composable
 fun QueueContent(
@@ -119,9 +119,9 @@ fun QueueContent(
                 if (!isSelBuilderFiltering) {
                     // Refresh baselines button
                     if (onRefreshBaselines != null) {
-                        IconButton(
+                        AppIconButton(
                             onClick = onRefreshBaselines,
-                            modifier = Modifier.size(32.dp).handPointer(),
+                            modifier = Modifier.size(32.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
@@ -134,9 +134,9 @@ fun QueueContent(
 
                     // Filter button
                     if (onOpenBatchFilter != null) {
-                        IconButton(
+                        AppIconButton(
                             onClick = onOpenBatchFilter,
-                            modifier = Modifier.size(32.dp).handPointer(),
+                            modifier = Modifier.size(32.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FilterList,

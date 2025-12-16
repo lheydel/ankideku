@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import com.ankideku.ui.components.sel.SelBuilderWindow
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
-import com.ankideku.ui.theme.handPointer
 
 @Composable
 fun Header(
@@ -84,9 +83,8 @@ fun Header(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Search button (SEL query builder)
-                IconButton(
+                AppIconButton(
                     onClick = { showSelWindow = true },
-                    modifier = Modifier.handPointer(),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -95,9 +93,8 @@ fun Header(
                     )
                 }
 
-                IconButton(
+                AppIconButton(
                     onClick = onSettingsClick,
-                    modifier = Modifier.handPointer(),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
@@ -106,9 +103,8 @@ fun Header(
                     )
                 }
 
-                IconButton(
+                AppIconButton(
                     onClick = onSidebarToggle,
-                    modifier = Modifier.handPointer(),
                 ) {
                     Icon(
                         imageVector = if (isSidebarVisible) Icons.Default.ChatBubble else Icons.Default.ChatBubbleOutline,

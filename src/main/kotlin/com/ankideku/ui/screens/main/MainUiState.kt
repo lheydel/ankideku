@@ -7,6 +7,7 @@ import com.ankideku.domain.model.HistoryEntry
 import com.ankideku.domain.model.Note
 import com.ankideku.domain.model.NoteField
 import com.ankideku.domain.model.NoteTypeConfig
+import com.ankideku.domain.model.ReviewContextConfig
 import com.ankideku.domain.model.ReviewMessage
 import com.ankideku.domain.model.ReviewMessageRole
 import com.ankideku.domain.model.ReviewSuggestion
@@ -192,6 +193,7 @@ data class ReviewSessionState(
     val messages: List<ReviewChatMessage> = emptyList(),
     val pendingSuggestions: List<ReviewSuggestionUi> = emptyList(),
     val memory: Map<String, String> = emptyMap(),
+    val contextConfig: ReviewContextConfig? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
 )

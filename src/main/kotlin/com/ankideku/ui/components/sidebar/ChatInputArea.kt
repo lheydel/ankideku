@@ -2,8 +2,6 @@ package com.ankideku.ui.components.sidebar
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
@@ -12,34 +10,31 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isShiftPressed
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 import com.ankideku.data.remote.llm.LlmProvider
-import com.ankideku.domain.model.Deck
 import com.ankideku.ui.theme.AppColorScheme
 import com.ankideku.ui.theme.Spacing
-import com.ankideku.util.isEnterKey
 
+/**
+ * Generic chat input area with provider indicator and customizable checkbox.
+ */
 @Composable
 fun ChatInputArea(
-    isSyncing: Boolean,
-    canStartSession: Boolean,
-    selectedDeck: Deck?,
-    forceSyncBeforeStart: Boolean,
+    placeholder: String,
+    enabled: Boolean,
     llmProvider: LlmProvider,
     colors: AppColorScheme,
-    onForceSyncChanged: (Boolean) -> Unit,
-    onStartSession: (String) -> Unit,
+    onSubmit: (String) -> Unit,
+    checkbox: @Composable (RowScope.() -> Unit)? = null,
+    bottomHint: String? = null,
+    modifier: Modifier = Modifier,
 ) {
+    val inputState = rememberTextFieldState()
+
     HorizontalDivider(color = colors.border, thickness = 1.dp)
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(colors.surface)
             .padding(Spacing.md),
@@ -50,25 +45,18 @@ fun ChatInputArea(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Checkbox(
-                    checked = forceSyncBeforeStart,
-                    onCheckedChange = onForceSyncChanged,
-                    enabled = !isSyncing,
-                    modifier = Modifier.size(20.dp).pointerHoverIcon(PointerIcon.Hand),
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = colors.accentStrong,
-                    ),
-                )
-                Text(
-                    text = "Sync deck before processing",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isSyncing) colors.textMuted else colors.textSecondary,
-                )
+            if (checkbox != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    checkbox()
+                }
+            } else {
+                Spacer(Modifier.weight(1f))
             }
+
+            // Provider indicator
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -92,57 +80,24 @@ fun ChatInputArea(
 
         Spacer(Modifier.height(12.dp))
 
-        val promptState = rememberTextFieldState()
-
-        fun submitPrompt() {
-            val prompt = promptState.text.toString()
-            if (prompt.isNotBlank() && canStartSession) {
-                onStartSession(prompt)
-                promptState.setTextAndPlaceCursorAtEnd("")
-            }
-        }
-
-        OutlinedTextField(
-            state = promptState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.isEnterKey()) {
-                        if (!event.isShiftPressed) {
-                            submitPrompt()
-                            true
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                },
-            placeholder = {
-                Text(
-                    text = if (isSyncing) "Syncing deck..." else "Describe what you want to improve... (Shift+Enter for new line)",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+        ChatTextField(
+            state = inputState,
+            placeholder = placeholder,
+            enabled = enabled,
+            colors = colors,
+            onSubmit = {
+                val text = inputState.text.toString()
+                if (text.isNotBlank()) {
+                    onSubmit(text)
+                    inputState.setTextAndPlaceCursorAtEnd("")
+                }
             },
-            enabled = !isSyncing,
-            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 3),
-            textStyle = MaterialTheme.typography.bodySmall,
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = colors.surfaceAlt,
-                focusedContainerColor = colors.surfaceAlt,
-                unfocusedBorderColor = colors.border,
-                focusedBorderColor = colors.accent,
-                unfocusedPlaceholderColor = colors.textMuted,
-                focusedPlaceholderColor = colors.textMuted,
-            ),
-            shape = RoundedCornerShape(8.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         )
 
-        if (selectedDeck == null) {
+        if (bottomHint != null) {
             Spacer(Modifier.height(Spacing.sm))
             Text(
-                text = "Select a deck to start",
+                text = bottomHint,
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textMuted,
             )

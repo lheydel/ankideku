@@ -21,7 +21,12 @@ data class ReviewSession(
  */
 @Serializable
 data class ReviewContextConfig(
-    val fieldsToInclude: List<String>? = null,  // null = all fields
+    // Per-context field selection (null = all fields, empty = none)
+    val originalFields: List<String>? = null,
+    val changesFields: List<String>? = null,
+    val editedFields: List<String>? = null,
+    val includeReasoning: Boolean = true,
+    // Conversation settings
     val messageHistoryLimit: Int = 10,
     val customSystemPrompt: String? = null,
 )

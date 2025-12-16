@@ -1,5 +1,6 @@
 package com.ankideku.ui.screens.main.actions
 
+import com.ankideku.domain.model.ReviewContextConfig
 import com.ankideku.domain.model.SuggestionId
 import com.ankideku.domain.repository.ReviewSessionRepository
 import com.ankideku.domain.usecase.review.ApplyResult
@@ -9,6 +10,7 @@ import com.ankideku.domain.usecase.review.ReviewSessionResult
 import com.ankideku.ui.screens.main.ReviewSessionState
 import com.ankideku.ui.screens.main.ToastType
 import com.ankideku.ui.screens.main.toUi
+import com.ankideku.util.onIO
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -19,6 +21,8 @@ interface ReviewChatActions {
     fun applyReviewSuggestion(reviewSuggestionId: Long)
     fun dismissReviewSuggestion(reviewSuggestionId: Long)
     fun resetConversation()
+    fun deleteMemory(key: String)
+    fun updateReviewConfig(config: ReviewContextConfig)
 }
 
 class ReviewChatActionsImpl(
@@ -28,29 +32,42 @@ class ReviewChatActionsImpl(
 ) : ReviewChatActions {
 
     override fun startReviewSession() {
-        val session = ctx.currentState.currentSession ?: return
+        println("[ReviewChatActions] startReviewSession called")
+        val session = ctx.currentState.currentSession
+        if (session == null) {
+            println("[ReviewChatActions] No current session, returning")
+            return
+        }
+        println("[ReviewChatActions] Session: ${session.id}, state: ${session.state}")
 
         ctx.scope.launch {
             updateReviewState { copy(isLoading = true, error = null) }
 
-            when (val result = orchestrator.startReviewSession(session.id)) {
-                is ReviewSessionResult.Started -> {
-                    updateReviewState { copy(isActive = true, isLoading = false) }
-                    observeMessages(result.reviewSessionId)
-                    observeMemory(result.reviewSessionId)
+            try {
+                when (val result = orchestrator.startReviewSession(session.id)) {
+                    is ReviewSessionResult.Started -> {
+                        val config = orchestrator.getContextConfig()
+                        updateReviewState { copy(isActive = true, isLoading = false, contextConfig = config) }
+                        observeMessages(result.reviewSessionId)
+                        observeMemory(result.reviewSessionId)
+                    }
+                    is ReviewSessionResult.Resumed -> {
+                        val config = orchestrator.getContextConfig()
+                        updateReviewState { copy(isActive = true, isLoading = false, contextConfig = config) }
+                        observeMessages(result.reviewSessionId)
+                        observeMemory(result.reviewSessionId)
+                    }
+                    is ReviewSessionResult.Reset -> {
+                        // Shouldn't happen on start
+                    }
+                    is ReviewSessionResult.Error -> {
+                        updateReviewState { copy(isLoading = false, error = result.message) }
+                        ctx.showToast("Failed to start review: ${result.message}", ToastType.Error)
+                    }
                 }
-                is ReviewSessionResult.Resumed -> {
-                    updateReviewState { copy(isActive = true, isLoading = false) }
-                    observeMessages(result.reviewSessionId)
-                    observeMemory(result.reviewSessionId)
-                }
-                is ReviewSessionResult.Reset -> {
-                    // Shouldn't happen on start
-                }
-                is ReviewSessionResult.Error -> {
-                    updateReviewState { copy(isLoading = false, error = result.message) }
-                    ctx.showToast("Failed to start review: ${result.message}", ToastType.Error)
-                }
+            } catch (e: Exception) {
+                updateReviewState { copy(isLoading = false, error = e.message) }
+                ctx.showToast("Failed to start review: ${e.message}", ToastType.Error)
             }
         }
     }
@@ -72,21 +89,26 @@ class ReviewChatActionsImpl(
         ctx.scope.launch {
             updateReviewState { copy(isLoading = true, error = null) }
 
-            when (val result = orchestrator.sendMessage(
-                content = content,
-                currentSuggestionId = currentSuggestionId,
-                includeCurrentSuggestion = includeSuggestionContext,
-            )) {
-                is ReviewMessageResult.Success -> {
-                    updateReviewState { copy(isLoading = false) }
-                    // Messages are updated via flow observation
-                    // Update pending suggestions
-                    refreshPendingSuggestions()
+            try {
+                when (val result = orchestrator.sendMessage(
+                    content = content,
+                    currentSuggestionId = currentSuggestionId,
+                    includeCurrentSuggestion = includeSuggestionContext,
+                )) {
+                    is ReviewMessageResult.Success -> {
+                        updateReviewState { copy(isLoading = false) }
+                        // Messages are updated via flow observation
+                        // Update pending suggestions
+                        refreshPendingSuggestions()
+                    }
+                    is ReviewMessageResult.Error -> {
+                        updateReviewState { copy(isLoading = false, error = result.message) }
+                        ctx.showToast("Message failed: ${result.message}", ToastType.Error)
+                    }
                 }
-                is ReviewMessageResult.Error -> {
-                    updateReviewState { copy(isLoading = false, error = result.message) }
-                    ctx.showToast("Message failed: ${result.message}", ToastType.Error)
-                }
+            } catch (e: Exception) {
+                updateReviewState { copy(isLoading = false, error = e.message) }
+                ctx.showToast("Message failed: ${e.message}", ToastType.Error)
             }
         }
     }
@@ -135,6 +157,24 @@ class ReviewChatActionsImpl(
                     updateReviewState { copy(isLoading = false) }
                 }
             }
+        }
+    }
+
+    override fun deleteMemory(key: String) {
+        ctx.scope.launch {
+            orchestrator.deleteMemory(key)
+            // Refresh memory display
+            val memory = orchestrator.getMemory()
+            updateReviewState { copy(memory = memory) }
+            ctx.showToast("Instruction deleted", ToastType.Info)
+        }
+    }
+
+    override fun updateReviewConfig(config: ReviewContextConfig) {
+        ctx.scope.launch {
+            orchestrator.updateConfig(config)
+            updateReviewState { copy(contextConfig = config) }
+            ctx.showToast("Settings saved", ToastType.Success)
         }
     }
 

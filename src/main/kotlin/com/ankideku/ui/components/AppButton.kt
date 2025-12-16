@@ -1,20 +1,43 @@
 package com.ankideku.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RichTooltip
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.ankideku.ui.theme.LocalAppColors
+import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
+
+/**
+ * Tooltip configuration for buttons.
+ */
+data class ButtonTooltip(
+    val title: String,
+    val description: String,
+    val highlight: String? = null,
+)
 
 /**
  * Button variant styles.
@@ -37,66 +60,129 @@ enum class AppButtonVariant {
  * @param modifier Modifier to apply to the button
  * @param variant The visual style of the button
  * @param enabled Whether the button is enabled
+ * @param isLoading Shows a loading spinner and disables the button
+ * @param loadingText Optional text to show while loading (defaults to content)
  * @param colors Custom button colors (uses defaults based on variant if null)
  * @param contentPadding Padding around the button content
  * @param border Border stroke for outlined variant
+ * @param tooltip Optional tooltip that shows on hover (persistent until clicked away)
  * @param content The button content (text, icon, etc.)
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     variant: AppButtonVariant = AppButtonVariant.Primary,
     enabled: Boolean = true,
+    isLoading: Boolean = false,
+    loadingText: String? = null,
     colors: ButtonColors? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     border: BorderStroke? = null,
+    tooltip: ButtonTooltip? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val buttonModifier = modifier.handPointer(enabled)
+    val appColors = LocalAppColors.current
+    val isEnabled = enabled && !isLoading
 
-    when (variant) {
-        AppButtonVariant.Primary -> {
-            Button(
-                onClick = onClick,
-                modifier = buttonModifier,
-                enabled = enabled,
-                colors = colors ?: ButtonDefaults.buttonColors(),
-                contentPadding = contentPadding,
-                content = content,
+    val buttonContent: @Composable RowScope.() -> Unit = {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
             )
+            if (loadingText != null) {
+                Spacer(Modifier.width(Spacing.sm))
+                Text(loadingText)
+            }
+        } else {
+            content()
         }
-        AppButtonVariant.Outlined -> {
-            OutlinedButton(
-                onClick = onClick,
-                modifier = buttonModifier,
-                enabled = enabled,
-                colors = colors ?: ButtonDefaults.outlinedButtonColors(),
-                contentPadding = contentPadding,
-                border = border ?: ButtonDefaults.outlinedButtonBorder(enabled),
-                content = content,
-            )
+    }
+
+    val button: @Composable () -> Unit = {
+        val buttonModifier = modifier.handPointer(isEnabled)
+
+        when (variant) {
+            AppButtonVariant.Primary -> {
+                Button(
+                    onClick = onClick,
+                    modifier = buttonModifier,
+                    enabled = isEnabled,
+                    colors = colors ?: ButtonDefaults.buttonColors(),
+                    contentPadding = contentPadding,
+                    content = buttonContent,
+                )
+            }
+            AppButtonVariant.Outlined -> {
+                OutlinedButton(
+                    onClick = onClick,
+                    modifier = buttonModifier,
+                    enabled = isEnabled,
+                    colors = colors ?: ButtonDefaults.outlinedButtonColors(),
+                    contentPadding = contentPadding,
+                    border = border ?: ButtonDefaults.outlinedButtonBorder(isEnabled),
+                    content = buttonContent,
+                )
+            }
+            AppButtonVariant.Text -> {
+                TextButton(
+                    onClick = onClick,
+                    modifier = buttonModifier,
+                    enabled = isEnabled,
+                    colors = colors ?: ButtonDefaults.textButtonColors(),
+                    contentPadding = contentPadding,
+                    content = buttonContent,
+                )
+            }
+            AppButtonVariant.Tonal -> {
+                FilledTonalButton(
+                    onClick = onClick,
+                    modifier = buttonModifier,
+                    enabled = isEnabled,
+                    colors = colors ?: ButtonDefaults.filledTonalButtonColors(),
+                    contentPadding = contentPadding,
+                    content = buttonContent,
+                )
+            }
         }
-        AppButtonVariant.Text -> {
-            TextButton(
-                onClick = onClick,
-                modifier = buttonModifier,
-                enabled = enabled,
-                colors = colors ?: ButtonDefaults.textButtonColors(),
-                contentPadding = contentPadding,
-                content = content,
-            )
+    }
+
+    if (tooltip != null) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
+            tooltip = {
+                RichTooltip(
+                    title = { Text(tooltip.title) },
+                    colors = TooltipDefaults.richTooltipColors(
+                        containerColor = appColors.surfaceAlt,
+                        titleContentColor = appColors.textPrimary,
+                        contentColor = appColors.textSecondary,
+                    ),
+                ) {
+                    Column {
+                        Text(
+                            text = tooltip.description,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (tooltip.highlight != null) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = tooltip.highlight,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = appColors.accent,
+                            )
+                        }
+                    }
+                }
+            },
+            state = rememberTooltipState(isPersistent = true),
+        ) {
+            button()
         }
-        AppButtonVariant.Tonal -> {
-            FilledTonalButton(
-                onClick = onClick,
-                modifier = buttonModifier,
-                enabled = enabled,
-                colors = colors ?: ButtonDefaults.filledTonalButtonColors(),
-                contentPadding = contentPadding,
-                content = content,
-            )
-        }
+    } else {
+        button()
     }
 }
 

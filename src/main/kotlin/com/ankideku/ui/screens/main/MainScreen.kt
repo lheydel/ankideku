@@ -211,6 +211,20 @@ fun MainScreen(
                             // Pre-session note filter
                             noteFilterCount = if (uiState.hasNoteFilter) uiState.displayedNotes.size else null,
                             totalNoteCount = uiState.deckNotes.size,
+                            // Review session
+                            reviewSessionState = uiState.reviewSessionState,
+                            reviewContextConfig = uiState.reviewSessionState.contextConfig,
+                            currentSuggestionId = uiState.currentSuggestion?.id,
+                            availableFields = uiState.currentSuggestion?.originalFields?.keys?.toList() ?: emptyList(),
+                            onStartReviewSession = viewModel::startReviewSession,
+                            onEndReviewSession = viewModel::endReviewSession,
+                            onSendReviewMessage = viewModel::sendMessage,
+                            onApplyReviewSuggestion = viewModel::applyReviewSuggestion,
+                            onDismissReviewSuggestion = viewModel::dismissReviewSuggestion,
+                            onResetReviewConversation = viewModel::resetConversation,
+                            onDeleteMemory = viewModel::deleteMemory,
+                            onUpdateReviewConfig = viewModel::updateReviewConfig,
+                            // Callbacks
                             onDeckSelected = viewModel::selectDeck,
                             onRefreshDecks = viewModel::refreshDecks,
                             onSyncDeck = viewModel::syncDeck,

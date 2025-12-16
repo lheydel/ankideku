@@ -72,8 +72,10 @@ class ReviewSessionOrchestrator(
      * Start or resume a review session for a batch session.
      */
     suspend fun startReviewSession(sessionId: SessionId): ReviewSessionResult {
+        println("[ReviewSessionOrchestrator] startReviewSession called for sessionId: $sessionId")
         // Check if review session already exists
         val existing = onIO { reviewSessionRepository.getForSession(sessionId) }
+        println("[ReviewSessionOrchestrator] Existing review session: $existing")
         if (existing != null) {
             return resumeReviewSession(existing)
         }
@@ -109,14 +111,18 @@ class ReviewSessionOrchestrator(
      * Resume an existing review session.
      */
     private suspend fun resumeReviewSession(reviewSession: ReviewSession): ReviewSessionResult {
+        println("[ReviewSessionOrchestrator] resumeReviewSession called for: ${reviewSession.id}")
         val provider = onIO { settingsRepository.getSettings().llmProvider }
+        println("[ReviewSessionOrchestrator] LLM provider: $provider")
 
         // Build system prompt with memory
         val systemPrompt = buildSystemPrompt(reviewSession.id)
 
         // Start new conversation (Claude CLI doesn't persist sessions)
+        println("[ReviewSessionOrchestrator] Starting conversation...")
         val llmService = LlmServiceFactory.getInstance(LlmConfig(provider))
         activeConversation = llmService.startConversation(systemPrompt)
+        println("[ReviewSessionOrchestrator] Conversation started: ${activeConversation?.id}")
         activeReviewSessionId = reviewSession.id
         activeSessionId = reviewSession.sessionId
 
@@ -126,13 +132,17 @@ class ReviewSessionOrchestrator(
         // Get last messages to include as context
         val config = reviewSession.contextConfig ?: ReviewContextConfig()
         val lastMessages = onIO { reviewSessionRepository.getLastMessages(reviewSession.id, config.messageHistoryLimit) }
+        println("[ReviewSessionOrchestrator] Last messages count: ${lastMessages.size}")
 
-        // Send message history to prime the conversation
+        // Replay history to restore conversation context
         if (lastMessages.isNotEmpty()) {
+            println("[ReviewSessionOrchestrator] Replaying history (${lastMessages.size} messages)...")
             val historyPrompt = buildHistoryPrompt(lastMessages)
             activeConversation?.sendMessage(historyPrompt)
+            println("[ReviewSessionOrchestrator] History replay complete")
         }
 
+        println("[ReviewSessionOrchestrator] Returning Resumed result")
         return ReviewSessionResult.Resumed(reviewSession.id, lastMessages.size)
     }
 
@@ -363,6 +373,22 @@ class ReviewSessionOrchestrator(
     }
 
     /**
+     * Delete a memory entry.
+     */
+    suspend fun deleteMemory(key: String) {
+        val reviewSessionId = activeReviewSessionId ?: return
+        onIO { reviewSessionRepository.deleteMemory(reviewSessionId, key) }
+    }
+
+    /**
+     * Get current context config.
+     */
+    suspend fun getContextConfig(): ReviewContextConfig? {
+        val reviewSessionId = activeReviewSessionId ?: return null
+        return onIO { reviewSessionRepository.getById(reviewSessionId)?.contextConfig }
+    }
+
+    /**
      * Get pending review suggestions.
      */
     suspend fun getPendingReviewSuggestions(): List<ReviewSuggestion> {
@@ -442,11 +468,14 @@ class ReviewSessionOrchestrator(
 
             You have access to a Memory tool for storing persistent instructions.
 
-            WHEN TO USE IT:
-            - When the user gives you a rule or preference (e.g., "always check X", "I prefer Y")
-            - When the user corrects you on something that should apply to future reviews
+            WHEN TO USE IT PROACTIVELY:
+            - When the user gives you a rule or preference (e.g., "always do X", "never do Y", "I prefer Z")
+            - When the user corrects your behavior or gives feedback about how you should work
             - When the user describes patterns or conventions to follow
-            - Don't wait for the user to say "remember this" - proactively store important instructions
+            - When the user asks you to "remember" or "memorize" something
+            - IMMEDIATELY after receiving such instructions - don't wait to be reminded
+
+            BE PROACTIVE: If you catch yourself thinking "I should remember this for next time", use the memory tool RIGHT AWAY in that same response.
 
             HOW TO USE IT:
             - Use descriptive keys that indicate the context (e.g., "kanji_rules", "example_quality")
@@ -457,6 +486,7 @@ class ReviewSessionOrchestrator(
             - Memory persists across conversation resets
             - When the conversation gets long and context drifts, the user may reset the chat
             - Your stored instructions will be restored, so you won't lose important context
+            - Using memory in the SAME response ensures nothing is forgotten
         """.trimIndent()
     }
 }

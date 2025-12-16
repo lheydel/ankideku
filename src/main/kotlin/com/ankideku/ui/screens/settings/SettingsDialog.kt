@@ -17,6 +17,7 @@ import com.ankideku.ui.components.AppDialog
 import com.ankideku.ui.theme.LocalAppColors
 import com.ankideku.ui.theme.Spacing
 import com.ankideku.ui.theme.handPointer
+import com.ankideku.ui.components.AppIconButton
 
 enum class SettingsTab(val label: String) {
     GENERAL("General"),
@@ -136,9 +137,8 @@ private fun SettingsHeader(onDismiss: () -> Unit) {
                 color = colors.textSecondary,
             )
         }
-        IconButton(
+        AppIconButton(
             onClick = onDismiss,
-            modifier = Modifier.handPointer(),
         ) {
             Icon(
                 imageVector = Icons.Default.Close,

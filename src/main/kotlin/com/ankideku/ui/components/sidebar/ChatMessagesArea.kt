@@ -12,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.Deck
-import com.ankideku.ui.components.ChatBubble
 import com.ankideku.ui.screens.main.ChatMessage
 import com.ankideku.ui.theme.AppColorScheme
 import com.ankideku.ui.theme.Spacing

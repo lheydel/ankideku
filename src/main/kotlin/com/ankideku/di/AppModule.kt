@@ -6,9 +6,10 @@ import com.ankideku.data.local.database.DatabaseFactory
 import com.ankideku.data.local.database.DatabaseWithDriver
 import com.ankideku.data.local.repository.SqlDeckRepository
 import com.ankideku.data.local.repository.SqlHistoryRepository
+import com.ankideku.data.local.repository.SqlNoteTypeConfigRepository
+import com.ankideku.data.local.repository.SqlReviewSessionRepository
 import com.ankideku.data.local.repository.SqlSelPresetRepository
 import com.ankideku.data.local.repository.SqlSelService
-import com.ankideku.data.local.repository.SqlNoteTypeConfigRepository
 import com.ankideku.data.local.repository.SqlSessionRepository
 import com.ankideku.data.local.repository.SqlSettingsRepository
 import com.ankideku.data.local.repository.SqlSuggestionRepository
@@ -18,8 +19,9 @@ import com.ankideku.data.remote.anki.AnkiConnectionMonitor
 import com.ankideku.domain.repository.DeckRepository
 import com.ankideku.domain.repository.HistoryRepository
 import com.ankideku.domain.repository.NoteTypeConfigRepository
-import com.ankideku.domain.repository.SessionRepository
+import com.ankideku.domain.repository.ReviewSessionRepository
 import com.ankideku.domain.repository.SelPresetRepository
+import com.ankideku.domain.repository.SessionRepository
 import com.ankideku.domain.repository.SettingsRepository
 import com.ankideku.domain.repository.SuggestionRepository
 import com.ankideku.domain.sel.SelService
@@ -31,6 +33,7 @@ import com.ankideku.domain.usecase.suggestion.BatchReviewFeature
 import com.ankideku.domain.usecase.suggestion.ConflictChecker
 import com.ankideku.domain.usecase.suggestion.ReviewSuggestionFeature
 import com.ankideku.domain.usecase.session.SessionFinder
+import com.ankideku.domain.usecase.review.ReviewSessionOrchestrator
 import com.ankideku.domain.usecase.suggestion.SessionOrchestrator
 import com.ankideku.domain.usecase.settings.SettingsManager
 import com.ankideku.domain.usecase.suggestion.SuggestionFinder
@@ -84,6 +87,7 @@ val appModule = module {
     single<SettingsRepository> { SqlSettingsRepository(get()) }
     single<NoteTypeConfigRepository> { SqlNoteTypeConfigRepository(get()) }
     single<SelPresetRepository> { SqlSelPresetRepository(get()) }
+    single<ReviewSessionRepository> { SqlReviewSessionRepository(get()) }
 
     // Services
     single<TransactionService> { SqlTransactionService(get()) }
@@ -100,6 +104,7 @@ val appModule = module {
     // Use cases (complex operations)
     factory { SyncDeckFeature(get(), get(), get()) }
     factory { SessionOrchestrator(get(), get(), get(), get()) }
+    factory { ReviewSessionOrchestrator(get(), get(), get()) }
     single { ConflictChecker(get()) }
     factory { ReviewSuggestionFeature(get(), get(), get(), get(), get(), get(), get()) }
     factory { BatchReviewFeature(get(), get(), get(), get(), get(), get(), get()) }
@@ -111,6 +116,8 @@ val appModule = module {
             sessionOrchestrator = get(),
             reviewSuggestionFeature = get(),
             batchReviewFeature = get(),
+            reviewSessionOrchestrator = get(),
+            reviewSessionRepository = get(),
             selService = get(),
             suggestionRepository = get(),
             deckRepository = get(),

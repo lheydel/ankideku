@@ -12,13 +12,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ankideku.domain.model.Session
 import com.ankideku.ui.components.AppButton
 import com.ankideku.ui.components.AppButtonVariant
+import com.ankideku.ui.components.AppIconButton
 import com.ankideku.ui.components.DeleteSessionButton
 import com.ankideku.ui.theme.AppColorScheme
 import com.ankideku.ui.theme.Spacing
@@ -100,9 +99,9 @@ fun SidebarHeader(
                         modifier = Modifier.size(32.dp),
                     )
                 }
-                IconButton(
+                AppIconButton(
                     onClick = onCloseSidebar,
-                    modifier = Modifier.size(32.dp).pointerHoverIcon(PointerIcon.Hand),
+                    modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,

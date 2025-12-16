@@ -11,8 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -20,6 +18,7 @@ import com.ankideku.domain.model.Deck
 import com.ankideku.domain.model.Session
 import com.ankideku.ui.components.AppButton
 import com.ankideku.ui.components.AppButtonVariant
+import com.ankideku.ui.components.AppIconButton
 import com.ankideku.ui.components.DeckSelector
 import com.ankideku.ui.screens.main.SyncProgressUi
 import com.ankideku.ui.theme.AppColorScheme
@@ -92,11 +91,10 @@ fun DeckSelectorSection(
                 enabled = !isSyncing && !isProcessing && !hasActiveSession,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(
+            AppIconButton(
                 onClick = onSyncDeck,
                 enabled = selectedDeck != null && !isSyncing && isConnected,
                 modifier = Modifier
-                    .pointerHoverIcon(PointerIcon.Hand)
                     .background(color = colors.surface, shape = RoundedCornerShape(8.dp))
                     .border(width = 1.dp, color = colors.border, shape = RoundedCornerShape(8.dp)),
             ) {
@@ -199,7 +197,7 @@ fun NoteFilterRow(
 
         // Clear button (only when filter active)
         if (noteFilterCount != null) {
-            IconButton(
+            AppIconButton(
                 onClick = onClearFilter,
                 modifier = Modifier.size(24.dp),
             ) {
