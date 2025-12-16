@@ -223,7 +223,9 @@ fun MainScreen(
                             onDismissReviewSuggestion = viewModel::dismissReviewSuggestion,
                             onResetReviewConversation = viewModel::resetConversation,
                             onDeleteMemory = viewModel::deleteMemory,
+                            onSaveMemory = viewModel::saveMemory,
                             onUpdateReviewConfig = viewModel::updateReviewConfig,
+                            onLoadSession = viewModel::loadSession,
                             // Callbacks
                             onDeckSelected = viewModel::selectDeck,
                             onRefreshDecks = viewModel::refreshDecks,

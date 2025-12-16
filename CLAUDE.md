@@ -127,7 +127,7 @@ New users don't run migrations - they get the schema directly from .sq files. Ex
 - Use mappers for clean domain <-> data layer conversion
 - Handle errors with sealed classes or Result types
 - **NEVER use `Palette` directly in components** - Always use `LocalAppColors.current` for colors to ensure proper light/dark theme support
-- **Reusability is a must** - Always reuse existing components, especially generic ones like `AppButton`, `DialogContent`, `AppDialog`. Check `ui/components/` before creating new UI elements. Never duplicate button styles, dialog layouts, or common patterns.
+- **Reusability is a must** - Always reuse existing components, especially generic ones like `AppButton`, `DialogContent`, `AppDialog`. Check `ui/components/` before creating new UI elements. Never duplicate button styles, dialog layouts, or other common patterns.
 
 **Key Files:**
 - `MainViewModel.kt` - Central state management with action delegation

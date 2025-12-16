@@ -13,7 +13,7 @@ import com.ankideku.domain.model.ReviewContextConfig
 import com.ankideku.domain.model.Session
 import com.ankideku.domain.model.SessionState
 import com.ankideku.ui.components.ProcessingIndicator
-import com.ankideku.ui.components.dialogs.ReviewSessionConfigDialog
+import com.ankideku.ui.components.sidebar.review.ReviewSessionConfigDialog
 import com.ankideku.ui.components.sidebar.review.ReviewChatArea
 import com.ankideku.ui.screens.main.ChatMessage
 import com.ankideku.ui.screens.main.ReviewSessionState
@@ -50,7 +50,9 @@ fun SidebarPanel(
     onDismissReviewSuggestion: (Long) -> Unit,
     onResetReviewConversation: () -> Unit,
     onDeleteMemory: (String) -> Unit,
+    onSaveMemory: (String, String) -> Unit,
     onUpdateReviewConfig: (ReviewContextConfig) -> Unit,
+    onLoadSession: (Long) -> Unit,
     // Callbacks
     onDeckSelected: (Deck) -> Unit,
     onRefreshDecks: () -> Unit,
@@ -130,21 +132,28 @@ fun SidebarPanel(
             // Chat area - switches between regular chat and review chat
             if (reviewSessionState.isActive) {
                 // Review chat mode
+                val isViewingActiveSession = reviewSessionState.activeSessionId == currentSession?.id
+
                 ReviewChatArea(
                     state = reviewSessionState,
+                    currentViewedSessionId = currentSession?.id,
                     colors = colors,
                     onApplySuggestion = onApplyReviewSuggestion,
                     onDismissSuggestion = onDismissReviewSuggestion,
                     onResetConversation = onResetReviewConversation,
                     onEndSession = onEndReviewSession,
                     onDeleteMemory = onDeleteMemory,
+                    onSaveMemory = onSaveMemory,
+                    onSendMessage = { message -> onSendReviewMessage(message, false) },
                     onOpenConfig = { showConfigDialog = true },
+                    onNavigateToSession = onLoadSession,
                     modifier = Modifier.weight(1f),
                 )
 
                 // Review chat input
                 var includeContext by remember { mutableStateOf(false) }
-                val hasCurrentSuggestion = currentSuggestionId != null
+                // Only show checkbox when viewing the active session AND there's a suggestion
+                val showCheckbox = isViewingActiveSession && currentSuggestionId != null
 
                 ChatInputArea(
                     placeholder = "Ask the AI... (Shift+Enter for new line)",
@@ -152,7 +161,7 @@ fun SidebarPanel(
                     llmProvider = llmProvider,
                     colors = colors,
                     onSubmit = { message -> onSendReviewMessage(message, includeContext) },
-                    checkbox = if (hasCurrentSuggestion) {
+                    checkbox = if (showCheckbox) {
                         {
                             Checkbox(
                                 checked = includeContext,

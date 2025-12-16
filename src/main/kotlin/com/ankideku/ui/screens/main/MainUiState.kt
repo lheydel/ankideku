@@ -190,6 +190,7 @@ data class BatchProgress(
 
 data class ReviewSessionState(
     val isActive: Boolean = false,
+    val activeSessionId: Long? = null,  // The batch session ID this review chat is connected to
     val messages: List<ReviewChatMessage> = emptyList(),
     val pendingSuggestions: List<ReviewSuggestionUi> = emptyList(),
     val memory: Map<String, String> = emptyMap(),

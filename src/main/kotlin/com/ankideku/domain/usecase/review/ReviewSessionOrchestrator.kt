@@ -381,6 +381,14 @@ class ReviewSessionOrchestrator(
     }
 
     /**
+     * Save/update a memory entry.
+     */
+    suspend fun saveMemory(key: String, value: String) {
+        val reviewSessionId = activeReviewSessionId ?: return
+        onIO { reviewSessionRepository.saveMemory(reviewSessionId, key, value) }
+    }
+
+    /**
      * Get current context config.
      */
     suspend fun getContextConfig(): ReviewContextConfig? {

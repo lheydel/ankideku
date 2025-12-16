@@ -1,4 +1,4 @@
-package com.ankideku.ui.components.dialogs
+package com.ankideku.ui.components.sidebar.review
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

@@ -22,6 +22,7 @@ interface ReviewChatActions {
     fun dismissReviewSuggestion(reviewSuggestionId: Long)
     fun resetConversation()
     fun deleteMemory(key: String)
+    fun saveMemory(key: String, value: String)
     fun updateReviewConfig(config: ReviewContextConfig)
 }
 
@@ -47,13 +48,13 @@ class ReviewChatActionsImpl(
                 when (val result = orchestrator.startReviewSession(session.id)) {
                     is ReviewSessionResult.Started -> {
                         val config = orchestrator.getContextConfig()
-                        updateReviewState { copy(isActive = true, isLoading = false, contextConfig = config) }
+                        updateReviewState { copy(isActive = true, activeSessionId = session.id, isLoading = false, contextConfig = config) }
                         observeMessages(result.reviewSessionId)
                         observeMemory(result.reviewSessionId)
                     }
                     is ReviewSessionResult.Resumed -> {
                         val config = orchestrator.getContextConfig()
-                        updateReviewState { copy(isActive = true, isLoading = false, contextConfig = config) }
+                        updateReviewState { copy(isActive = true, activeSessionId = session.id, isLoading = false, contextConfig = config) }
                         observeMessages(result.reviewSessionId)
                         observeMemory(result.reviewSessionId)
                     }
@@ -167,6 +168,16 @@ class ReviewChatActionsImpl(
             val memory = orchestrator.getMemory()
             updateReviewState { copy(memory = memory) }
             ctx.showToast("Instruction deleted", ToastType.Info)
+        }
+    }
+
+    override fun saveMemory(key: String, value: String) {
+        ctx.scope.launch {
+            orchestrator.saveMemory(key, value)
+            // Refresh memory display
+            val memory = orchestrator.getMemory()
+            updateReviewState { copy(memory = memory) }
+            ctx.showToast("Instruction saved", ToastType.Success)
         }
     }
 

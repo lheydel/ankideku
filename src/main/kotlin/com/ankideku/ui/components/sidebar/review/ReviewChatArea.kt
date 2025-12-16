@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,43 +34,71 @@ import com.ankideku.ui.theme.handPointer
 @Composable
 fun ReviewChatArea(
     state: ReviewSessionState,
+    currentViewedSessionId: Long?,
     colors: AppColorScheme,
     onApplySuggestion: (Long) -> Unit,
     onDismissSuggestion: (Long) -> Unit,
     onResetConversation: () -> Unit,
     onEndSession: () -> Unit,
     onDeleteMemory: (String) -> Unit,
+    onSaveMemory: (String, String) -> Unit,
+    onSendMessage: (String) -> Unit,
     onOpenConfig: () -> Unit,
+    onNavigateToSession: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var isMemoryExpanded by remember { mutableStateOf(false) }
+    var isMemoryDialogOpen by remember { mutableStateOf(false) }
+    var memoryWasModified by remember { mutableStateOf(false) }
+    val isViewingDifferentSession = state.activeSessionId != null &&
+        currentViewedSessionId != null &&
+        state.activeSessionId != currentViewedSessionId
+
+    // Memory dialog
+    if (isMemoryDialogOpen) {
+        MemoryDialog(
+            memory = state.memory,
+            colors = colors,
+            onDeleteMemory = { key ->
+                onDeleteMemory(key)
+                memoryWasModified = true
+            },
+            onSaveMemory = { key, value ->
+                onSaveMemory(key, value)
+                memoryWasModified = true
+            },
+            onDismiss = {
+                isMemoryDialogOpen = false
+                if (memoryWasModified) {
+                    onSendMessage("[Memory updated] I've updated my stored instructions. Please acknowledge this update.")
+                    memoryWasModified = false
+                }
+            },
+        )
+    }
 
     Column(modifier = modifier) {
         // Header with actions
         ReviewChatHeader(
+            activeSessionId = state.activeSessionId,
             memoryCount = state.memory.size,
             colors = colors,
             onResetConversation = onResetConversation,
             onEndSession = onEndSession,
             onOpenConfig = onOpenConfig,
-            onToggleMemory = { isMemoryExpanded = !isMemoryExpanded },
-            isMemoryExpanded = isMemoryExpanded,
+            onOpenMemory = { isMemoryDialogOpen = true },
+            onNavigateToSession = onNavigateToSession,
         )
 
-        // Expandable memory viewer
-        AnimatedVisibility(
-            visible = isMemoryExpanded && state.memory.isNotEmpty(),
-            enter = expandVertically(),
-            exit = shrinkVertically(),
-        ) {
-            MemoryViewer(
-                memory = state.memory,
+        HorizontalDivider(color = colors.borderMuted, thickness = 1.dp)
+
+        // Warning banner when viewing a different session
+        if (isViewingDifferentSession) {
+            SessionMismatchBanner(
+                activeSessionId = state.activeSessionId,
                 colors = colors,
-                onDeleteMemory = onDeleteMemory,
+                onNavigateToSession = onNavigateToSession,
             )
         }
-
-        HorizontalDivider(color = colors.borderMuted, thickness = 1.dp)
 
         // Messages area
         ReviewMessagesArea(
@@ -101,13 +131,14 @@ fun ReviewChatArea(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReviewChatHeader(
+    activeSessionId: Long?,
     memoryCount: Int,
     colors: AppColorScheme,
     onResetConversation: () -> Unit,
     onEndSession: () -> Unit,
     onOpenConfig: () -> Unit,
-    onToggleMemory: () -> Unit,
-    isMemoryExpanded: Boolean,
+    onOpenMemory: () -> Unit,
+    onNavigateToSession: (Long) -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -122,57 +153,75 @@ private fun ReviewChatHeader(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
                 Text(
                     text = "Review Chat",
                     style = MaterialTheme.typography.titleSmall,
                     color = colors.textPrimary,
                 )
-                // Memory badge (clickable to expand)
-                if (memoryCount > 0) {
+                // Session indicator (clickable to navigate)
+                if (activeSessionId != null) {
+                    Text(
+                        text = "·",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = colors.textMuted,
+                    )
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         tooltip = {
                             PlainTooltip(containerColor = colors.surfaceAlt) {
-                                Text(
-                                    text = if (isMemoryExpanded) "Hide stored instructions" else "View stored instructions",
-                                    color = colors.textPrimary,
-                                )
+                                Text("Go to session #$activeSessionId", color = colors.textPrimary)
                             }
                         },
                         state = rememberTooltipState(),
                     ) {
-                        Surface(
-                            color = if (isMemoryExpanded) colors.accent else colors.accentMuted,
-                            shape = MaterialTheme.shapes.small,
+                        Text(
+                            text = "#$activeSessionId",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = colors.accent,
                             modifier = Modifier
                                 .handPointer()
-                                .clickable(onClick = onToggleMemory),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = Spacing.xs, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Memory,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = if (isMemoryExpanded) colors.surface else colors.accent,
-                                )
-                                Spacer(Modifier.width(2.dp))
-                                Text(
-                                    text = "$memoryCount",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isMemoryExpanded) colors.surface else colors.accent,
-                                )
-                                Icon(
-                                    imageVector = if (isMemoryExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = if (isMemoryExpanded) colors.surface else colors.accent,
-                                )
+                                .clickable { onNavigateToSession(activeSessionId) },
+                        )
+                    }
+                }
+                Spacer(Modifier.width(Spacing.xs))
+                // Memory button with brain icon
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = {
+                        PlainTooltip(containerColor = colors.surfaceAlt) {
+                            Text(
+                                text = if (memoryCount > 0) "View stored instructions ($memoryCount)" else "No stored instructions",
+                                color = colors.textPrimary,
+                            )
+                        }
+                    },
+                    state = rememberTooltipState(),
+                ) {
+                    BadgedBox(
+                        badge = {
+                            if (memoryCount > 0) {
+                                Badge(
+                                    containerColor = colors.accent,
+                                    contentColor = colors.surface,
+                                ) {
+                                    Text("$memoryCount")
+                                }
                             }
+                        },
+                    ) {
+                        AppIconButton(
+                            onClick = onOpenMemory,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Psychology,
+                                contentDescription = "Memory",
+                                tint = colors.accent,
+                                modifier = Modifier.size(20.dp),
+                            )
                         }
                     }
                 }
@@ -359,127 +408,48 @@ private fun ReviewMessagesArea(
     }
 }
 
-/**
- * Expandable panel showing stored AI instructions (memory).
- */
 @Composable
-private fun MemoryViewer(
-    memory: Map<String, String>,
+private fun SessionMismatchBanner(
+    activeSessionId: Long,
     colors: AppColorScheme,
-    onDeleteMemory: (String) -> Unit,
+    onNavigateToSession: (Long) -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = colors.surfaceAlt,
+        color = colors.warningMuted,
     ) {
-        Column(
-            modifier = Modifier.padding(Spacing.sm),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.sm),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "Stored Instructions",
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.textMuted,
-                modifier = Modifier.padding(bottom = Spacing.xs),
-            )
-            memory.entries.forEach { (key, value) ->
-                MemoryEntry(
-                    key = key,
-                    value = value,
-                    colors = colors,
-                    onDelete = { onDeleteMemory(key) },
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MemoryEntry(
-    key: String,
-    value: String,
-    colors: AppColorScheme,
-    onDelete: () -> Unit,
-) {
-    var isExpanded by remember { mutableStateOf(false) }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        color = colors.surface,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Column(modifier = Modifier.padding(Spacing.sm)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .handPointer()
-                        .clickable { isExpanded = !isExpanded },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
-                        modifier = Modifier.size(16.dp),
-                        tint = colors.textMuted,
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(
-                        text = key,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colors.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    tooltip = {
-                        PlainTooltip(containerColor = colors.surfaceAlt) {
-                            Text("Delete instruction", color = colors.textPrimary)
-                        }
-                    },
-                    state = rememberTooltipState(),
-                ) {
-                    AppIconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(24.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete instruction",
-                            modifier = Modifier.size(14.dp),
-                            tint = colors.textMuted,
-                        )
-                    }
-                }
-            }
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically(),
-                exit = shrinkVertically(),
-            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = colors.warning,
+                )
                 Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary,
-                    modifier = Modifier.padding(top = Spacing.xs, start = Spacing.md + Spacing.xs),
+                    text = "Viewing different session",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.warning,
                 )
             }
-            if (!isExpanded) {
+            AppButton(
+                onClick = { onNavigateToSession(activeSessionId) },
+                variant = AppButtonVariant.Text,
+                contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = Spacing.xs),
+            ) {
                 Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = Spacing.md + Spacing.xs),
+                    text = "Go to active",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.accent,
                 )
             }
         }
